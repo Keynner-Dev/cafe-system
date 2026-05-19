@@ -22,6 +22,12 @@ INSTALLED_APPS = [
     # Librerías externas
     'rest_framework',
     'corsheaders',
+    # Apps del proyecto
+    'terceros',
+    'inventario',
+    'compras',
+    'ventas',
+    'precios',
 ]
 
 MIDDLEWARE = [
