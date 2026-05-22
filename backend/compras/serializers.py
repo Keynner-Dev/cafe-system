@@ -33,6 +33,9 @@ class DetalleCompraSerializer(serializers.ModelSerializer):
     class Meta:
         model = DetalleCompra
         fields = '__all__'
+        extra_kwargs = {
+            'compra': {'required': False}
+        }
 
 
 class CompraSerializer(serializers.ModelSerializer):
