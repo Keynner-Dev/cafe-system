@@ -1,6 +1,8 @@
 from django.db import models
+from decimal import Decimal
 from terceros.models import Tercero
 from inventario.models import TipoCafe, Bodega
+
 
 class Venta(models.Model):
     cliente = models.ForeignKey(Tercero, on_delete=models.PROTECT)
@@ -10,7 +12,10 @@ class Venta(models.Model):
 
     @property
     def total(self):
-        return sum(d.subtotal for d in self.detalles.all())
+        return sum(
+            (d.subtotal for d in self.detalles.all()),
+            Decimal('0')
+        )
 
     def __str__(self):
         return f"Venta #{self.id} - {self.cliente} - {self.fecha}"
