@@ -1,6 +1,8 @@
 from django.db import models
+from decimal import Decimal
 from terceros.models import Tercero
 from inventario.models import TipoCafe, Bodega
+
 
 class Compra(models.Model):
     proveedor = models.ForeignKey(Tercero, on_delete=models.PROTECT)
@@ -10,18 +12,22 @@ class Compra(models.Model):
 
     @property
     def total(self):
-        # Solo suma los detalles ya liquidados o no depósito
-        return sum(
-            d.subtotal for d in self.detalles.all()
-            if not d.es_deposito or d.liquidado
-        )
+        total = Decimal('0')
+        for d in self.detalles.all():
+            if not d.es_deposito:
+                total += d.kilos * (d.precio_kilo or Decimal('0'))
+            else:
+                for l in d.liquidaciones.all():
+                    total += l.kilos * (l.precio_kilo or Decimal('0'))
+        return total
 
     @property
     def total_deposito_pendiente(self):
-        return sum(
-            d.kilos_pendientes_liquidar * (d.precio_kilo or 0)
-            for d in self.detalles.filter(es_deposito=True, liquidado=False)
-        )
+        total = Decimal('0')
+        for d in self.detalles.filter(es_deposito=True, liquidado=False):
+            if d.liquidaciones.exists():
+                total += d.kilos_pendientes_liquidar * d.liquidaciones.last().precio_kilo
+        return total
 
     def __str__(self):
         return f"Compra #{self.id} - {self.proveedor} - {self.fecha}"
@@ -39,14 +45,17 @@ class DetalleCompra(models.Model):
     kilos = models.DecimalField(max_digits=10, decimal_places=2)
     precio_kilo = models.DecimalField(
         max_digits=10, decimal_places=2,
-        null=True, blank=True  # puede ser null si es depósito sin precio aún
+        null=True, blank=True
     )
     es_deposito = models.BooleanField(default=False)
-    liquidado = models.BooleanField(default=False)  # True cuando todos los kilos están liquidados
+    liquidado = models.BooleanField(default=False)
 
     @property
     def kilos_liquidados(self):
-        return sum(l.kilos for l in self.liquidaciones.all())
+        return sum(
+            (l.kilos for l in self.liquidaciones.all()),
+            Decimal('0')
+        )
 
     @property
     def kilos_pendientes_liquidar(self):
@@ -54,9 +63,7 @@ class DetalleCompra(models.Model):
 
     @property
     def subtotal(self):
-        if self.precio_kilo:
-            return self.kilos * self.precio_kilo
-        return 0
+        return self.kilos * (self.precio_kilo or Decimal('0'))
 
     def __str__(self):
         estado = ' [DEPÓSITO]' if self.es_deposito else ''
@@ -80,25 +87,13 @@ class LiquidacionDeposito(models.Model):
     creado_en = models.DateTimeField(auto_now_add=True)
 
     @property
-    def total(self):
-        total = 0
-        for d in self.detalles.all():
-            if not d.es_deposito:
-                # Compra normal: kilos × precio
-                total += d.subtotal
-            else:
-                # Depósito: suma lo que ya se liquidó
-                total += sum(l.subtotal for l in d.liquidaciones.all())
-        return total
+    def subtotal(self):
+        return self.kilos * self.precio_kilo
 
-    @property
-    def total_deposito_pendiente(self):
-        total = 0
-        for d in self.detalles.filter(es_deposito=True, liquidado=False):
-            total += d.kilos_pendientes_liquidar * (
-                # Usa el precio de la última liquidación como referencia
-                d.liquidaciones.last().precio_kilo
-                if d.liquidaciones.exists()
-                else 0
-            )
-        return total
+    def __str__(self):
+        return f"Liquidación #{self.id} - {self.kilos}kg @ ${self.precio_kilo}"
+
+    class Meta:
+        verbose_name = 'Liquidación de Depósito'
+        verbose_name_plural = 'Liquidaciones de Depósito'
+        ordering = ['-fecha']
