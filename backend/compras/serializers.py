@@ -43,10 +43,23 @@ class CompraSerializer(serializers.ModelSerializer):
     total = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     total_deposito_pendiente = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     proveedor_nombre = serializers.CharField(source='proveedor.nombre', read_only=True)
+    # Campo nuevo: kilos totales pendientes de liquidar
+    kilos_deposito_pendiente = serializers.SerializerMethodField()
+    tiene_deposito_pendiente = serializers.SerializerMethodField()
 
     class Meta:
         model = Compra
         fields = '__all__'
+
+    def get_kilos_deposito_pendiente(self, obj):
+        total_kilos = sum(
+            d.kilos_pendientes_liquidar
+            for d in obj.detalles.filter(es_deposito=True, liquidado=False)
+        )
+        return total_kilos
+
+    def get_tiene_deposito_pendiente(self, obj):
+        return obj.detalles.filter(es_deposito=True, liquidado=False).exists()
 
     @transaction.atomic
     def create(self, validated_data):
@@ -55,9 +68,6 @@ class CompraSerializer(serializers.ModelSerializer):
 
         for detalle_data in detalles_data:
             detalle = DetalleCompra.objects.create(compra=compra, **detalle_data)
-
-            # El café siempre entra físicamente a la bodega
-            # sin importar si es depósito o no
             MovimientoInventario.objects.create(
                 tipo='entrada',
                 tipo_cafe=detalle.tipo_cafe,

@@ -1,53 +1,58 @@
-import { useEffect, useState } from 'react'
-import { getCompras, deleteCompra } from '../../api/compras'
-import CompraModal from '../../components/compras/CompraModal'
-import LiquidacionModal from '../../components/compras/LiquidacionModal'
-import CompraDetalle from '../../components/compras/CompraDetalle'
+import { useEffect, useState } from "react";
+import { getCompras, deleteCompra } from "../../api/compras";
+import CompraModal from "../../components/compras/CompraModal";
+import LiquidacionModal from "../../components/compras/LiquidacionModal";
+import CompraDetalle from "../../components/compras/CompraDetalle";
 
 export default function ComprasPage() {
-  const [compras, setCompras] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [liquidacionOpen, setLiquidacionOpen] = useState(false)
-  const [detalleOpen, setDetalleOpen] = useState(false)
-  const [compraSeleccionada, setCompraSeleccionada] = useState(null)
-  const [detalleSeleccionado, setDetalleSeleccionado] = useState(null)
+  const [compras, setCompras] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [liquidacionOpen, setLiquidacionOpen] = useState(false);
+  const [detalleOpen, setDetalleOpen] = useState(false);
+  const [compraSeleccionada, setCompraSeleccionada] = useState(null);
+  const [detalleSeleccionado, setDetalleSeleccionado] = useState(null);
 
   const cargarCompras = () => {
-    setLoading(true)
+    setLoading(true);
     getCompras()
-      .then(res => setCompras(res.data))
-      .finally(() => setLoading(false))
-  }
+      .then((res) => setCompras(res.data))
+      .finally(() => setLoading(false));
+  };
 
-  useEffect(() => { cargarCompras() }, [])
+  useEffect(() => {
+    cargarCompras();
+  }, []);
 
   const handleNuevo = () => {
-    setCompraSeleccionada(null)
-    setModalOpen(true)
-  }
+    setCompraSeleccionada(null);
+    setModalOpen(true);
+  };
 
   const handleVerDetalle = (compra) => {
-    setCompraSeleccionada(compra)
-    setDetalleOpen(true)
-  }
+    setCompraSeleccionada(compra);
+    setDetalleOpen(true);
+  };
 
   const handleLiquidar = (detalle) => {
-    setDetalleSeleccionado(detalle)
-    setLiquidacionOpen(true)
-  }
+    setDetalleSeleccionado(detalle);
+    setLiquidacionOpen(true);
+  };
 
   const handleEliminar = async (id) => {
-    if (!confirm('¿Eliminar esta compra? También se eliminarán sus movimientos.')) return
+    if (
+      !confirm("¿Eliminar esta compra? También se eliminarán sus movimientos.")
+    )
+      return;
     try {
-      await deleteCompra(id)
-      cargarCompras()
+      await deleteCompra(id);
+      cargarCompras();
     } catch {
-      alert('No se pudo eliminar.')
+      alert("No se pudo eliminar.");
     }
-  }
+  };
 
-  const formatCOP = (val) => `$${Number(val || 0).toLocaleString('es-CO')}`
+  const formatCOP = (val) => `$${Number(val || 0).toLocaleString("es-CO")}`;
 
   return (
     <div>
@@ -55,7 +60,9 @@ export default function ComprasPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-3xl font-bold text-gray-800">Compras</h2>
-          <p className="text-gray-500 text-sm mt-1">Registro de compras de café</p>
+          <p className="text-gray-500 text-sm mt-1">
+            Registro de compras de café
+          </p>
         </div>
         <button
           onClick={handleNuevo}
@@ -84,12 +91,15 @@ export default function ComprasPage() {
             <tbody>
               {compras.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-400">
+                  <td
+                    colSpan={6}
+                    className="px-6 py-8 text-center text-gray-400"
+                  >
                     No hay compras registradas
                   </td>
                 </tr>
               ) : (
-                compras.map(c => (
+                compras.map((c) => (
                   <tr key={c.id} className="border-t hover:bg-gray-50">
                     <td className="px-6 py-3 text-gray-400">{c.id}</td>
                     <td className="px-6 py-3 font-medium">{c.fecha}</td>
@@ -98,13 +108,16 @@ export default function ComprasPage() {
                       {formatCOP(c.total)}
                     </td>
                     <td className="px-6 py-3">
-                      {Number(c.total_deposito_pendiente) > 0 ? (
+                      {c.tiene_deposito_pendiente ? (
                         <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold">
-                          {formatCOP(c.total_deposito_pendiente)} pendiente
+                          {Number(c.kilos_deposito_pendiente).toLocaleString(
+                            "es-CO",
+                          )}{" "}
+                          kg pendientes
                         </span>
                       ) : (
                         <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
-                          Al día
+                          Al día ✓
                         </span>
                       )}
                     </td>
@@ -155,12 +168,12 @@ export default function ComprasPage() {
         <LiquidacionModal
           detalle={detalleSeleccionado}
           onClose={() => {
-            setLiquidacionOpen(false)
-            setDetalleOpen(false)
+            setLiquidacionOpen(false);
+            setDetalleOpen(false);
           }}
           onSaved={cargarCompras}
         />
       )}
     </div>
-  )
+  );
 }

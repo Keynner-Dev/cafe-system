@@ -80,13 +80,25 @@ class LiquidacionDeposito(models.Model):
     creado_en = models.DateTimeField(auto_now_add=True)
 
     @property
-    def subtotal(self):
-        return self.kilos * self.precio_kilo
+    def total(self):
+        total = 0
+        for d in self.detalles.all():
+            if not d.es_deposito:
+                # Compra normal: kilos × precio
+                total += d.subtotal
+            else:
+                # Depósito: suma lo que ya se liquidó
+                total += sum(l.subtotal for l in d.liquidaciones.all())
+        return total
 
-    def __str__(self):
-        return f"Liquidación #{self.id} - {self.kilos}kg @ ${self.precio_kilo}"
-
-    class Meta:
-        verbose_name = 'Liquidación de Depósito'
-        verbose_name_plural = 'Liquidaciones de Depósito'
-        ordering = ['-fecha']
+    @property
+    def total_deposito_pendiente(self):
+        total = 0
+        for d in self.detalles.filter(es_deposito=True, liquidado=False):
+            total += d.kilos_pendientes_liquidar * (
+                # Usa el precio de la última liquidación como referencia
+                d.liquidaciones.last().precio_kilo
+                if d.liquidaciones.exists()
+                else 0
+            )
+        return total
