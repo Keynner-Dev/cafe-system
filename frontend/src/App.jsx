@@ -6,6 +6,7 @@ import InventarioPage from './pages/inventario/InventarioPage'
 import ComprasPage from './pages/compras/ComprasPage'
 import VentasPage from './pages/ventas/VentasPage'
 import PreciosPage from './pages/precios/PreciosPage'
+import TrasladosPage from './pages/inventario/TrasladosPage'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="compras" element={<ComprasPage />} />
           <Route path="ventas" element={<VentasPage />} />
           <Route path="precios" element={<PreciosPage />} />
+          <Route path="traslados" element={<TrasladosPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

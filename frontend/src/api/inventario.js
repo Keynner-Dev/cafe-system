@@ -18,3 +18,5 @@ export const getStock = (params) => api.get('/inventario/movimientos/stock/', { 
 // Movimientos
 export const getMovimientos = () => api.get('/inventario/movimientos/')
 export const createMovimiento = (data) => api.post('/inventario/movimientos/', data)
+
+export const trasladar = (data) => api.post('/inventario/trasladar/', data)

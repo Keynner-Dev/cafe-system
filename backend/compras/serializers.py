@@ -4,7 +4,10 @@ from .models import Compra, DetalleCompra, LiquidacionDeposito
 from inventario.models import MovimientoInventario
 
 class LiquidacionDepositoSerializer(serializers.ModelSerializer):
-    subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    subtotal = serializers.SerializerMethodField()
+
+    def get_subtotal(self, obj):
+        return float(obj.subtotal or 0)
 
     class Meta:
         model = LiquidacionDeposito
@@ -23,11 +26,13 @@ class LiquidacionDepositoSerializer(serializers.ModelSerializer):
 
 
 class DetalleCompraSerializer(serializers.ModelSerializer):
-    subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    kilos_liquidados = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    kilos_pendientes_liquidar = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    subtotal = serializers.SerializerMethodField()
+    kilos_liquidados = serializers.SerializerMethodField()
+    kilos_pendientes_liquidar = serializers.SerializerMethodField()
+
     tipo_cafe_nombre = serializers.CharField(source='tipo_cafe.nombre', read_only=True)
     bodega_nombre = serializers.CharField(source='bodega.nombre', read_only=True)
+
     liquidaciones = LiquidacionDepositoSerializer(many=True, read_only=True)
 
     class Meta:
@@ -37,13 +42,21 @@ class DetalleCompraSerializer(serializers.ModelSerializer):
             'compra': {'required': False}
         }
 
+    def get_subtotal(self, obj):
+        return float(obj.subtotal or 0)
+
+    def get_kilos_liquidados(self, obj):
+        return float(obj.kilos_liquidados or 0)
+
+    def get_kilos_pendientes_liquidar(self, obj):
+        return float(obj.kilos_pendientes_liquidar or 0)
+
 
 class CompraSerializer(serializers.ModelSerializer):
     detalles = DetalleCompraSerializer(many=True)
-    total = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    total_deposito_pendiente = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     proveedor_nombre = serializers.CharField(source='proveedor.nombre', read_only=True)
-    # Campo nuevo: kilos totales pendientes de liquidar
+    total = serializers.SerializerMethodField()
+    total_deposito_pendiente = serializers.SerializerMethodField()
     kilos_deposito_pendiente = serializers.SerializerMethodField()
     tiene_deposito_pendiente = serializers.SerializerMethodField()
 
@@ -51,12 +64,27 @@ class CompraSerializer(serializers.ModelSerializer):
         model = Compra
         fields = '__all__'
 
+    def get_total(self, obj):
+        try:
+            return float(obj.total)
+        except Exception:
+            return 0.0
+
+    def get_total_deposito_pendiente(self, obj):
+        try:
+            return float(obj.total_deposito_pendiente)
+        except Exception:
+            return 0.0
+
     def get_kilos_deposito_pendiente(self, obj):
-        total_kilos = sum(
-            d.kilos_pendientes_liquidar
-            for d in obj.detalles.filter(es_deposito=True, liquidado=False)
-        )
-        return total_kilos
+        try:
+            total = sum(
+                d.kilos_pendientes_liquidar
+                for d in obj.detalles.filter(es_deposito=True, liquidado=False)
+            )
+            return float(total)
+        except Exception:
+            return 0.0
 
     def get_tiene_deposito_pendiente(self, obj):
         return obj.detalles.filter(es_deposito=True, liquidado=False).exists()

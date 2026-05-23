@@ -7,6 +7,7 @@ const links = [
   { to: '/compras', label: '🛒 Compras' },
   { to: '/ventas', label: '💰 Ventas' },
   { to: '/precios', label: '☕ Precios' },
+  { to: '/traslados', label: '🚛 Traslados' },
 ]
 
 export default function Sidebar() {

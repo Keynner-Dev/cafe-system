@@ -1,9 +1,12 @@
 from rest_framework.routers import DefaultRouter
-from .views import TipoCafeViewSet, BodegaViewSet, MovimientoInventarioViewSet
+from django.urls import path
+from .views import TipoCafeViewSet, BodegaViewSet, MovimientoInventarioViewSet, trasladar
 
 router = DefaultRouter()
 router.register(r'tipos-cafe', TipoCafeViewSet)
 router.register(r'bodegas', BodegaViewSet)
 router.register(r'movimientos', MovimientoInventarioViewSet)
 
-urlpatterns = router.urls
+urlpatterns = router.urls + [
+    path('trasladar/', trasladar),
+]

@@ -8,7 +8,7 @@ const formatKg = (val) => `${Number(val || 0).toLocaleString('es-CO')} kg`
 function CardMetrica({ icono, label, valor, sub, color }) {
   return (
     <div className="bg-white rounded-xl shadow p-5 flex items-center gap-4">
-      <div className={`${color} w-12 h-12 rounded-full flex items-center justify-center text-white text-xl flex-shrink-0`}>
+      <div className={`${color} w-12 h-12 rounded-full flex items-center justify-center text-white text-xl shrink-0`}>
         {icono}
       </div>
       <div>
