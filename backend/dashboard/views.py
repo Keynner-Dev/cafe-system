@@ -62,15 +62,18 @@ def dashboard_data(request):
                 'stock': stock
             })
 
-    # ── Depósitos pendientes ──
+   # ── Depósitos pendientes ──
     from compras.models import DetalleCompra
     depositos_pendientes = DetalleCompra.objects.filter(
         es_deposito=True,
         liquidado=False
     )
-    total_kilos_deposito = depositos_pendientes.aggregate(
-        total=Sum('kilos')
-    )['total'] or Decimal('0')
+
+    total_kilos_deposito = sum(
+        d.kilos_pendientes_liquidar
+        for d in depositos_pendientes
+    ) or Decimal('0')
+
     cantidad_depositos = depositos_pendientes.count()
 
     # ── Últimas 5 compras ──

@@ -7,7 +7,6 @@ from django.db.models import Sum
 
 
 def get_stock_disponible(tipo_cafe_id, bodega_id):
-    """Calcula el stock actual de un tipo de café en una bodega"""
     movimientos = MovimientoInventario.objects.filter(
         tipo_cafe_id=tipo_cafe_id,
         bodega_id=bodega_id
@@ -24,7 +23,6 @@ def get_stock_disponible(tipo_cafe_id, bodega_id):
 
 
 class DetalleVentaSerializer(serializers.ModelSerializer):
-    subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     tipo_cafe_nombre = serializers.CharField(source='tipo_cafe.nombre', read_only=True)
     bodega_nombre = serializers.CharField(source='bodega.nombre', read_only=True)
 
@@ -38,15 +36,28 @@ class DetalleVentaSerializer(serializers.ModelSerializer):
 
 class VentaSerializer(serializers.ModelSerializer):
     detalles = DetalleVentaSerializer(many=True)
-    total = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     cliente_nombre = serializers.CharField(source='cliente.nombre', read_only=True)
+    numero_remision = serializers.CharField(read_only=True)
+    total_kilos = serializers.SerializerMethodField()
+    total_bultos = serializers.SerializerMethodField()
 
     class Meta:
         model = Venta
         fields = '__all__'
 
+    def get_total_kilos(self, obj):
+        try:
+            return float(obj.total_kilos)
+        except Exception:
+            return 0.0
+
+    def get_total_bultos(self, obj):
+        try:
+            return int(obj.total_bultos)
+        except Exception:
+            return 0
+
     def validate(self, data):
-        """Valida que haya stock suficiente para cada detalle"""
         detalles = data.get('detalles', [])
         errores = []
 
@@ -80,9 +91,8 @@ class VentaSerializer(serializers.ModelSerializer):
                 tipo_cafe=detalle.tipo_cafe,
                 bodega=detalle.bodega,
                 kilos=detalle.kilos,
-                precio_kilo=detalle.precio_kilo,
                 referencia=f'venta-{venta.id}',
-                nota=f'Salida por venta #{venta.id}'
+                nota=f'Salida por remisión {venta.numero_remision}'
             )
 
         return venta
