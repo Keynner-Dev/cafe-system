@@ -1,6 +1,26 @@
 import { useState } from 'react'
 import { createLiquidacion } from '../../api/compras'
 
+// ─── Iconos SVG inline ────────────────────────────────────────────────────────
+const IconX = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+)
+
+// ─── Estilos reutilizables ────────────────────────────────────────────────────
+const inputStyle = {
+  width: '100%', boxSizing: 'border-box',
+  border: '1px solid #e2e8f0', borderRadius: '6px',
+  padding: '8px 12px', fontSize: '13px', color: '#0f172a',
+  outline: 'none', background: 'white',
+}
+const labelStyle = {
+  display: 'block', fontSize: '12px', fontWeight: 500,
+  color: '#475569', marginBottom: '5px',
+}
+
 const hoy = new Date().toISOString().split('T')[0]
 
 export default function LiquidacionModal({ detalle, onClose, onSaved }) {
@@ -12,7 +32,7 @@ export default function LiquidacionModal({ detalle, onClose, onSaved }) {
     nota: '',
   })
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError]     = useState(null)
 
   const handleChange = (e) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
@@ -20,15 +40,12 @@ export default function LiquidacionModal({ detalle, onClose, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setLoading(true)
-    setError(null)
-
     if (Number(form.kilos) > Number(detalle.kilos_pendientes_liquidar)) {
       setError(`No puedes liquidar más de ${detalle.kilos_pendientes_liquidar} kg disponibles.`)
-      setLoading(false)
       return
     }
-
+    setLoading(true)
+    setError(null)
     try {
       await createLiquidacion(form)
       onSaved()
@@ -40,114 +57,218 @@ export default function LiquidacionModal({ detalle, onClose, onSaved }) {
     }
   }
 
-  const subtotal = Number(form.kilos) * Number(form.precio_kilo) || 0
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) onClose()
+  }
+
+  const subtotal  = Number(form.kilos) * Number(form.precio_kilo) || 0
+  const focusGold = (e) => e.target.style.borderColor = '#ca8a04'
+  const blurGray  = (e) => e.target.style.borderColor = '#e2e8f0'
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold text-gray-800">Liquidar Depósito</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+    <div
+      onClick={handleBackdropClick}
+      style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(15, 23, 42, 0.5)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 60, padding: '16px',
+      }}
+    >
+      <div style={{
+        background: 'white', borderRadius: '12px',
+        width: '100%', maxWidth: '460px',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+        overflow: 'hidden',
+      }}>
+
+        {/* ── Cabecera ── */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '18px 20px', borderBottom: '1px solid #f1f5f9',
+        }}>
+          <div>
+            <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
+              Liquidar depósito
+            </h2>
+            <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '2px' }}>
+              Registra el precio y los kilos a liquidar
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '30px', height: '30px', borderRadius: '6px',
+              border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f172a' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8' }}
+          >
+            <IconX />
+          </button>
         </div>
 
-        {/* Info del depósito */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-          <p className="text-sm font-semibold text-yellow-800">{detalle.tipo_cafe_nombre}</p>
-          <p className="text-xs text-yellow-600">{detalle.bodega_nombre}</p>
-          <p className="text-sm text-yellow-700 mt-1">
-            Disponible para liquidar: <strong>{detalle.kilos_pendientes_liquidar} kg</strong>
-          </p>
-        </div>
+        {/* ── Cuerpo ── */}
+        <form onSubmit={handleSubmit}>
+          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>
-        )}
+            {/* Info del depósito */}
+            <div style={{
+              background: '#fffbeb', border: '1px solid #fde68a',
+              borderRadius: '8px', padding: '12px 14px',
+            }}>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: '#92400e', margin: '0 0 2px' }}>
+                {detalle.tipo_cafe_nombre}
+              </p>
+              <p style={{ fontSize: '11px', color: '#ca8a04', margin: '0 0 6px' }}>
+                {detalle.bodega_nombre}
+              </p>
+              <p style={{ fontSize: '12px', color: '#78350f', margin: 0 }}>
+                Disponible para liquidar:{' '}
+                <strong>{detalle.kilos_pendientes_liquidar} kg</strong>
+              </p>
+            </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha *</label>
-            <input
-              type="date"
-              name="fecha"
-              value={form.fecha}
-              onChange={handleChange}
-              required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
+            {/* Error */}
+            {error && (
+              <div style={{
+                background: '#fef2f2', border: '1px solid #fecaca',
+                borderRadius: '6px', padding: '10px 12px',
+                color: '#dc2626', fontSize: '12px',
+              }}>
+                {error}
+              </div>
+            )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Kilos a liquidar * (máx: {detalle.kilos_pendientes_liquidar} kg)
-            </label>
-            <input
-              type="number"
-              name="kilos"
-              value={form.kilos}
-              onChange={handleChange}
-              required
-              min="0.01"
-              max={detalle.kilos_pendientes_liquidar}
-              step="0.01"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="0.00"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Precio por kilo *</label>
-            <div className="relative">
-              <span className="absolute left-3 top-2 text-gray-400 font-medium">$</span>
+            {/* Fecha */}
+            <div>
+              <label style={labelStyle}>Fecha *</label>
               <input
-                type="number"
-                name="precio_kilo"
-                value={form.precio_kilo}
+                type="date"
+                name="fecha"
+                value={form.fecha}
                 onChange={handleChange}
                 required
-                min="0"
-                step="0.01"
-                className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="0.00"
+                style={inputStyle}
+                onFocus={focusGold} onBlur={blurGray}
               />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nota</label>
-            <textarea
-              name="nota"
-              value={form.nota}
-              onChange={handleChange}
-              rows={2}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Observación opcional"
-            />
-          </div>
-
-          {subtotal > 0 && (
-            <div className="bg-green-50 rounded-lg p-3 flex justify-between">
-              <span className="text-sm font-medium text-gray-700">Total a pagar:</span>
-              <span className="font-bold text-green-700">${subtotal.toLocaleString('es-CO')}</span>
+            {/* Kilos */}
+            <div>
+              <label style={labelStyle}>
+                Kilos a liquidar * (máx: {detalle.kilos_pendientes_liquidar} kg)
+              </label>
+              <input
+                type="number"
+                name="kilos"
+                value={form.kilos}
+                onChange={handleChange}
+                required
+                min="0.01"
+                max={detalle.kilos_pendientes_liquidar}
+                step="0.01"
+                placeholder="0.00"
+                style={inputStyle}
+                onFocus={focusGold} onBlur={blurGray}
+              />
             </div>
-          )}
 
-          <div className="flex gap-3 pt-2">
+            {/* Precio por kilo */}
+            <div>
+              <label style={labelStyle}>Precio por kilo *</label>
+              <div style={{ position: 'relative' }}>
+                <span style={{
+                  position: 'absolute', left: '10px', top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#94a3b8', fontSize: '13px', pointerEvents: 'none',
+                }}>
+                  $
+                </span>
+                <input
+                  type="number"
+                  name="precio_kilo"
+                  value={form.precio_kilo}
+                  onChange={handleChange}
+                  required min="0" step="0.01"
+                  placeholder="0.00"
+                  style={{ ...inputStyle, paddingLeft: '22px' }}
+                  onFocus={focusGold} onBlur={blurGray}
+                />
+              </div>
+            </div>
+
+            {/* Nota */}
+            <div>
+              <label style={labelStyle}>Nota</label>
+              <textarea
+                name="nota"
+                value={form.nota}
+                onChange={handleChange}
+                rows={2}
+                placeholder="Observación opcional"
+                style={{ ...inputStyle, resize: 'vertical', minHeight: '60px' }}
+                onFocus={focusGold} onBlur={blurGray}
+              />
+            </div>
+
+            {/* Total preview */}
+            {subtotal > 0 && (
+              <div style={{
+                background: '#fffbeb', border: '1px solid #fde68a',
+                borderRadius: '8px', padding: '12px 14px',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: '#475569' }}>
+                  Total a pagar:
+                </span>
+                <span style={{ fontSize: '18px', fontWeight: 700, color: '#ca8a04' }}>
+                  ${subtotal.toLocaleString('es-CO')}
+                </span>
+              </div>
+            )}
+
+          </div>
+
+          {/* ── Pie ── */}
+          <div style={{
+            display: 'flex', gap: '10px',
+            padding: '16px 20px', borderTop: '1px solid #f1f5f9',
+          }}>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              style={{
+                flex: 1, padding: '9px',
+                border: '1px solid #e2e8f0', borderRadius: '6px',
+                background: 'white', color: '#475569',
+                fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+              onMouseLeave={e => e.currentTarget.style.background = 'white'}
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50"
+              style={{
+                flex: 1, padding: '9px',
+                border: 'none', borderRadius: '6px',
+                background: loading ? '#fde68a' : '#ca8a04', color: 'white',
+                fontSize: '13px', fontWeight: 500,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#a16207' }}
+              onMouseLeave={e => { if (!loading) e.currentTarget.style.background = '#ca8a04' }}
             >
-              {loading ? 'Guardando...' : 'Liquidar'}
+              {loading ? 'Guardando...' : 'Liquidar depósito'}
             </button>
           </div>
         </form>
+
       </div>
     </div>
   )

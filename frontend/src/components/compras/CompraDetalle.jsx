@@ -1,74 +1,134 @@
-import { formatCOP } from "../../utils/format";
+// ─── Iconos SVG inline ────────────────────────────────────────────────────────
+const IconX = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+)
 
 export default function CompraDetalle({ compra, onClose, onLiquidar }) {
+  const formatCOP = (val) => `$${Number(val || 0).toLocaleString('es-CO')}`
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) onClose()
+  }
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-screen overflow-y-auto p-6">
-        <div className="flex justify-between items-center mb-6">
+    <div
+      onClick={handleBackdropClick}
+      style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(15, 23, 42, 0.5)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 50, padding: '16px',
+      }}
+    >
+      <div style={{
+        background: 'white', borderRadius: '12px',
+        width: '100%', maxWidth: '640px',
+        maxHeight: '90vh', overflowY: 'auto',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+      }}>
+
+        {/* ── Cabecera ── */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '18px 20px', borderBottom: '1px solid #f1f5f9',
+          position: 'sticky', top: 0, background: 'white', zIndex: 1,
+        }}>
           <div>
-            <h3 className="text-xl font-bold text-gray-800">
+            <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
               Compra #{compra.id}
-            </h3>
-            <p className="text-gray-500 text-sm">
+            </h2>
+            <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '2px' }}>
               {compra.fecha} — {compra.proveedor_nombre}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '30px', height: '30px', borderRadius: '6px',
+              border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f172a' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8' }}
           >
-            &times;
+            <IconX />
           </button>
         </div>
 
-        <div className="space-y-3">
-          {compra.detalles.map((d) => (
+        {/* ── Cuerpo ── */}
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+          {compra.detalles.map(d => (
             <div
               key={d.id}
-              className={`border rounded-lg p-4 ${d.es_deposito ? "border-yellow-200 bg-yellow-50" : "border-gray-200 bg-gray-50"}`}
+              style={{
+                border: d.es_deposito ? '1px solid #fde68a' : '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '14px',
+                background: d.es_deposito ? '#fffbeb' : '#f8fafc',
+              }}
             >
-              <div className="flex justify-between items-start">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+
+                {/* Info izquierda */}
                 <div>
-                  <p className="font-semibold text-gray-800">
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
                     {d.tipo_cafe_nombre}
                   </p>
-                  <p className="text-sm text-gray-500">{d.bodega_nombre}</p>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                    {d.bodega_nombre}
+                  </p>
+                  <p style={{ fontSize: '12px', color: '#475569', marginTop: '6px' }}>
                     {d.kilos} kg
-                    {d.precio_kilo &&
-                      ` × $${Number(d.precio_kilo).toLocaleString("es-CO")}/kg`}
+                    {d.precio_kilo && ` × ${formatCOP(d.precio_kilo)}/kg`}
                   </p>
                 </div>
 
-                <div className="text-right">
+                {/* Info derecha */}
+                <div style={{ textAlign: 'right' }}>
                   {d.es_deposito ? (
-                    <div>
-                      <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold block mb-2">
+                    <>
+                      <span style={{
+                        background: '#fef9c3', color: '#ca8a04',
+                        fontSize: '11px', fontWeight: 600,
+                        padding: '2px 8px', borderRadius: '99px',
+                        display: 'inline-block', marginBottom: '6px',
+                      }}>
                         Depósito
                       </span>
-                      <p className="text-xs text-gray-500">
-                        Pendiente: {d.kilos_pendientes_liquidar} kg
+                      <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 6px' }}>
+                        Pendiente: <strong>{d.kilos_pendientes_liquidar} kg</strong>
                       </p>
-                      {Number(d.kilos_pendientes_liquidar) > 0 && (
+                      {Number(d.kilos_pendientes_liquidar) > 0 ? (
                         <button
                           onClick={() => onLiquidar(d)}
-                          className="mt-2 px-3 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                          style={{
+                            padding: '5px 12px', borderRadius: '5px', border: 'none',
+                            background: '#ca8a04', color: 'white',
+                            fontSize: '11px', fontWeight: 500, cursor: 'pointer',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#a16207'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#ca8a04'}
                         >
                           Liquidar
                         </button>
-                      )}
-                      {Number(d.kilos_pendientes_liquidar) <= 0 && (
-                        <span className="mt-2 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold block">
+                      ) : (
+                        <span style={{
+                          background: '#f0fdf4', color: '#16a34a',
+                          fontSize: '11px', fontWeight: 600,
+                          padding: '2px 8px', borderRadius: '99px',
+                          display: 'inline-block',
+                        }}>
                           Liquidado ✓
                         </span>
                       )}
-                    </div>
+                    </>
                   ) : (
-                    <span className="font-bold text-gray-800">
-                      $
-                      {(Number(d.kilos) * Number(d.precio_kilo)).toLocaleString(
-                        "es-CO",
-                      )}
+                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+                      {formatCOP(Number(d.kilos) * Number(d.precio_kilo))}
                     </span>
                   )}
                 </div>
@@ -76,58 +136,78 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
 
               {/* Liquidaciones previas */}
               {d.es_deposito && d.liquidaciones?.length > 0 && (
-                <div className="mt-3 border-t border-yellow-200 pt-3">
-                  <p className="text-xs font-semibold text-gray-500 mb-2">
-                    Liquidaciones:
+                <div style={{
+                  marginTop: '12px',
+                  paddingTop: '12px',
+                  borderTop: '1px solid #fde68a',
+                }}>
+                  <p style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '6px' }}>
+                    Liquidaciones registradas:
                   </p>
-                  {d.liquidaciones.map((l) => (
+                  {d.liquidaciones.map(l => (
                     <div
                       key={l.id}
-                      className="flex justify-between text-xs text-gray-600"
+                      style={{
+                        display: 'flex', justifyContent: 'space-between',
+                        fontSize: '11px', color: '#475569',
+                        padding: '3px 0',
+                      }}
                     >
-                      <span>
-                        {l.fecha} — {l.kilos} kg × $
-                        {Number(l.precio_kilo).toLocaleString("es-CO")}/kg
-                      </span>
-                      <span className="font-semibold">
-                        ${Number(l.subtotal).toLocaleString("es-CO")}
-                      </span>
+                      <span>{l.fecha} — {l.kilos} kg × {formatCOP(l.precio_kilo)}/kg</span>
+                      <span style={{ fontWeight: 600 }}>{formatCOP(l.subtotal)}</span>
                     </div>
                   ))}
                 </div>
               )}
             </div>
           ))}
-        </div>
 
-        {/* Totales */}
-        <div className="mt-6 bg-gray-50 rounded-lg p-4 space-y-2">
-          <div className="flex justify-between text-sm text-gray-600">
-            <span>Total pagado (normal + liquidaciones):</span>
-            <span className="font-bold text-gray-800">
-              ${Number(compra.total).toLocaleString("es-CO")}
-            </span>
-          </div>
-          {compra.tiene_deposito_pendiente && (
-            <div className="flex justify-between text-sm text-yellow-600">
-              <span>Kilos en depósito pendientes:</span>
-              <span className="font-semibold">
-                {Number(compra.kilos_deposito_pendiente).toLocaleString(
-                  "es-CO",
-                )}{" "}
-                kg
+          {/* ── Totales ── */}
+          <div style={{
+            background: '#f8fafc', border: '1px solid #e2e8f0',
+            borderRadius: '8px', padding: '14px 16px',
+            display: 'flex', flexDirection: 'column', gap: '8px',
+            marginTop: '4px',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: '#64748b' }}>
+                Total pagado (normal + liquidaciones):
+              </span>
+              <span style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+                {formatCOP(compra.total)}
               </span>
             </div>
-          )}
+            {compra.tiene_deposito_pendiente && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', color: '#ca8a04' }}>
+                  Kilos en depósito pendientes:
+                </span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#ca8a04' }}>
+                  {Number(compra.kilos_deposito_pendiente).toLocaleString('es-CO')} kg
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
-        <button
-          onClick={onClose}
-          className="mt-4 w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-        >
-          Cerrar
-        </button>
+        {/* ── Pie ── */}
+        <div style={{ padding: '16px 20px', borderTop: '1px solid #f1f5f9' }}>
+          <button
+            onClick={onClose}
+            style={{
+              width: '100%', padding: '9px',
+              border: '1px solid #e2e8f0', borderRadius: '6px',
+              background: 'white', color: '#475569',
+              fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+            onMouseLeave={e => e.currentTarget.style.background = 'white'}
+          >
+            Cerrar
+          </button>
+        </div>
+
       </div>
     </div>
-  );
+  )
 }
