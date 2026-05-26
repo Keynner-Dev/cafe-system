@@ -1,105 +1,179 @@
-import { useEffect, useState } from "react";
-import { getVentas, deleteVenta } from "../../api/ventas";
-import VentaModal from "../../components/ventas/VentaModal";
-import VentaDetalle from "../../components/ventas/VentaDetalle";
+import { useEffect, useState } from 'react'
+import { getVentas, deleteVenta } from '../../api/ventas'
+import VentaModal from '../../components/ventas/VentaModal'
+import VentaDetalle from '../../components/ventas/VentaDetalle'
 
+// ─── Iconos SVG inline ────────────────────────────────────────────────────────
+const IconPlus = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+)
+const IconEye = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+const IconTrash = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6" /><path d="M14 11v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+  </svg>
+)
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 export default function VentasPage() {
-  const [ventas, setVentas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [detalleOpen, setDetalleOpen] = useState(false);
-  const [ventaSeleccionada, setVentaSeleccionada] = useState(null);
+  const [ventas, setVentas]                       = useState([])
+  const [loading, setLoading]                     = useState(true)
+  const [modalOpen, setModalOpen]                 = useState(false)
+  const [detalleOpen, setDetalleOpen]             = useState(false)
+  const [ventaSeleccionada, setVentaSeleccionada] = useState(null)
 
   const cargarVentas = () => {
-    setLoading(true);
+    setLoading(true)
     getVentas()
-      .then((res) => setVentas(res.data))
-      .finally(() => setLoading(false));
-  };
+      .then(res => setVentas(res.data))
+      .finally(() => setLoading(false))
+  }
 
-  useEffect(() => { cargarVentas() }, []);
+  useEffect(() => { cargarVentas() }, [])
 
   const handleVerDetalle = (venta) => {
-    setVentaSeleccionada(venta);
-    setDetalleOpen(true);
-  };
+    setVentaSeleccionada(venta)
+    setDetalleOpen(true)
+  }
 
   const handleEliminar = async (id) => {
-    if (!confirm("¿Eliminar esta venta? También se eliminarán sus movimientos.")) return;
+    if (!confirm('¿Eliminar esta venta? También se eliminarán sus movimientos de inventario.')) return
     try {
-      await deleteVenta(id);
-      cargarVentas();
+      await deleteVenta(id)
+      cargarVentas()
     } catch {
-      alert("No se pudo eliminar.");
+      alert('No se pudo eliminar.')
     }
-  };
+  }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+      {/* ── Encabezado ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h2 className="text-3xl font-bold text-gray-800">Ventas</h2>
-          <p className="text-gray-500 text-sm mt-1">Registro de ventas de café</p>
+          <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
+            Ventas
+          </h1>
+          <p style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
+            Registro de remisiones de venta de café
+          </p>
         </div>
         <button
           onClick={() => setModalOpen(true)}
-          className="px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 font-medium"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            background: '#16a34a', color: 'white',
+            border: 'none', borderRadius: '6px',
+            padding: '8px 14px', fontSize: '13px', fontWeight: 500,
+            cursor: 'pointer',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#15803d'}
+          onMouseLeave={e => e.currentTarget.style.background = '#16a34a'}
         >
-          + Nueva Venta
+          <IconPlus /> Nueva remisión
         </button>
       </div>
 
+      {/* ── Tabla ── */}
       {loading ? (
-        <p className="text-gray-500">Cargando...</p>
+        <div style={{ color: '#94a3b8', fontSize: '13px', padding: '20px 0' }}>
+          Cargando ventas...
+        </div>
       ) : (
-        <div className="bg-white rounded-xl shadow overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-green-900 text-white">
-              <tr>
-                <th className="px-6 py-3 text-left">Remisión</th>
-                <th className="px-6 py-3 text-left">Fecha</th>
-                <th className="px-6 py-3 text-left">Cliente</th>
-                <th className="px-6 py-3 text-left">Kilos</th>
-                <th className="px-6 py-3 text-left">Bultos</th>
-                <th className="px-6 py-3 text-left">Flete</th>
-                <th className="px-6 py-3 text-left">Acciones</th>
+        <div style={{
+          background: 'white', border: '1px solid #e2e8f0',
+          borderRadius: '10px', overflow: 'hidden',
+        }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: '#0f172a' }}>
+                {['Remisión', 'Fecha', 'Cliente', 'Kilos', 'Bultos', 'Flete', 'Acciones'].map(col => (
+                  <th key={col} style={{
+                    padding: '11px 16px', textAlign: 'left',
+                    color: '#e2e8f0', fontWeight: 500, fontSize: '12px',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {col}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {ventas.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-400">
-                    No hay ventas registradas
+                  <td colSpan={7} style={{
+                    padding: '40px', textAlign: 'center',
+                    color: '#94a3b8', fontSize: '13px',
+                  }}>
+                    No hay ventas registradas aún.
                   </td>
                 </tr>
               ) : (
-                ventas.map((v) => (
-                  <tr key={v.id} className="border-t hover:bg-gray-50">
-                    <td className="px-6 py-3 font-mono font-semibold text-green-700">
-                      {v.numero_remision}
+                ventas.map(v => (
+                  <tr
+                    key={v.id}
+                    style={{ borderTop: '1px solid #f1f5f9', transition: 'background 0.1s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                  >
+                    <td style={{ padding: '11px 16px' }}>
+                      <span style={{
+                        fontFamily: 'monospace', fontWeight: 700,
+                        color: '#16a34a', fontSize: '13px',
+                      }}>
+                        {v.numero_remision}
+                      </span>
                     </td>
-                    <td className="px-6 py-3">{v.fecha}</td>
-                    <td className="px-6 py-3">{v.cliente_nombre}</td>
-                    <td className="px-6 py-3">
-                      {Number(v.total_kilos).toLocaleString("es-CO")} kg
+                    <td style={{ padding: '11px 16px', fontWeight: 500, color: '#0f172a' }}>{v.fecha}</td>
+                    <td style={{ padding: '11px 16px', color: '#475569' }}>{v.cliente_nombre}</td>
+                    <td style={{ padding: '11px 16px', color: '#475569' }}>
+                      {Number(v.total_kilos).toLocaleString('es-CO')} kg
                     </td>
-                    <td className="px-6 py-3">{v.total_bultos}</td>
-                    <td className="px-6 py-3">
-                      ${Number(v.flete_valor || 0).toLocaleString("es-CO")}
+                    <td style={{ padding: '11px 16px', color: '#475569' }}>{v.total_bultos}</td>
+                    <td style={{ padding: '11px 16px', color: '#475569' }}>
+                      ${Number(v.flete_valor || 0).toLocaleString('es-CO')}
                     </td>
-                    <td className="px-6 py-3">
-                      <div className="flex gap-2">
+                    <td style={{ padding: '11px 16px' }}>
+                      <div style={{ display: 'flex', gap: '6px' }}>
                         <button
                           onClick={() => handleVerDetalle(v)}
-                          className="px-3 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100"
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '4px',
+                            padding: '5px 10px', borderRadius: '5px', border: 'none',
+                            background: '#eff6ff', color: '#2563eb',
+                            fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#dbeafe'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#eff6ff'}
                         >
-                          Ver
+                          <IconEye /> Ver
                         </button>
                         <button
                           onClick={() => handleEliminar(v.id)}
-                          className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100"
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '4px',
+                            padding: '5px 10px', borderRadius: '5px', border: 'none',
+                            background: '#fef2f2', color: '#dc2626',
+                            fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}
                         >
-                          Eliminar
+                          <IconTrash /> Eliminar
                         </button>
                       </div>
                     </td>
@@ -108,22 +182,26 @@ export default function VentasPage() {
               )}
             </tbody>
           </table>
+
+          {ventas.length > 0 && (
+            <div style={{
+              padding: '10px 16px',
+              borderTop: '1px solid #f1f5f9',
+              color: '#94a3b8', fontSize: '12px',
+            }}>
+              {ventas.length} remisión(es) registrada(s)
+            </div>
+          )}
         </div>
       )}
 
+      {/* ── Modales ── */}
       {modalOpen && (
-        <VentaModal
-          onClose={() => setModalOpen(false)}
-          onSaved={cargarVentas}
-        />
+        <VentaModal onClose={() => setModalOpen(false)} onSaved={cargarVentas} />
       )}
-
       {detalleOpen && ventaSeleccionada && (
-        <VentaDetalle
-          venta={ventaSeleccionada}
-          onClose={() => setDetalleOpen(false)}
-        />
+        <VentaDetalle venta={ventaSeleccionada} onClose={() => setDetalleOpen(false)} />
       )}
     </div>
-  );
+  )
 }

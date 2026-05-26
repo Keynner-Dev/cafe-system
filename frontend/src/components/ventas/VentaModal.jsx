@@ -3,6 +3,59 @@ import { createVenta } from '../../api/ventas'
 import { getTerceros } from '../../api/terceros'
 import { getTiposCafe, getBodegas } from '../../api/inventario'
 
+// ─── Iconos SVG inline ────────────────────────────────────────────────────────
+const IconX = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+)
+const IconPlus = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+)
+const IconTrash = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6" /><path d="M14 11v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+  </svg>
+)
+
+// ─── Estilos reutilizables ────────────────────────────────────────────────────
+const inputStyle = {
+  width: '100%', boxSizing: 'border-box',
+  border: '1px solid #e2e8f0', borderRadius: '6px',
+  padding: '8px 12px', fontSize: '13px', color: '#0f172a',
+  outline: 'none', background: 'white',
+}
+const labelStyle = {
+  display: 'block', fontSize: '12px', fontWeight: 500,
+  color: '#475569', marginBottom: '5px',
+}
+const focusGreen = (e) => e.target.style.borderColor = '#16a34a'
+const blurGray   = (e) => e.target.style.borderColor = '#e2e8f0'
+
+// ─── Encabezado de sección ────────────────────────────────────────────────────
+function Seccion({ label }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '10px',
+      margin: '4px 0 16px',
+    }}>
+      <span style={{ fontSize: '12px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
+        {label}
+      </span>
+      <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+    </div>
+  )
+}
+
+// ─── Constantes ──────────────────────────────────────────────────────────────
 const hoy = new Date().toISOString().split('T')[0]
 const detalleVacio = { tipo_cafe: '', bodega: '', bultos: '', kilos: '' }
 const initialForm = {
@@ -14,19 +67,15 @@ const initialForm = {
   flete_valor: '', flete_pagadero_por: '', nota: '',
 }
 
-function Seccion({ titulo }) {
-  return <h4 className="font-semibold text-gray-700 border-b border-gray-200 pb-2 mb-3">{titulo}</h4>
-}
-
 export default function VentaModal({ onClose, onSaved }) {
-  const [form, setForm] = useState(initialForm)
+  const [form, setForm]         = useState(initialForm)
   const [detalles, setDetalles] = useState([{ ...detalleVacio }])
   const [clientes, setClientes] = useState([])
   const [tiposCafe, setTiposCafe] = useState([])
-  const [bodegas, setBodegas] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [submitted, setSubmitted] = useState(false) // ← control anti-duplicado
+  const [bodegas, setBodegas]   = useState([])
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState(null)
+  const [submitted, setSubmitted] = useState(false)
 
   useEffect(() => {
     getTerceros().then(res =>
@@ -49,33 +98,27 @@ export default function VentaModal({ onClose, onSaved }) {
     })
   }, [])
 
-  const agregarDetalle = useCallback(() => {
-    setDetalles(prev => [...prev, { ...detalleVacio }])
-  }, [])
-
+  const agregarDetalle  = useCallback(() => setDetalles(prev => [...prev, { ...detalleVacio }]), [])
   const eliminarDetalle = useCallback((i) => {
     setDetalles(prev => prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i))
   }, [])
 
-  const totalKilos = detalles.reduce((acc, d) => acc + (Number(d.kilos) || 0), 0)
+  const totalKilos  = detalles.reduce((acc, d) => acc + (Number(d.kilos)  || 0), 0)
   const totalBultos = detalles.reduce((acc, d) => acc + (Number(d.bultos) || 0), 0)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     e.stopPropagation()
-
-    // Anti-duplicado: si ya se envió o está cargando, no hacer nada
     if (loading || submitted) return
     setSubmitted(true)
     setLoading(true)
     setError(null)
-
     try {
       await createVenta({ ...form, detalles })
       onSaved()
       onClose()
     } catch (err) {
-      setSubmitted(false) // permite reintentar si hay error
+      setSubmitted(false)
       const data = err.response?.data
       if (data?.stock) setError(data.stock.join(' | '))
       else setError('Error al guardar. Verifica los datos.')
@@ -84,196 +127,310 @@ export default function VentaModal({ onClose, onSaved }) {
     }
   }
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) onClose()
+  }
 
-        <div className="flex justify-between items-center mb-6">
+  return (
+    <div
+      onClick={handleBackdropClick}
+      style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(15, 23, 42, 0.5)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 50, padding: '16px',
+      }}
+    >
+      <div style={{
+        background: 'white', borderRadius: '12px',
+        width: '100%', maxWidth: '760px',
+        maxHeight: '90vh', overflowY: 'auto',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+      }}>
+
+        {/* ── Cabecera ── */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '18px 20px', borderBottom: '1px solid #f1f5f9',
+          position: 'sticky', top: 0, background: 'white', zIndex: 1,
+        }}>
           <div>
-            <h3 className="text-xl font-bold text-gray-800">Nueva Remisión</h3>
-            <p className="text-xs text-gray-400">El número se genera automáticamente</p>
+            <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
+              Nueva remisión
+            </h2>
+            <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '2px' }}>
+              El número se genera automáticamente
+            </p>
           </div>
-          <button type="button" onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl">&times;
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '30px', height: '30px', borderRadius: '6px',
+              border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f172a' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8' }}
+          >
+            <IconX />
           </button>
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>
-        )}
+        {/* ── Cuerpo ── */}
+        <form onSubmit={handleSubmit}>
+          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Error */}
+            {error && (
+              <div style={{
+                background: '#fef2f2', border: '1px solid #fecaca',
+                borderRadius: '6px', padding: '10px 12px',
+                color: '#dc2626', fontSize: '12px',
+              }}>
+                {error}
+              </div>
+            )}
 
-          <Seccion titulo="📋 Datos generales" />
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Fecha *</label>
-              <input type="date" name="fecha" value={form.fecha}
-                onChange={handleChange} required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
+            {/* ── Datos generales ── */}
+            <Seccion label="Datos generales" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div>
+                <label style={labelStyle}>Fecha *</label>
+                <input type="date" name="fecha" value={form.fecha}
+                  onChange={handleChange} required
+                  style={inputStyle} onFocus={focusGreen} onBlur={blurGray}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Cliente *</label>
+                <select name="cliente" value={form.cliente}
+                  onChange={handleChange} required
+                  style={inputStyle} onFocus={focusGreen} onBlur={blurGray}
+                >
+                  <option value="">Selecciona cliente</option>
+                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                </select>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Cuenta</label>
+                <input type="text" name="cuenta" value={form.cuenta}
+                  onChange={handleChange} placeholder="Ej: SMS, CP, Practices..."
+                  style={inputStyle} onFocus={focusGreen} onBlur={blurGray}
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Cliente *</label>
-              <select name="cliente" value={form.cliente}
-                onChange={handleChange} required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Selecciona cliente</option>
-                {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-              </select>
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs text-gray-600 mb-1">Cuenta</label>
-              <input type="text" name="cuenta" value={form.cuenta}
-                onChange={handleChange} placeholder="Ej: SMS, CP, Practices..."
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-          </div>
 
-          <Seccion titulo="☕ Mercancía" />
-          <div className="space-y-3">
-            {detalles.map((d, i) => (
-              <div key={i} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Tipo de café *</label>
-                    <select name="tipo_cafe" value={d.tipo_cafe}
-                      onChange={e => handleDetalleChange(i, e)} required
-                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                    >
-                      <option value="">Selecciona</option>
-                      {tiposCafe.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
-                    </select>
+            {/* ── Mercancía ── */}
+            <Seccion label="Mercancía" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {detalles.map((d, i) => (
+                <div key={i} style={{
+                  border: '1px solid #e2e8f0', borderRadius: '8px',
+                  padding: '14px', background: '#f8fafc',
+                }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: '11px' }}>Tipo de café *</label>
+                      <select name="tipo_cafe" value={d.tipo_cafe}
+                        onChange={e => handleDetalleChange(i, e)} required
+                        style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+                        onFocus={focusGreen} onBlur={blurGray}
+                      >
+                        <option value="">Selecciona</option>
+                        {tiposCafe.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: '11px' }}>Bodega *</label>
+                      <select name="bodega" value={d.bodega}
+                        onChange={e => handleDetalleChange(i, e)} required
+                        style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+                        onFocus={focusGreen} onBlur={blurGray}
+                      >
+                        <option value="">Selecciona</option>
+                        {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: '11px' }}>Bultos *</label>
+                      <input type="number" name="bultos" value={d.bultos}
+                        onChange={e => handleDetalleChange(i, e)} required min="1"
+                        placeholder="0"
+                        style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+                        onFocus={focusGreen} onBlur={blurGray}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: '11px' }}>Kilos *</label>
+                      <input type="number" name="kilos" value={d.kilos}
+                        onChange={e => handleDetalleChange(i, e)} required min="0.01" step="0.01"
+                        placeholder="0.00"
+                        style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+                        onFocus={focusGreen} onBlur={blurGray}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Bodega *</label>
-                    <select name="bodega" value={d.bodega}
-                      onChange={e => handleDetalleChange(i, e)} required
-                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                    >
-                      <option value="">Selecciona</option>
-                      {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Bultos *</label>
-                    <input type="number" name="bultos" value={d.bultos}
-                      onChange={e => handleDetalleChange(i, e)} required min="1"
-                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Kilos *</label>
-                    <input type="number" name="kilos" value={d.kilos}
-                      onChange={e => handleDetalleChange(i, e)} required min="0.01" step="0.01"
-                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                      placeholder="0.00"
-                    />
-                  </div>
+                  {detalles.length > 1 && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                      <button type="button" onClick={() => eliminarDetalle(i)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '4px',
+                          padding: '4px 8px', borderRadius: '5px', border: 'none',
+                          background: '#fef2f2', color: '#dc2626',
+                          fontSize: '11px', fontWeight: 500, cursor: 'pointer',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                        onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}
+                      >
+                        <IconTrash /> Eliminar línea
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {detalles.length > 1 && (
-                  <div className="flex justify-end mt-2">
-                    <button type="button" onClick={() => eliminarDetalle(i)}
-                      className="text-xs text-red-400 hover:text-red-600">
-                      Eliminar línea
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-            <button type="button" onClick={agregarDetalle}
-              className="px-3 py-1 text-sm bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100">
-              + Agregar tipo de café
-            </button>
-          </div>
+              ))}
 
-          {(totalKilos > 0 || totalBultos > 0) && (
-            <div className="bg-gray-50 rounded-lg p-3 flex gap-6 text-sm">
-              <span className="text-gray-600">Total bultos: <strong>{totalBultos}</strong></span>
-              <span className="text-gray-600">Total kilos: <strong>{totalKilos.toLocaleString('es-CO')} kg</strong></span>
+              <button type="button" onClick={agregarDetalle}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  padding: '6px 12px', borderRadius: '6px', alignSelf: 'flex-start',
+                  border: '1px solid #bbf7d0', background: '#f0fdf4',
+                  color: '#16a34a', fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+                onMouseLeave={e => e.currentTarget.style.background = '#f0fdf4'}
+              >
+                <IconPlus /> Agregar tipo de café
+              </button>
             </div>
-          )}
 
-          <Seccion titulo="🧑 Datos del conductor" />
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { name: 'conductor_nombre', label: 'Nombre *', placeholder: 'Nombre completo', required: true },
-              { name: 'conductor_cedula', label: 'Cédula *', placeholder: 'Número de cédula', required: true },
-              { name: 'conductor_direccion', label: 'Dirección', placeholder: 'Dirección' },
-              { name: 'conductor_telefono', label: 'Teléfono', placeholder: 'Teléfono' },
-            ].map(field => (
-              <div key={field.name}>
-                <label className="block text-xs text-gray-600 mb-1">{field.label}</label>
-                <input type="text" name={field.name} value={form[field.name]}
-                  onChange={handleChange} required={field.required}
-                  placeholder={field.placeholder}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+            {/* Totales de mercancía */}
+            {(totalKilos > 0 || totalBultos > 0) && (
+              <div style={{
+                background: '#f8fafc', border: '1px solid #e2e8f0',
+                borderRadius: '6px', padding: '10px 14px',
+                display: 'flex', gap: '24px',
+              }}>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>
+                  Total bultos: <strong style={{ color: '#0f172a' }}>{totalBultos}</strong>
+                </span>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>
+                  Total kilos: <strong style={{ color: '#0f172a' }}>{totalKilos.toLocaleString('es-CO')} kg</strong>
+                </span>
               </div>
-            ))}
-          </div>
+            )}
 
-          <Seccion titulo="🚛 Datos del vehículo" />
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {[
-              { name: 'vehiculo_clase', label: 'Clase', placeholder: 'Ej: Camión' },
-              { name: 'vehiculo_placas', label: 'Placas *', placeholder: 'Ej: AJH 274', required: true },
-              { name: 'vehiculo_marca', label: 'Marca', placeholder: 'Ej: Dodge' },
-              { name: 'vehiculo_color', label: 'Color', placeholder: 'Ej: Vinotinto' },
-              { name: 'vehiculo_modelo', label: 'Modelo', placeholder: 'Año modelo' },
-            ].map(field => (
-              <div key={field.name}>
-                <label className="block text-xs text-gray-600 mb-1">{field.label}</label>
-                <input type="text" name={field.name} value={form[field.name]}
-                  onChange={handleChange} required={field.required}
-                  placeholder={field.placeholder}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+            {/* ── Conductor ── */}
+            <Seccion label="Datos del conductor" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              {[
+                { name: 'conductor_nombre',    label: 'Nombre *',    placeholder: 'Nombre completo',   required: true },
+                { name: 'conductor_cedula',    label: 'Cédula *',    placeholder: 'Número de cédula',  required: true },
+                { name: 'conductor_direccion', label: 'Dirección',   placeholder: 'Dirección' },
+                { name: 'conductor_telefono',  label: 'Teléfono',    placeholder: 'Teléfono' },
+              ].map(field => (
+                <div key={field.name}>
+                  <label style={labelStyle}>{field.label}</label>
+                  <input type="text" name={field.name} value={form[field.name]}
+                    onChange={handleChange} required={field.required}
+                    placeholder={field.placeholder}
+                    style={inputStyle} onFocus={focusGreen} onBlur={blurGray}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* ── Vehículo ── */}
+            <Seccion label="Datos del vehículo" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
+              {[
+                { name: 'vehiculo_clase',  label: 'Clase',     placeholder: 'Ej: Camión' },
+                { name: 'vehiculo_placas', label: 'Placas *',  placeholder: 'Ej: AJH 274', required: true },
+                { name: 'vehiculo_marca',  label: 'Marca',     placeholder: 'Ej: Dodge' },
+                { name: 'vehiculo_color',  label: 'Color',     placeholder: 'Ej: Vinotinto' },
+                { name: 'vehiculo_modelo', label: 'Modelo',    placeholder: 'Año modelo' },
+              ].map(field => (
+                <div key={field.name}>
+                  <label style={labelStyle}>{field.label}</label>
+                  <input type="text" name={field.name} value={form[field.name]}
+                    onChange={handleChange} required={field.required}
+                    placeholder={field.placeholder}
+                    style={inputStyle} onFocus={focusGreen} onBlur={blurGray}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* ── Flete ── */}
+            <Seccion label="Flete" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div>
+                <label style={labelStyle}>Valor del flete</label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{
+                    position: 'absolute', left: '10px', top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#94a3b8', fontSize: '13px', pointerEvents: 'none',
+                  }}>$</span>
+                  <input type="number" name="flete_valor" value={form.flete_valor}
+                    onChange={handleChange} min="0" step="0.01" placeholder="0"
+                    style={{ ...inputStyle, paddingLeft: '22px' }}
+                    onFocus={focusGreen} onBlur={blurGray}
+                  />
+                </div>
               </div>
-            ))}
-          </div>
-
-          <Seccion titulo="💵 Flete" />
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Valor del flete</label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-gray-400 text-sm">$</span>
-                <input type="number" name="flete_valor" value={form.flete_valor}
-                  onChange={handleChange} min="0" step="0.01"
-                  className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="0"
+              <div>
+                <label style={labelStyle}>Pagadero por</label>
+                <input type="text" name="flete_pagadero_por" value={form.flete_pagadero_por}
+                  onChange={handleChange} placeholder="Quien paga el flete"
+                  style={inputStyle} onFocus={focusGreen} onBlur={blurGray}
                 />
               </div>
             </div>
+
+            {/* ── Nota ── */}
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Pagadero por</label>
-              <input type="text" name="flete_pagadero_por" value={form.flete_pagadero_por}
-                onChange={handleChange} placeholder="Quien paga el flete"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              <label style={labelStyle}>Nota</label>
+              <textarea name="nota" value={form.nota} onChange={handleChange} rows={2}
+                placeholder="Observación opcional"
+                style={{ ...inputStyle, resize: 'vertical', minHeight: '60px' }}
+                onFocus={focusGreen} onBlur={blurGray}
               />
             </div>
+
           </div>
 
-          <div>
-            <label className="block text-xs text-gray-600 mb-1">Nota</label>
-            <textarea name="nota" value={form.nota} onChange={handleChange} rows={2}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Observación opcional"
-            />
-          </div>
-
-          <div className="flex gap-3 pt-2">
+          {/* ── Pie ── */}
+          <div style={{
+            display: 'flex', gap: '10px',
+            padding: '16px 20px', borderTop: '1px solid #f1f5f9',
+            position: 'sticky', bottom: 0, background: 'white',
+          }}>
             <button type="button" onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+              style={{
+                flex: 1, padding: '9px',
+                border: '1px solid #e2e8f0', borderRadius: '6px',
+                background: 'white', color: '#475569',
+                fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+              onMouseLeave={e => e.currentTarget.style.background = 'white'}
+            >
               Cancelar
             </button>
             <button type="submit" disabled={loading || submitted}
-              className="flex-1 px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50">
-              {loading ? 'Guardando...' : 'Registrar Remisión'}
+              style={{
+                flex: 1, padding: '9px',
+                border: 'none', borderRadius: '6px',
+                background: (loading || submitted) ? '#86efac' : '#16a34a',
+                color: 'white', fontSize: '13px', fontWeight: 500,
+                cursor: (loading || submitted) ? 'not-allowed' : 'pointer',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { if (!loading && !submitted) e.currentTarget.style.background = '#15803d' }}
+              onMouseLeave={e => { if (!loading && !submitted) e.currentTarget.style.background = '#16a34a' }}
+            >
+              {loading ? 'Guardando...' : 'Registrar remisión'}
             </button>
           </div>
         </form>
