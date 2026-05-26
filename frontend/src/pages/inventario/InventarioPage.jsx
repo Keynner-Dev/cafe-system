@@ -5,7 +5,56 @@ import {
   getStock
 } from '../../api/inventario'
 import ItemModal from '../../components/inventario/ItemModal'
-import TablaBase from '../../components/common/TablaBase'
+
+// ─── Iconos SVG inline ────────────────────────────────────────────────────────
+const IconPlus = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+)
+const IconEdit = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+)
+const IconTrash = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6"/>
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+    <path d="M10 11v6"/><path d="M14 11v6"/>
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+  </svg>
+)
+const IconFilter = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+  </svg>
+)
+const IconSearch = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+)
+
+// ─── Badge de estado ──────────────────────────────────────────────────────────
+function BadgeEstado({ activo }) {
+  return (
+    <span style={{
+      background: activo ? '#f0fdf4' : '#fef2f2',
+      color: activo ? '#16a34a' : '#dc2626',
+      fontSize: '11px', fontWeight: 600,
+      padding: '2px 8px', borderRadius: '99px',
+    }}>
+      {activo ? 'Activo' : 'Inactivo'}
+    </span>
+  )
+}
 
 const TABS = ['Tipos de Café', 'Bodegas', 'Stock']
 
@@ -19,6 +68,7 @@ const camposBodega = [
   { name: 'ubicacion', label: 'Ubicación', placeholder: 'Ej: Carretera principal km 3' },
 ]
 
+// ─── Componente principal ─────────────────────────────────────────────────────
 export default function InventarioPage() {
   const [tabActiva, setTabActiva] = useState('Tipos de Café')
 
@@ -104,113 +154,299 @@ export default function InventarioPage() {
     }
   }
 
-  const handleEditar = (item) => {
-    setItemEditando(item)
-    setModalOpen(true)
-  }
+  const handleEditar = (item) => { setItemEditando(item); setModalOpen(true) }
+  const handleNuevo  = ()     => { setItemEditando(null);  setModalOpen(true) }
 
-  const handleNuevo = () => {
-    setItemEditando(null)
-    setModalOpen(true)
-  }
-
-  // ── Columnas ──
-  const columnasTipos = [
-    { key: 'id', label: '#' },
-    { key: 'nombre', label: 'Nombre' },
-    { key: 'descripcion', label: 'Descripción' },
-    {
-      key: 'activo', label: 'Estado',
-      render: (fila) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${fila.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-          {fila.activo ? 'Activo' : 'Inactivo'}
-        </span>
-      )
-    },
-  ]
-
-  const columnasBodegas = [
-    { key: 'id', label: '#' },
-    { key: 'nombre', label: 'Nombre' },
-    { key: 'ubicacion', label: 'Ubicación' },
-    {
-      key: 'activo', label: 'Estado',
-      render: (fila) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${fila.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-          {fila.activo ? 'Activo' : 'Inactivo'}
-        </span>
-      )
-    },
-  ]
+  const loading = tabActiva === 'Tipos de Café' ? loadingTipos : loadingBodegas
 
   return (
-    <div>
-      {/* Encabezado */}
-      <div className="flex justify-between items-center mb-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+      {/* ── Encabezado ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h2 className="text-3xl font-bold text-gray-800">Inventario</h2>
-          <p className="text-gray-500 text-sm mt-1">Tipos de café, bodegas y stock</p>
+          <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
+            Inventario
+          </h1>
+          <p style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
+            Gestión de tipos de café, bodegas y consulta de stock
+          </p>
         </div>
         {tabActiva !== 'Stock' && (
           <button
             onClick={handleNuevo}
-            className="px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 font-medium"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              background: '#16a34a', color: 'white',
+              border: 'none', borderRadius: '6px',
+              padding: '8px 14px', fontSize: '13px', fontWeight: 500,
+              cursor: 'pointer',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#15803d'}
+            onMouseLeave={e => e.currentTarget.style.background = '#16a34a'}
           >
-            + {tabActiva === 'Tipos de Café' ? 'Nuevo Tipo' : 'Nueva Bodega'}
+            <IconPlus />
+            {tabActiva === 'Tipos de Café' ? 'Nuevo tipo' : 'Nueva bodega'}
           </button>
         )}
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-gray-200">
-        {TABS.map(tab => (
-          <button
-            key={tab}
-            onClick={() => setTabActiva(tab)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              tabActiva === tab
-                ? 'border-green-700 text-green-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
+      {/* ── Tabs ── */}
+      <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #e2e8f0' }}>
+        {TABS.map(tab => {
+          const activa = tabActiva === tab
+          return (
+            <button
+              key={tab}
+              onClick={() => setTabActiva(tab)}
+              style={{
+                padding: '9px 18px',
+                fontSize: '13px',
+                fontWeight: activa ? 600 : 400,
+                color: activa ? '#16a34a' : '#64748b',
+                background: 'none',
+                border: 'none',
+                borderBottom: activa ? '2px solid #16a34a' : '2px solid transparent',
+                marginBottom: '-1px',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { if (!activa) e.currentTarget.style.color = '#0f172a' }}
+              onMouseLeave={e => { if (!activa) e.currentTarget.style.color = '#64748b' }}
+            >
+              {tab}
+            </button>
+          )
+        })}
       </div>
 
-      {/* Contenido por tab */}
+      {/* ── Tab: Tipos de Café ── */}
       {tabActiva === 'Tipos de Café' && (
-        <TablaBase
-          columnas={columnasTipos}
-          datos={tiposCafe}
-          loading={loadingTipos}
-          onEditar={handleEditar}
-          onEliminar={handleEliminarTipo}
-        />
+        loadingTipos ? (
+          <div style={{ color: '#94a3b8', fontSize: '13px', padding: '20px 0' }}>
+            Cargando tipos de café...
+          </div>
+        ) : (
+          <div style={{
+            background: 'white', border: '1px solid #e2e8f0',
+            borderRadius: '10px', overflow: 'hidden',
+          }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ background: '#0f172a' }}>
+                  {['#', 'Nombre', 'Descripción', 'Estado', 'Acciones'].map(col => (
+                    <th key={col} style={{
+                      padding: '11px 16px', textAlign: 'left',
+                      color: '#e2e8f0', fontWeight: 500, fontSize: '12px',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {tiposCafe.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{
+                      padding: '40px', textAlign: 'center',
+                      color: '#94a3b8', fontSize: '13px',
+                    }}>
+                      No hay tipos de café registrados aún.
+                    </td>
+                  </tr>
+                ) : (
+                  tiposCafe.map(t => (
+                    <tr
+                      key={t.id}
+                      style={{ borderTop: '1px solid #f1f5f9', transition: 'background 0.1s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                    >
+                      <td style={{ padding: '11px 16px', color: '#94a3b8' }}>{t.id}</td>
+                      <td style={{ padding: '11px 16px', fontWeight: 500, color: '#0f172a' }}>{t.nombre}</td>
+                      <td style={{ padding: '11px 16px', color: '#475569' }}>{t.descripcion || '—'}</td>
+                      <td style={{ padding: '11px 16px' }}><BadgeEstado activo={t.activo} /></td>
+                      <td style={{ padding: '11px 16px' }}>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            onClick={() => handleEditar(t)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '4px',
+                              padding: '5px 10px', borderRadius: '5px', border: 'none',
+                              background: '#eff6ff', color: '#2563eb',
+                              fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#dbeafe'}
+                            onMouseLeave={e => e.currentTarget.style.background = '#eff6ff'}
+                          >
+                            <IconEdit /> Editar
+                          </button>
+                          <button
+                            onClick={() => handleEliminarTipo(t.id)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '4px',
+                              padding: '5px 10px', borderRadius: '5px', border: 'none',
+                              background: '#fef2f2', color: '#dc2626',
+                              fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                            onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}
+                          >
+                            <IconTrash /> Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+            {tiposCafe.length > 0 && (
+              <div style={{
+                padding: '10px 16px', borderTop: '1px solid #f1f5f9',
+                color: '#94a3b8', fontSize: '12px',
+              }}>
+                {tiposCafe.length} tipo(s) registrado(s)
+              </div>
+            )}
+          </div>
+        )
       )}
 
+      {/* ── Tab: Bodegas ── */}
       {tabActiva === 'Bodegas' && (
-        <TablaBase
-          columnas={columnasBodegas}
-          datos={bodegas}
-          loading={loadingBodegas}
-          onEditar={handleEditar}
-          onEliminar={handleEliminarBodega}
-        />
+        loadingBodegas ? (
+          <div style={{ color: '#94a3b8', fontSize: '13px', padding: '20px 0' }}>
+            Cargando bodegas...
+          </div>
+        ) : (
+          <div style={{
+            background: 'white', border: '1px solid #e2e8f0',
+            borderRadius: '10px', overflow: 'hidden',
+          }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ background: '#0f172a' }}>
+                  {['#', 'Nombre', 'Ubicación', 'Estado', 'Acciones'].map(col => (
+                    <th key={col} style={{
+                      padding: '11px 16px', textAlign: 'left',
+                      color: '#e2e8f0', fontWeight: 500, fontSize: '12px',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {bodegas.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{
+                      padding: '40px', textAlign: 'center',
+                      color: '#94a3b8', fontSize: '13px',
+                    }}>
+                      No hay bodegas registradas aún.
+                    </td>
+                  </tr>
+                ) : (
+                  bodegas.map(b => (
+                    <tr
+                      key={b.id}
+                      style={{ borderTop: '1px solid #f1f5f9', transition: 'background 0.1s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                    >
+                      <td style={{ padding: '11px 16px', color: '#94a3b8' }}>{b.id}</td>
+                      <td style={{ padding: '11px 16px', fontWeight: 500, color: '#0f172a' }}>{b.nombre}</td>
+                      <td style={{ padding: '11px 16px', color: '#475569' }}>{b.ubicacion || '—'}</td>
+                      <td style={{ padding: '11px 16px' }}><BadgeEstado activo={b.activo} /></td>
+                      <td style={{ padding: '11px 16px' }}>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            onClick={() => handleEditar(b)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '4px',
+                              padding: '5px 10px', borderRadius: '5px', border: 'none',
+                              background: '#eff6ff', color: '#2563eb',
+                              fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#dbeafe'}
+                            onMouseLeave={e => e.currentTarget.style.background = '#eff6ff'}
+                          >
+                            <IconEdit /> Editar
+                          </button>
+                          <button
+                            onClick={() => handleEliminarBodega(b.id)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '4px',
+                              padding: '5px 10px', borderRadius: '5px', border: 'none',
+                              background: '#fef2f2', color: '#dc2626',
+                              fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                            onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}
+                          >
+                            <IconTrash /> Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+            {bodegas.length > 0 && (
+              <div style={{
+                padding: '10px 16px', borderTop: '1px solid #f1f5f9',
+                color: '#94a3b8', fontSize: '12px',
+              }}>
+                {bodegas.length} bodega(s) registrada(s)
+              </div>
+            )}
+          </div>
+        )
       )}
 
+      {/* ── Tab: Stock ── */}
       {tabActiva === 'Stock' && (
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
           {/* Filtros */}
-          <div className="bg-white rounded-xl shadow p-6 mb-6">
-            <h3 className="font-semibold text-gray-700 mb-4">Consultar Stock</h3>
-            <div className="flex gap-4 flex-wrap">
-              <div className="flex-1 min-w-48">
-                <label className="block text-sm text-gray-600 mb-1">Bodega</label>
+          <div style={{
+            background: 'white', border: '1px solid #e2e8f0',
+            borderRadius: '10px', padding: '20px',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              marginBottom: '16px',
+            }}>
+              <span style={{ color: '#64748b' }}><IconFilter /></span>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
+                Filtros de consulta
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              {/* Select Bodega */}
+              <div style={{ flex: '1', minWidth: '160px' }}>
+                <label style={{
+                  display: 'block', fontSize: '12px', fontWeight: 500,
+                  color: '#475569', marginBottom: '5px',
+                }}>
+                  Bodega
+                </label>
                 <select
                   value={filtroBodega}
                   onChange={e => setFiltroBodega(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    border: '1px solid #e2e8f0', borderRadius: '6px',
+                    padding: '8px 12px', fontSize: '13px', color: '#0f172a',
+                    background: 'white', outline: 'none',
+                  }}
+                  onFocus={e => e.target.style.borderColor = '#16a34a'}
+                  onBlur={e => e.target.style.borderColor = '#e2e8f0'}
                 >
                   <option value="">Todas las bodegas</option>
                   {bodegas.map(b => (
@@ -218,12 +454,26 @@ export default function InventarioPage() {
                   ))}
                 </select>
               </div>
-              <div className="flex-1 min-w-48">
-                <label className="block text-sm text-gray-600 mb-1">Tipo de Café</label>
+
+              {/* Select Tipo */}
+              <div style={{ flex: '1', minWidth: '160px' }}>
+                <label style={{
+                  display: 'block', fontSize: '12px', fontWeight: 500,
+                  color: '#475569', marginBottom: '5px',
+                }}>
+                  Tipo de Café
+                </label>
                 <select
                   value={filtroTipo}
                   onChange={e => setFiltroTipo(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    border: '1px solid #e2e8f0', borderRadius: '6px',
+                    padding: '8px 12px', fontSize: '13px', color: '#0f172a',
+                    background: 'white', outline: 'none',
+                  }}
+                  onFocus={e => e.target.style.borderColor = '#16a34a'}
+                  onBlur={e => e.target.style.borderColor = '#e2e8f0'}
                 >
                   <option value="">Todos los tipos</option>
                   {tiposCafe.map(t => (
@@ -231,42 +481,65 @@ export default function InventarioPage() {
                   ))}
                 </select>
               </div>
-              <div className="flex items-end">
-                <button
-                  onClick={consultarStock}
-                  disabled={loadingStock}
-                  className="px-6 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50"
-                >
-                  {loadingStock ? 'Consultando...' : 'Consultar'}
-                </button>
-              </div>
+
+              {/* Botón */}
+              <button
+                onClick={consultarStock}
+                disabled={loadingStock}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '8px 16px',
+                  background: loadingStock ? '#86efac' : '#16a34a',
+                  color: 'white', border: 'none', borderRadius: '6px',
+                  fontSize: '13px', fontWeight: 500,
+                  cursor: loadingStock ? 'not-allowed' : 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+                onMouseEnter={e => { if (!loadingStock) e.currentTarget.style.background = '#15803d' }}
+                onMouseLeave={e => { if (!loadingStock) e.currentTarget.style.background = '#16a34a' }}
+              >
+                <IconSearch />
+                {loadingStock ? 'Consultando...' : 'Consultar stock'}
+              </button>
             </div>
           </div>
 
-          {/* Resultado */}
-          {stock && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Resultados */}
+          {stock ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
               {[
-                { label: 'Total Entradas', value: `${stock.entradas} kg`, color: 'bg-blue-500' },
-                { label: 'Total Salidas', value: `${stock.salidas} kg`, color: 'bg-red-500' },
-                { label: 'Stock Actual', value: `${stock.stock_actual} kg`, color: 'bg-green-500' },
+                { label: 'Total Entradas', value: stock.entradas, color: '#2563eb', bg: '#eff6ff' },
+                { label: 'Total Salidas',  value: stock.salidas,  color: '#dc2626', bg: '#fef2f2' },
+                { label: 'Stock Actual',   value: stock.stock_actual, color: '#16a34a', bg: '#f0fdf4' },
               ].map(card => (
-                <div key={card.label} className="bg-white rounded-xl shadow p-6 flex items-center gap-4">
-                  <div className={`${card.color} w-12 h-12 rounded-full flex items-center justify-center text-white text-xl`}>
-                    📦
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-sm">{card.label}</p>
-                    <p className="text-2xl font-bold text-gray-800">{card.value}</p>
-                  </div>
+                <div key={card.label} style={{
+                  background: 'white', border: '1px solid #e2e8f0',
+                  borderRadius: '10px', padding: '20px',
+                  borderLeft: `3px solid ${card.color}`,
+                }}>
+                  <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 8px 0', fontWeight: 500 }}>
+                    {card.label}
+                  </p>
+                  <p style={{ fontSize: '26px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                    {card.value}
+                    <span style={{ fontSize: '14px', fontWeight: 400, color: '#94a3b8', marginLeft: '4px' }}>kg</span>
+                  </p>
                 </div>
               ))}
+            </div>
+          ) : !loadingStock && (
+            <div style={{
+              background: 'white', border: '1px solid #e2e8f0',
+              borderRadius: '10px', padding: '48px',
+              textAlign: 'center', color: '#94a3b8', fontSize: '13px',
+            }}>
+              Selecciona los filtros y presiona <strong style={{ color: '#64748b' }}>Consultar stock</strong> para ver los resultados.
             </div>
           )}
         </div>
       )}
 
-      {/* Modal */}
+      {/* ── Modal ── */}
       {modalOpen && (
         <ItemModal
           titulo={tabActiva === 'Tipos de Café' ? 'Tipo de Café' : 'Bodega'}
