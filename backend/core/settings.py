@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     # Apps del proyecto
+    'usuarios',      # ← debe ir ANTES que las demás apps del proyecto
     'terceros',
     'inventario',
     'compras',
@@ -32,7 +33,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # ← debe ir primero
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -71,10 +72,14 @@ DATABASES = {
         'HOST': os.getenv('DB_HOST'),
         'PORT': os.getenv('DB_PORT', '5432'),
         'OPTIONS': {
-            'sslmode': 'require',  # ← requerido por NeonDB
+            'sslmode': 'require',
         },
     }
 }
+
+# ─── Modelo de usuario personalizado ─────────────────────────────────────────
+# IMPORTANTE: esto le dice a Django que use nuestro modelo en vez del default
+AUTH_USER_MODEL = 'usuarios.Usuario'
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},

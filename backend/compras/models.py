@@ -1,13 +1,28 @@
 from django.db import models
+from django.conf import settings
 from decimal import Decimal
 from terceros.models import Tercero
 from inventario.models import TipoCafe, Bodega
 
 
 class Compra(models.Model):
-    proveedor = models.ForeignKey(Tercero, on_delete=models.PROTECT)
+    # Renombramos proveedor → caficultor para mayor claridad
+    caficultor = models.ForeignKey(
+        Tercero,
+        on_delete=models.PROTECT,
+        related_name='compras',
+    )
     fecha = models.DateField()
     nota = models.TextField(blank=True, null=True)
+
+    # Usuario que registró la compra
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='compras_registradas',
+    )
     creado_en = models.DateTimeField(auto_now_add=True)
 
     @property
@@ -30,7 +45,7 @@ class Compra(models.Model):
         return total
 
     def __str__(self):
-        return f"Compra #{self.id} - {self.proveedor} - {self.fecha}"
+        return f"Compra #{self.id} - {self.caficultor} - {self.fecha}"
 
     class Meta:
         verbose_name = 'Compra'
@@ -45,7 +60,7 @@ class DetalleCompra(models.Model):
     kilos = models.DecimalField(max_digits=10, decimal_places=2)
     precio_kilo = models.DecimalField(
         max_digits=10, decimal_places=2,
-        null=True, blank=True
+        null=True, blank=True,
     )
     es_deposito = models.BooleanField(default=False)
     liquidado = models.BooleanField(default=False)
@@ -78,12 +93,21 @@ class LiquidacionDeposito(models.Model):
     detalle_compra = models.ForeignKey(
         DetalleCompra,
         on_delete=models.PROTECT,
-        related_name='liquidaciones'
+        related_name='liquidaciones',
     )
     kilos = models.DecimalField(max_digits=10, decimal_places=2)
     precio_kilo = models.DecimalField(max_digits=10, decimal_places=2)
     fecha = models.DateField()
     nota = models.TextField(blank=True, null=True)
+
+    # Usuario que registró la liquidación
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='liquidaciones_registradas',
+    )
     creado_en = models.DateTimeField(auto_now_add=True)
 
     @property

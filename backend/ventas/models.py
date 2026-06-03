@@ -1,13 +1,19 @@
 from django.db import models
+from django.conf import settings
 from decimal import Decimal
 from terceros.models import Tercero
 from inventario.models import TipoCafe, Bodega
 
 
 class Venta(models.Model):
-    # Número de remisión automático (se genera con el id)
     fecha = models.DateField()
-    cliente = models.ForeignKey(Tercero, on_delete=models.PROTECT)
+
+    # Renombramos cliente → empresa
+    empresa = models.ForeignKey(
+        Tercero,
+        on_delete=models.PROTECT,
+        related_name='ventas',
+    )
     cuenta = models.CharField(max_length=100, blank=True, null=True)
 
     # Datos del conductor
@@ -27,7 +33,23 @@ class Venta(models.Model):
     flete_valor = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     flete_pagadero_por = models.CharField(max_length=200, blank=True, null=True)
 
+    # Precio por kilo — lo coloca el JEFE desde su interfaz después de crear la remisión
+    # Los administradores NO ven este campo
+    precio_kilo_jefe = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        null=True, blank=True,
+    )
+
     nota = models.TextField(blank=True, null=True)
+
+    # Usuario que registró la venta
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ventas_registradas',
+    )
     creado_en = models.DateTimeField(auto_now_add=True)
 
     @property
@@ -50,7 +72,7 @@ class Venta(models.Model):
         return self.flete_valor
 
     def __str__(self):
-        return f"Remisión {self.numero_remision} - {self.cliente} - {self.fecha}"
+        return f"Remisión {self.numero_remision} - {self.empresa} - {self.fecha}"
 
     class Meta:
         verbose_name = 'Venta'
