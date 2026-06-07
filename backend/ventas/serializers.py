@@ -9,7 +9,7 @@ from django.db.models import Sum
 def get_stock_disponible(tipo_cafe_id, bodega_id):
     movimientos = MovimientoInventario.objects.filter(
         tipo_cafe_id=tipo_cafe_id,
-        bodega_id=bodega_id
+        bodega_id=bodega_id,
     )
     entradas = movimientos.filter(
         tipo__in=['entrada', 'traslado_entrada']
@@ -36,14 +36,21 @@ class DetalleVentaSerializer(serializers.ModelSerializer):
 
 class VentaSerializer(serializers.ModelSerializer):
     detalles = DetalleVentaSerializer(many=True)
-    cliente_nombre = serializers.CharField(source='cliente.nombre', read_only=True)
+
+    # Antes era cliente_nombre — ahora es empresa_nombre
+    empresa_nombre = serializers.CharField(source='empresa.nombre', read_only=True)
+
     numero_remision = serializers.CharField(read_only=True)
     total_kilos = serializers.SerializerMethodField()
     total_bultos = serializers.SerializerMethodField()
 
+    # creado_por solo lectura — lo asigna la view
+    creado_por = serializers.StringRelatedField(read_only=True)
+
     class Meta:
         model = Venta
         fields = '__all__'
+        read_only_fields = ['creado_por', 'creado_en']
 
     def get_total_kilos(self, obj):
         try:

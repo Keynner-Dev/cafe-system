@@ -11,11 +11,17 @@ class CompraViewSet(viewsets.ModelViewSet):
     queryset = Compra.objects.all()
     serializer_class = CompraSerializer
 
+    def perform_create(self, serializer):
+        # Asigna automáticamente el usuario logueado como creador
+        # Si no hay usuario autenticado (desarrollo sin login), lo deja en null
+        user = self.request.user if self.request.user.is_authenticated else None
+        serializer.save(creado_por=user)
+
     @transaction.atomic
     def destroy(self, request, *args, **kwargs):
         compra = self.get_object()
 
-        # Eliminar movimientos de inventario asociados
+        # Eliminar movimientos de inventario asociados a esta compra
         MovimientoInventario.objects.filter(
             referencia=f'compra-{compra.id}'
         ).delete()
@@ -27,3 +33,7 @@ class CompraViewSet(viewsets.ModelViewSet):
 class LiquidacionDepositoViewSet(viewsets.ModelViewSet):
     queryset = LiquidacionDeposito.objects.all()
     serializer_class = LiquidacionDepositoSerializer
+
+    def perform_create(self, serializer):
+        user = self.request.user if self.request.user.is_authenticated else None
+        serializer.save(creado_por=user)

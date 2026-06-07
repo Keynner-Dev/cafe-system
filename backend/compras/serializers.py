@@ -3,6 +3,7 @@ from django.db import transaction
 from .models import Compra, DetalleCompra, LiquidacionDeposito
 from inventario.models import MovimientoInventario
 
+
 class LiquidacionDepositoSerializer(serializers.ModelSerializer):
     subtotal = serializers.SerializerMethodField()
 
@@ -12,6 +13,8 @@ class LiquidacionDepositoSerializer(serializers.ModelSerializer):
     class Meta:
         model = LiquidacionDeposito
         fields = '__all__'
+        # creado_por lo asigna la view automáticamente, no el frontend
+        read_only_fields = ['creado_por', 'creado_en']
 
     def create(self, validated_data):
         liquidacion = LiquidacionDeposito.objects.create(**validated_data)
@@ -29,10 +32,8 @@ class DetalleCompraSerializer(serializers.ModelSerializer):
     subtotal = serializers.SerializerMethodField()
     kilos_liquidados = serializers.SerializerMethodField()
     kilos_pendientes_liquidar = serializers.SerializerMethodField()
-
     tipo_cafe_nombre = serializers.CharField(source='tipo_cafe.nombre', read_only=True)
     bodega_nombre = serializers.CharField(source='bodega.nombre', read_only=True)
-
     liquidaciones = LiquidacionDepositoSerializer(many=True, read_only=True)
 
     class Meta:
@@ -54,15 +55,22 @@ class DetalleCompraSerializer(serializers.ModelSerializer):
 
 class CompraSerializer(serializers.ModelSerializer):
     detalles = DetalleCompraSerializer(many=True)
-    proveedor_nombre = serializers.CharField(source='proveedor.nombre', read_only=True)
+
+    # Antes era proveedor_nombre — ahora es caficultor_nombre
+    caficultor_nombre = serializers.CharField(source='caficultor.nombre', read_only=True)
+
     total = serializers.SerializerMethodField()
     total_deposito_pendiente = serializers.SerializerMethodField()
     kilos_deposito_pendiente = serializers.SerializerMethodField()
     tiene_deposito_pendiente = serializers.SerializerMethodField()
 
+    # creado_por lo asigna la view, el frontend no lo envía
+    creado_por = serializers.StringRelatedField(read_only=True)
+
     class Meta:
         model = Compra
         fields = '__all__'
+        read_only_fields = ['creado_por', 'creado_en']
 
     def get_total(self, obj):
         try:
