@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createVenta } from '../../api/ventas'
 import { getTerceros } from '../../api/terceros'
 import { getTiposCafe, getBodegas } from '../../api/inventario'
 
-// ─── Iconos SVG inline ────────────────────────────────────────────────────────
 const IconX = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -25,8 +24,14 @@ const IconTrash = () => (
     <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
   </svg>
 )
+const IconSearch = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+)
 
-// ─── Estilos reutilizables ────────────────────────────────────────────────────
 const inputStyle = {
   width: '100%', boxSizing: 'border-box',
   border: '1px solid #e2e8f0', borderRadius: '6px',
@@ -40,13 +45,9 @@ const labelStyle = {
 const focusGreen = (e) => e.target.style.borderColor = '#16a34a'
 const blurGray   = (e) => e.target.style.borderColor = '#e2e8f0'
 
-// ─── Encabezado de sección ────────────────────────────────────────────────────
 function Seccion({ label }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: '10px',
-      margin: '4px 0 16px',
-    }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '4px 0 16px' }}>
       <span style={{ fontSize: '12px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
         {label}
       </span>
@@ -55,11 +56,10 @@ function Seccion({ label }) {
   )
 }
 
-// ─── Constantes ──────────────────────────────────────────────────────────────
 const hoy = new Date().toISOString().split('T')[0]
 const detalleVacio = { tipo_cafe: '', bodega: '', bultos: '', kilos: '' }
 const initialForm = {
-  fecha: hoy, cliente: '', cuenta: '',
+  fecha: hoy, empresa: '', cuenta: '',          // ← "empresa" en vez de "cliente"
   conductor_nombre: '', conductor_cedula: '',
   conductor_direccion: '', conductor_telefono: '',
   vehiculo_clase: '', vehiculo_placas: '',
@@ -70,20 +70,67 @@ const initialForm = {
 export default function VentaModal({ onClose, onSaved }) {
   const [form, setForm]         = useState(initialForm)
   const [detalles, setDetalles] = useState([{ ...detalleVacio }])
-  const [clientes, setClientes] = useState([])
+
+  // ── estados del buscador de empresa ──
+  const [busqueda, setBusqueda]                     = useState('')
+  const [resultados, setResultados]                 = useState([])
+  const [dropdownVisible, setDropdownVisible]       = useState(false)
+  const [empresaSeleccionada, setEmpresaSeleccionada] = useState(null)
+  const [buscando, setBuscando]                     = useState(false)
+  const dropdownRef = useRef(null)
+
   const [tiposCafe, setTiposCafe] = useState([])
-  const [bodegas, setBodegas]   = useState([])
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState(null)
+  const [bodegas, setBodegas]     = useState([])
+  const [loading, setLoading]     = useState(false)
+  const [error, setError]         = useState(null)
   const [submitted, setSubmitted] = useState(false)
 
   useEffect(() => {
-    getTerceros().then(res =>
-      setClientes(res.data.filter(t => t.tipo === 'cliente' || t.tipo === 'ambos'))
-    )
     getTiposCafe().then(res => setTiposCafe(res.data))
     getBodegas().then(res => setBodegas(res.data))
   }, [])
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownVisible(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    if (busqueda.length < 2) {
+      setResultados([])
+      setDropdownVisible(false)
+      return
+    }
+    setBuscando(true)
+    const timer = setTimeout(() => {
+      getTerceros({ buscar: busqueda, tipo: 'empresa' })
+        .then(res => {
+          setResultados(res.data)
+          setDropdownVisible(true)
+        })
+        .finally(() => setBuscando(false))
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [busqueda])
+
+  const seleccionarEmpresa = (tercero) => {
+    setEmpresaSeleccionada(tercero)
+    setForm(prev => ({ ...prev, empresa: tercero.id }))
+    setBusqueda(tercero.nombre)
+    setDropdownVisible(false)
+  }
+
+  const limpiarEmpresa = () => {
+    setEmpresaSeleccionada(null)
+    setForm(prev => ({ ...prev, empresa: '' }))
+    setBusqueda('')
+    setResultados([])
+  }
 
   const handleChange = useCallback((e) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
@@ -109,6 +156,10 @@ export default function VentaModal({ onClose, onSaved }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     e.stopPropagation()
+    if (!form.empresa) {
+      setError('Debes seleccionar una empresa.')
+      return
+    }
     if (loading || submitted) return
     setSubmitted(true)
     setLoading(true)
@@ -162,9 +213,7 @@ export default function VentaModal({ onClose, onSaved }) {
               El número se genera automáticamente
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
+          <button type="button" onClick={onClose}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: '30px', height: '30px', borderRadius: '6px',
@@ -181,7 +230,6 @@ export default function VentaModal({ onClose, onSaved }) {
         <form onSubmit={handleSubmit}>
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-            {/* Error */}
             {error && (
               <div style={{
                 background: '#fef2f2', border: '1px solid #fecaca',
@@ -192,9 +240,9 @@ export default function VentaModal({ onClose, onSaved }) {
               </div>
             )}
 
-            {/* ── Datos generales ── */}
             <Seccion label="Datos generales" />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+
               <div>
                 <label style={labelStyle}>Fecha *</label>
                 <input type="date" name="fecha" value={form.fecha}
@@ -202,16 +250,94 @@ export default function VentaModal({ onClose, onSaved }) {
                   style={inputStyle} onFocus={focusGreen} onBlur={blurGray}
                 />
               </div>
-              <div>
-                <label style={labelStyle}>Cliente *</label>
-                <select name="cliente" value={form.cliente}
-                  onChange={handleChange} required
-                  style={inputStyle} onFocus={focusGreen} onBlur={blurGray}
-                >
-                  <option value="">Selecciona cliente</option>
-                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                </select>
+
+              {/* ── Buscador de empresa ── */}
+              <div ref={dropdownRef} style={{ position: 'relative' }}>
+                <label style={labelStyle}>Empresa *</label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{
+                    position: 'absolute', left: '10px', top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#94a3b8', pointerEvents: 'none',
+                    display: 'flex', alignItems: 'center',
+                  }}>
+                    <IconSearch />
+                  </span>
+                  <input
+                    type="text"
+                    value={busqueda}
+                    onChange={e => {
+                      setBusqueda(e.target.value)
+                      if (empresaSeleccionada) limpiarEmpresa()
+                    }}
+                    placeholder="Buscar por nombre o NIT..."
+                    style={{ ...inputStyle, paddingLeft: '32px', paddingRight: empresaSeleccionada ? '32px' : '12px' }}
+                    onFocus={focusGreen} onBlur={blurGray}
+                    autoComplete="off"
+                  />
+                  {empresaSeleccionada && (
+                    <button
+                      type="button"
+                      onClick={limpiarEmpresa}
+                      style={{
+                        position: 'absolute', right: '8px', top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none', border: 'none',
+                        cursor: 'pointer', color: '#94a3b8',
+                        display: 'flex', alignItems: 'center', padding: '2px',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.color = '#dc2626'}
+                      onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+                    >
+                      <IconX />
+                    </button>
+                  )}
+                </div>
+
+                {dropdownVisible && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0,
+                    background: 'white', border: '1px solid #e2e8f0',
+                    borderRadius: '6px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                    zIndex: 10, marginTop: '2px', maxHeight: '200px', overflowY: 'auto',
+                  }}>
+                    {buscando ? (
+                      <div style={{ padding: '10px 12px', color: '#94a3b8', fontSize: '12px' }}>
+                        Buscando...
+                      </div>
+                    ) : resultados.length === 0 ? (
+                      <div style={{ padding: '10px 12px', color: '#94a3b8', fontSize: '12px' }}>
+                        No se encontraron empresas.
+                      </div>
+                    ) : (
+                      resultados.map(r => (
+                        <div key={r.id} onClick={() => seleccionarEmpresa(r)}
+                          style={{
+                            padding: '9px 12px', cursor: 'pointer',
+                            fontSize: '13px', color: '#0f172a',
+                            borderBottom: '1px solid #f1f5f9',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                        >
+                          <span style={{ fontWeight: 500 }}>{r.nombre}</span>
+                          {r.cedula && (
+                            <span style={{ color: '#94a3b8', fontSize: '12px', marginLeft: '8px' }}>
+                              {r.cedula}
+                            </span>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                <input type="text" required value={form.empresa} onChange={() => {}}
+                  style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+                  tabIndex={-1}
+                />
               </div>
+
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={labelStyle}>Cuenta</label>
                 <input type="text" name="cuenta" value={form.cuenta}
@@ -304,7 +430,6 @@ export default function VentaModal({ onClose, onSaved }) {
               </button>
             </div>
 
-            {/* Totales de mercancía */}
             {(totalKilos > 0 || totalBultos > 0) && (
               <div style={{
                 background: '#f8fafc', border: '1px solid #e2e8f0',
@@ -324,10 +449,10 @@ export default function VentaModal({ onClose, onSaved }) {
             <Seccion label="Datos del conductor" />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
               {[
-                { name: 'conductor_nombre',    label: 'Nombre *',    placeholder: 'Nombre completo',   required: true },
-                { name: 'conductor_cedula',    label: 'Cédula *',    placeholder: 'Número de cédula',  required: true },
-                { name: 'conductor_direccion', label: 'Dirección',   placeholder: 'Dirección' },
-                { name: 'conductor_telefono',  label: 'Teléfono',    placeholder: 'Teléfono' },
+                { name: 'conductor_nombre',    label: 'Nombre *',   placeholder: 'Nombre completo',  required: true },
+                { name: 'conductor_cedula',    label: 'Cédula *',   placeholder: 'Número de cédula', required: true },
+                { name: 'conductor_direccion', label: 'Dirección',  placeholder: 'Dirección' },
+                { name: 'conductor_telefono',  label: 'Teléfono',   placeholder: 'Teléfono' },
               ].map(field => (
                 <div key={field.name}>
                   <label style={labelStyle}>{field.label}</label>
@@ -344,11 +469,11 @@ export default function VentaModal({ onClose, onSaved }) {
             <Seccion label="Datos del vehículo" />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
               {[
-                { name: 'vehiculo_clase',  label: 'Clase',     placeholder: 'Ej: Camión' },
-                { name: 'vehiculo_placas', label: 'Placas *',  placeholder: 'Ej: AJH 274', required: true },
-                { name: 'vehiculo_marca',  label: 'Marca',     placeholder: 'Ej: Dodge' },
-                { name: 'vehiculo_color',  label: 'Color',     placeholder: 'Ej: Vinotinto' },
-                { name: 'vehiculo_modelo', label: 'Modelo',    placeholder: 'Año modelo' },
+                { name: 'vehiculo_clase',  label: 'Clase',    placeholder: 'Ej: Camión' },
+                { name: 'vehiculo_placas', label: 'Placas *', placeholder: 'Ej: AJH 274', required: true },
+                { name: 'vehiculo_marca',  label: 'Marca',    placeholder: 'Ej: Dodge' },
+                { name: 'vehiculo_color',  label: 'Color',    placeholder: 'Ej: Vinotinto' },
+                { name: 'vehiculo_modelo', label: 'Modelo',   placeholder: 'Año modelo' },
               ].map(field => (
                 <div key={field.name}>
                   <label style={labelStyle}>{field.label}</label>
@@ -388,7 +513,6 @@ export default function VentaModal({ onClose, onSaved }) {
               </div>
             </div>
 
-            {/* ── Nota ── */}
             <div>
               <label style={labelStyle}>Nota</label>
               <textarea name="nota" value={form.nota} onChange={handleChange} rows={2}
@@ -420,8 +544,7 @@ export default function VentaModal({ onClose, onSaved }) {
             </button>
             <button type="submit" disabled={loading || submitted}
               style={{
-                flex: 1, padding: '9px',
-                border: 'none', borderRadius: '6px',
+                flex: 1, padding: '9px', border: 'none', borderRadius: '6px',
                 background: (loading || submitted) ? '#86efac' : '#16a34a',
                 color: 'white', fontSize: '13px', fontWeight: 500,
                 cursor: (loading || submitted) ? 'not-allowed' : 'pointer',

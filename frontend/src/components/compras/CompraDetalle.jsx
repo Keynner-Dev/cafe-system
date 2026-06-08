@@ -1,4 +1,3 @@
-// ─── Iconos SVG inline ────────────────────────────────────────────────────────
 const IconX = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -40,8 +39,9 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
             <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
               Compra #{compra.id}
             </h2>
+            {/* ← caficultor_nombre en vez de proveedor_nombre */}
             <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '2px' }}>
-              {compra.fecha} — {compra.proveedor_nombre}
+              {compra.fecha} — {compra.caficultor_nombre}
             </p>
           </div>
           <button
@@ -66,8 +66,7 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
               key={d.id}
               style={{
                 border: d.es_deposito ? '1px solid #fde68a' : '1px solid #e2e8f0',
-                borderRadius: '8px',
-                padding: '14px',
+                borderRadius: '8px', padding: '14px',
                 background: d.es_deposito ? '#fffbeb' : '#f8fafc',
               }}
             >
@@ -122,7 +121,7 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
                           padding: '2px 8px', borderRadius: '99px',
                           display: 'inline-block',
                         }}>
-                          Liquidado ✓
+                          Liquidado
                         </span>
                       )}
                     </>
@@ -137,8 +136,7 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
               {/* Liquidaciones previas */}
               {d.es_deposito && d.liquidaciones?.length > 0 && (
                 <div style={{
-                  marginTop: '12px',
-                  paddingTop: '12px',
+                  marginTop: '12px', paddingTop: '12px',
                   borderTop: '1px solid #fde68a',
                 }}>
                   <p style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '6px' }}>
@@ -149,8 +147,7 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
                       key={l.id}
                       style={{
                         display: 'flex', justifyContent: 'space-between',
-                        fontSize: '11px', color: '#475569',
-                        padding: '3px 0',
+                        fontSize: '11px', color: '#475569', padding: '3px 0',
                       }}
                     >
                       <span>{l.fecha} — {l.kilos} kg × {formatCOP(l.precio_kilo)}/kg</span>

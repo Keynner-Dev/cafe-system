@@ -4,7 +4,6 @@ import CompraModal from '../../components/compras/CompraModal'
 import LiquidacionModal from '../../components/compras/LiquidacionModal'
 import CompraDetalle from '../../components/compras/CompraDetalle'
 
-// ─── Iconos SVG inline ────────────────────────────────────────────────────────
 const IconPlus = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -28,7 +27,6 @@ const IconTrash = () => (
   </svg>
 )
 
-// ─── Badge de depósito ────────────────────────────────────────────────────────
 function BadgeDeposito({ tiene, kilos }) {
   if (tiene) {
     return (
@@ -48,19 +46,18 @@ function BadgeDeposito({ tiene, kilos }) {
       fontSize: '11px', fontWeight: 600,
       padding: '2px 8px', borderRadius: '99px',
     }}>
-      Al día ✓
+      Al día
     </span>
   )
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
 export default function ComprasPage() {
-  const [compras, setCompras]                     = useState([])
-  const [loading, setLoading]                     = useState(true)
-  const [modalOpen, setModalOpen]                 = useState(false)
-  const [liquidacionOpen, setLiquidacionOpen]     = useState(false)
-  const [detalleOpen, setDetalleOpen]             = useState(false)
-  const [compraSeleccionada, setCompraSeleccionada] = useState(null)
+  const [compras, setCompras]                         = useState([])
+  const [loading, setLoading]                         = useState(true)
+  const [modalOpen, setModalOpen]                     = useState(false)
+  const [liquidacionOpen, setLiquidacionOpen]         = useState(false)
+  const [detalleOpen, setDetalleOpen]                 = useState(false)
+  const [compraSeleccionada, setCompraSeleccionada]   = useState(null)
   const [detalleSeleccionado, setDetalleSeleccionado] = useState(null)
 
   const cargarCompras = () => {
@@ -136,7 +133,8 @@ export default function ComprasPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: '#0f172a' }}>
-                {['#', 'Fecha', 'Proveedor', 'Total', 'Depósito', 'Acciones'].map(col => (
+                {/* ← 'Caficultor' en vez de 'Proveedor' */}
+                {['#', 'Fecha', 'Caficultor', 'Total', 'Depósito', 'Acciones'].map(col => (
                   <th key={col} style={{
                     padding: '11px 16px', textAlign: 'left',
                     color: '#e2e8f0', fontWeight: 500, fontSize: '12px',
@@ -167,12 +165,16 @@ export default function ComprasPage() {
                   >
                     <td style={{ padding: '11px 16px', color: '#94a3b8' }}>{c.id}</td>
                     <td style={{ padding: '11px 16px', fontWeight: 500, color: '#0f172a' }}>{c.fecha}</td>
-                    <td style={{ padding: '11px 16px', color: '#475569' }}>{c.proveedor_nombre}</td>
+                    {/* ← caficultor_nombre en vez de proveedor_nombre */}
+                    <td style={{ padding: '11px 16px', color: '#475569' }}>{c.caficultor_nombre}</td>
                     <td style={{ padding: '11px 16px', fontWeight: 600, color: '#0f172a' }}>
                       {formatCOP(c.total)}
                     </td>
                     <td style={{ padding: '11px 16px' }}>
-                      <BadgeDeposito tiene={c.tiene_deposito_pendiente} kilos={c.kilos_deposito_pendiente} />
+                      <BadgeDeposito
+                        tiene={c.tiene_deposito_pendiente}
+                        kilos={c.kilos_deposito_pendiente}
+                      />
                     </td>
                     <td style={{ padding: '11px 16px' }}>
                       <div style={{ display: 'flex', gap: '6px' }}>
@@ -212,8 +214,7 @@ export default function ComprasPage() {
 
           {compras.length > 0 && (
             <div style={{
-              padding: '10px 16px',
-              borderTop: '1px solid #f1f5f9',
+              padding: '10px 16px', borderTop: '1px solid #f1f5f9',
               color: '#94a3b8', fontSize: '12px',
             }}>
               {compras.length} compra(s) registrada(s)
@@ -222,15 +223,10 @@ export default function ComprasPage() {
         </div>
       )}
 
-      {/* ── Modal nueva compra ── */}
+      {/* ── Modales ── */}
       {modalOpen && (
-        <CompraModal
-          onClose={() => setModalOpen(false)}
-          onSaved={cargarCompras}
-        />
+        <CompraModal onClose={() => setModalOpen(false)} onSaved={cargarCompras} />
       )}
-
-      {/* ── Modal detalle ── */}
       {detalleOpen && compraSeleccionada && (
         <CompraDetalle
           compra={compraSeleccionada}
@@ -238,8 +234,6 @@ export default function ComprasPage() {
           onLiquidar={handleLiquidar}
         />
       )}
-
-      {/* ── Modal liquidación ── */}
       {liquidacionOpen && detalleSeleccionado && (
         <LiquidacionModal
           detalle={detalleSeleccionado}

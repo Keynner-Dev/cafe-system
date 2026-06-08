@@ -3,7 +3,6 @@ import { getVentas, deleteVenta } from '../../api/ventas'
 import VentaModal from '../../components/ventas/VentaModal'
 import VentaDetalle from '../../components/ventas/VentaDetalle'
 
-// ─── Iconos SVG inline ────────────────────────────────────────────────────────
 const IconPlus = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -27,7 +26,6 @@ const IconTrash = () => (
   </svg>
 )
 
-// ─── Componente principal ─────────────────────────────────────────────────────
 export default function VentasPage() {
   const [ventas, setVentas]                       = useState([])
   const [loading, setLoading]                     = useState(true)
@@ -101,7 +99,8 @@ export default function VentasPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: '#0f172a' }}>
-                {['Remisión', 'Fecha', 'Cliente', 'Kilos', 'Bultos', 'Flete', 'Acciones'].map(col => (
+                {/* ← 'Empresa' en vez de 'Cliente' */}
+                {['Remisión', 'Fecha', 'Empresa', 'Kilos', 'Bultos', 'Flete', 'Acciones'].map(col => (
                   <th key={col} style={{
                     padding: '11px 16px', textAlign: 'left',
                     color: '#e2e8f0', fontWeight: 500, fontSize: '12px',
@@ -138,12 +137,19 @@ export default function VentasPage() {
                         {v.numero_remision}
                       </span>
                     </td>
-                    <td style={{ padding: '11px 16px', fontWeight: 500, color: '#0f172a' }}>{v.fecha}</td>
-                    <td style={{ padding: '11px 16px', color: '#475569' }}>{v.cliente_nombre}</td>
+                    <td style={{ padding: '11px 16px', fontWeight: 500, color: '#0f172a' }}>
+                      {v.fecha}
+                    </td>
+                    {/* ← empresa_nombre en vez de cliente_nombre */}
+                    <td style={{ padding: '11px 16px', color: '#475569' }}>
+                      {v.empresa_nombre}
+                    </td>
                     <td style={{ padding: '11px 16px', color: '#475569' }}>
                       {Number(v.total_kilos).toLocaleString('es-CO')} kg
                     </td>
-                    <td style={{ padding: '11px 16px', color: '#475569' }}>{v.total_bultos}</td>
+                    <td style={{ padding: '11px 16px', color: '#475569' }}>
+                      {v.total_bultos}
+                    </td>
                     <td style={{ padding: '11px 16px', color: '#475569' }}>
                       ${Number(v.flete_valor || 0).toLocaleString('es-CO')}
                     </td>
@@ -185,8 +191,7 @@ export default function VentasPage() {
 
           {ventas.length > 0 && (
             <div style={{
-              padding: '10px 16px',
-              borderTop: '1px solid #f1f5f9',
+              padding: '10px 16px', borderTop: '1px solid #f1f5f9',
               color: '#94a3b8', fontSize: '12px',
             }}>
               {ventas.length} remisión(es) registrada(s)

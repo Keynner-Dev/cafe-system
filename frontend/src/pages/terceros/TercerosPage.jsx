@@ -77,7 +77,7 @@ export default function TercerosPage() {
 
   const cargarTerceros = () => {
     setLoading(true)
-    getTerceros()
+    getTerceros({ todos: true})
       .then(res => setTerceros(res.data))
       .catch(err => console.error(err))
       .finally(() => setLoading(false))
@@ -98,9 +98,16 @@ export default function TercerosPage() {
     }
   }
 
-  const tercerosFiltrados = terceros.filter(t =>
-    t.nombre.toLowerCase().includes(filtro.toLowerCase())
-  )
+  const tercerosFiltrados = terceros.filter(t => {
+    const texto = filtro.toLowerCase().trim()
+
+    return (
+        (t.nombre || '').toLowerCase().includes(texto) ||
+        (t.cedula || '').toString().includes(texto) ||
+        (t.telefono || '').toString().includes(texto) ||
+        (t.telefono_whatsapp || '').toString().includes(texto)
+    )
+    })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

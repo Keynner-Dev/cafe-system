@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createTercero, updateTercero } from '../../api/terceros'
 
-// ─── Icono cerrar ─────────────────────────────────────────────────────────────
 const IconX = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -9,7 +8,6 @@ const IconX = () => (
   </svg>
 )
 
-// ─── Estilos reutilizables ────────────────────────────────────────────────────
 const inputStyle = {
   width: '100%', boxSizing: 'border-box',
   border: '1px solid #e2e8f0', borderRadius: '6px',
@@ -21,12 +19,15 @@ const labelStyle = {
   color: '#475569', marginBottom: '5px',
 }
 
+// ← cedula y telefono_whatsapp agregados, tipo empieza en 'empresa'
 const initialForm = {
-  nombre: '',
-  tipo: 'cliente',
-  telefono: '',
-  direccion: '',
-  activo: true,
+  nombre:            '',
+  tipo:              'empresa',
+  cedula:            '',
+  telefono:          '',
+  telefono_whatsapp: '',
+  direccion:         '',
+  activo:            true,
 }
 
 export default function TerceroModal({ tercero, onClose, onSaved }) {
@@ -34,7 +35,6 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState(null)
 
-  // Si viene un tercero, es edición — cargamos sus datos
   useEffect(() => {
     if (tercero) setForm(tercero)
     else setForm(initialForm)
@@ -61,10 +61,12 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
     }
   }
 
-  // Cierra al hacer clic en el backdrop (fuera del modal)
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) onClose()
   }
+
+  const focusGreen = (e) => e.target.style.borderColor = '#16a34a'
+  const blurGray   = (e) => e.target.style.borderColor = '#e2e8f0'
 
   return (
     <div
@@ -79,22 +81,24 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
       <div style={{
         background: 'white', borderRadius: '12px',
         width: '100%', maxWidth: '480px',
+        maxHeight: '90vh', overflowY: 'auto',
         boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
         overflow: 'hidden',
       }}>
 
-        {/* ── Cabecera del modal ── */}
+        {/* ── Cabecera ── */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '18px 20px',
-          borderBottom: '1px solid #f1f5f9',
+          padding: '18px 20px', borderBottom: '1px solid #f1f5f9',
         }}>
           <div>
             <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
               {tercero ? 'Editar tercero' : 'Nuevo tercero'}
             </h2>
             <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '2px' }}>
-              {tercero ? `Modificando: ${tercero.nombre}` : 'Completa los datos del cliente o proveedor'}
+              {tercero
+                ? `Modificando: ${tercero.nombre}`
+                : 'Completa los datos de la empresa o caficultor'}
             </p>
           </div>
           <button
@@ -102,8 +106,7 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: '30px', height: '30px', borderRadius: '6px',
-              border: 'none', background: 'transparent', cursor: 'pointer',
-              color: '#94a3b8',
+              border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f172a' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8' }}
@@ -112,11 +115,10 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
           </button>
         </div>
 
-        {/* ── Cuerpo del formulario ── */}
+        {/* ── Cuerpo ── */}
         <form onSubmit={handleSubmit}>
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-            {/* Error */}
             {error && (
               <div style={{
                 background: '#fef2f2', border: '1px solid #fecaca',
@@ -137,12 +139,11 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
                 required
                 placeholder="Ej: Juan García"
                 style={inputStyle}
-                onFocus={e => e.target.style.borderColor = '#16a34a'}
-                onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                onFocus={focusGreen} onBlur={blurGray}
               />
             </div>
 
-            {/* Tipo */}
+            {/* Tipo ← opciones actualizadas */}
             <div>
               <label style={labelStyle}>Tipo *</label>
               <select
@@ -150,27 +151,61 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
                 value={form.tipo}
                 onChange={handleChange}
                 style={inputStyle}
-                onFocus={e => e.target.style.borderColor = '#16a34a'}
-                onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                onFocus={focusGreen} onBlur={blurGray}
               >
-                <option value="cliente">Cliente</option>
-                <option value="proveedor">Proveedor</option>
+                <option value="empresa">Empresa</option>
+                <option value="caficultor">Caficultor</option>
                 <option value="ambos">Ambos</option>
               </select>
             </div>
 
-            {/* Teléfono */}
+            {/* Cédula ← campo nuevo */}
             <div>
-              <label style={labelStyle}>Teléfono</label>
+              <label style={labelStyle}>
+                Cédula / NIT
+                <span style={{ color: '#94a3b8', fontWeight: 400, marginLeft: '4px' }}>
+                  (usado para búsqueda y portal)
+                </span>
+              </label>
               <input
-                name="telefono"
-                value={form.telefono || ''}
+                name="cedula"
+                value={form.cedula || ''}
                 onChange={handleChange}
-                placeholder="Ej: 3001234567"
+                placeholder="Ej: 1234567890"
                 style={inputStyle}
-                onFocus={e => e.target.style.borderColor = '#16a34a'}
-                onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                onFocus={focusGreen} onBlur={blurGray}
               />
+            </div>
+
+            {/* Teléfono y WhatsApp en grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={labelStyle}>Teléfono</label>
+                <input
+                  name="telefono"
+                  value={form.telefono || ''}
+                  onChange={handleChange}
+                  placeholder="Ej: 3001234567"
+                  style={inputStyle}
+                  onFocus={focusGreen} onBlur={blurGray}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>
+                  WhatsApp
+                  <span style={{ color: '#94a3b8', fontWeight: 400, marginLeft: '4px' }}>
+                    (con código país)
+                  </span>
+                </label>
+                <input
+                  name="telefono_whatsapp"
+                  value={form.telefono_whatsapp || ''}
+                  onChange={handleChange}
+                  placeholder="Ej: 573001234567"
+                  style={inputStyle}
+                  onFocus={focusGreen} onBlur={blurGray}
+                />
+              </div>
             </div>
 
             {/* Dirección */}
@@ -183,23 +218,27 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
                 rows={2}
                 placeholder="Dirección del tercero"
                 style={{ ...inputStyle, resize: 'vertical', minHeight: '60px' }}
-                onFocus={e => e.target.style.borderColor = '#16a34a'}
-                onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                onFocus={focusGreen} onBlur={blurGray}
               />
             </div>
 
-            {/* Activo (toggle-style checkbox) */}
+            {/* Toggle activo */}
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               background: '#f8fafc', borderRadius: '6px', padding: '10px 12px',
             }}>
               <div>
-                <p style={{ fontSize: '13px', fontWeight: 500, color: '#0f172a', margin: 0 }}>Estado activo</p>
+                <p style={{ fontSize: '13px', fontWeight: 500, color: '#0f172a', margin: 0 }}>
+                  Estado activo
+                </p>
                 <p style={{ fontSize: '11px', color: '#94a3b8', margin: '2px 0 0' }}>
                   Los terceros inactivos no aparecen en formularios de compra/venta
                 </p>
               </div>
-              <label style={{ position: 'relative', display: 'inline-block', width: '40px', height: '22px', flexShrink: 0 }}>
+              <label style={{
+                position: 'relative', display: 'inline-block',
+                width: '40px', height: '22px', flexShrink: 0,
+              }}>
                 <input
                   type="checkbox"
                   name="activo"
@@ -226,11 +265,10 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
 
           </div>
 
-          {/* ── Pie del modal ── */}
+          {/* ── Pie ── */}
           <div style={{
             display: 'flex', gap: '10px',
-            padding: '16px 20px',
-            borderTop: '1px solid #f1f5f9',
+            padding: '16px 20px', borderTop: '1px solid #f1f5f9',
           }}>
             <button
               type="button"
@@ -252,9 +290,9 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
               style={{
                 flex: 1, padding: '9px',
                 border: 'none', borderRadius: '6px',
-                background: loading ? '#86efac' : '#16a34a',
-                color: 'white',
-                fontSize: '13px', fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer',
+                background: loading ? '#86efac' : '#16a34a', color: 'white',
+                fontSize: '13px', fontWeight: 500,
+                cursor: loading ? 'not-allowed' : 'pointer',
                 transition: 'background 0.15s',
               }}
               onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#15803d' }}

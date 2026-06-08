@@ -1,4 +1,3 @@
-// ─── Iconos SVG inline ────────────────────────────────────────────────────────
 const IconX = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -6,12 +5,14 @@ const IconX = () => (
   </svg>
 )
 
-// ─── Fila de dato ─────────────────────────────────────────────────────────────
 function Dato({ label, value }) {
   if (!value) return null
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-      <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+      <span style={{
+        fontSize: '10px', color: '#94a3b8', fontWeight: 500,
+        textTransform: 'uppercase', letterSpacing: '0.4px',
+      }}>
         {label}
       </span>
       <span style={{ fontSize: '13px', color: '#0f172a' }}>{value}</span>
@@ -48,7 +49,10 @@ export default function VentaDetalle({ venta, onClose }) {
           position: 'sticky', top: 0, background: 'white', zIndex: 1,
         }}>
           <div>
-            <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px', margin: 0 }}>
+            <p style={{
+              fontSize: '10px', color: '#94a3b8', fontWeight: 500,
+              textTransform: 'uppercase', letterSpacing: '0.4px', margin: 0,
+            }}>
               Remisión
             </p>
             <h2 style={{
@@ -58,10 +62,13 @@ export default function VentaDetalle({ venta, onClose }) {
             }}>
               {venta.numero_remision}
             </h2>
+            {/* ← empresa_nombre en vez de cliente_nombre, en dos sitios */}
             <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
-              {venta.fecha} — {venta.cliente_nombre}
+              {venta.fecha} — {venta.empresa_nombre}
               {venta.cuenta && (
-                <span style={{ marginLeft: '6px', color: '#94a3b8' }}>· Cuenta: {venta.cuenta}</span>
+                <span style={{ marginLeft: '6px', color: '#94a3b8' }}>
+                  · Cuenta: {venta.cuenta}
+                </span>
               )}
             </p>
           </div>
@@ -85,7 +92,10 @@ export default function VentaDetalle({ venta, onClose }) {
 
           {/* ── Tabla de mercancía ── */}
           <div>
-            <p style={{ fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+            <p style={{
+              fontSize: '11px', fontWeight: 600, color: '#475569',
+              marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px',
+            }}>
               Mercancía
             </p>
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
@@ -104,28 +114,43 @@ export default function VentaDetalle({ venta, onClose }) {
                 </thead>
                 <tbody>
                   {venta.detalles.map(d => (
-                    <tr key={d.id}
+                    <tr
+                      key={d.id}
                       style={{ borderTop: '1px solid #f1f5f9' }}
                       onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
                       onMouseLeave={e => e.currentTarget.style.background = 'white'}
                     >
-                      <td style={{ padding: '9px 14px', color: '#0f172a', fontWeight: 500 }}>{d.tipo_cafe_nombre}</td>
-                      <td style={{ padding: '9px 14px', color: '#475569' }}>{d.bodega_nombre}</td>
-                      <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>{d.bultos}</td>
+                      <td style={{ padding: '9px 14px', color: '#0f172a', fontWeight: 500 }}>
+                        {d.tipo_cafe_nombre}
+                      </td>
+                      <td style={{ padding: '9px 14px', color: '#475569' }}>
+                        {d.bodega_nombre}
+                      </td>
+                      <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>
+                        {d.bultos}
+                      </td>
                       <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>
                         {Number(d.kilos).toLocaleString('es-CO')} kg
                       </td>
                     </tr>
                   ))}
-                  {/* Fila de totales */}
                   <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
-                    <td colSpan={2} style={{ padding: '9px 14px', fontSize: '12px', fontWeight: 600, color: '#475569' }}>
+                    <td colSpan={2} style={{
+                      padding: '9px 14px', fontSize: '12px',
+                      fontWeight: 600, color: '#475569',
+                    }}>
                       Total
                     </td>
-                    <td style={{ padding: '9px 14px', fontWeight: 700, color: '#0f172a', textAlign: 'right' }}>
+                    <td style={{
+                      padding: '9px 14px', fontWeight: 700,
+                      color: '#0f172a', textAlign: 'right',
+                    }}>
                       {venta.total_bultos} bultos
                     </td>
-                    <td style={{ padding: '9px 14px', fontWeight: 700, color: '#0f172a', textAlign: 'right' }}>
+                    <td style={{
+                      padding: '9px 14px', fontWeight: 700,
+                      color: '#0f172a', textAlign: 'right',
+                    }}>
                       {Number(venta.total_kilos).toLocaleString('es-CO')} kg
                     </td>
                   </tr>
@@ -137,12 +162,14 @@ export default function VentaDetalle({ venta, onClose }) {
           {/* ── Conductor y vehículo ── */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
 
-            {/* Conductor */}
             <div style={{
               border: '1px solid #e2e8f0', borderRadius: '8px',
               padding: '14px', background: '#f8fafc',
             }}>
-              <p style={{ fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+              <p style={{
+                fontSize: '11px', fontWeight: 600, color: '#475569',
+                marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px',
+              }}>
                 Conductor
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -153,12 +180,14 @@ export default function VentaDetalle({ venta, onClose }) {
               </div>
             </div>
 
-            {/* Vehículo */}
             <div style={{
               border: '1px solid #e2e8f0', borderRadius: '8px',
               padding: '14px', background: '#f8fafc',
             }}>
-              <p style={{ fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+              <p style={{
+                fontSize: '11px', fontWeight: 600, color: '#475569',
+                marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px',
+              }}>
                 Vehículo
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -179,7 +208,9 @@ export default function VentaDetalle({ venta, onClose }) {
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             }}>
               <div>
-                <p style={{ fontSize: '12px', fontWeight: 600, color: '#15803d', margin: '0 0 2px' }}>Flete</p>
+                <p style={{ fontSize: '12px', fontWeight: 600, color: '#15803d', margin: '0 0 2px' }}>
+                  Flete
+                </p>
                 {venta.flete_pagadero_por && (
                   <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>
                     Pagadero por: {venta.flete_pagadero_por}
