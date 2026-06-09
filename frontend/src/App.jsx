@@ -9,6 +9,7 @@ import ComprasPage from './pages/compras/ComprasPage'
 import VentasPage from './pages/ventas/VentasPage'
 import PreciosPage from './pages/precios/PreciosPage'
 import TrasladosPage from './pages/inventario/TrasladosPage'
+import UsuariosPage from './pages/usuarios/UsuariosPage'
 
 // Componente que protege rutas — si no hay sesión, redirige al login
 function RutaProtegida({ children }) {
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="ventas"    element={<VentasPage />} />
         <Route path="precios"   element={<PreciosPage />} />
         <Route path="traslados" element={<TrasladosPage />} />
+        <Route path="/usuarios" element={<UsuariosPage />} />
       </Route>
     </Routes>
   )
