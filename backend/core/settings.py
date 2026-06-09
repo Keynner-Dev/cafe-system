@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'precios',
     'dashboard',
     'caja',
+    'gastos',
 ]
 
 MIDDLEWARE = [
