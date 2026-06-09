@@ -24,13 +24,14 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'corsheaders',
     # Apps del proyecto
-    'usuarios',      # ← debe ir ANTES que las demás apps del proyecto
+    'usuarios',
     'terceros',
     'inventario',
     'compras',
     'ventas',
     'precios',
     'dashboard',
+    'caja',
 ]
 
 MIDDLEWARE = [

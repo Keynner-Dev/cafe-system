@@ -10,8 +10,8 @@ import VentasPage from './pages/ventas/VentasPage'
 import PreciosPage from './pages/precios/PreciosPage'
 import TrasladosPage from './pages/inventario/TrasladosPage'
 import UsuariosPage from './pages/usuarios/UsuariosPage'
+import CajaPage from './pages/caja/CajaPage'      // ← nueva línea
 
-// Componente que protege rutas — si no hay sesión, redirige al login
 function RutaProtegida({ children }) {
   const { usuario, cargando } = useAuth()
 
@@ -44,26 +44,25 @@ export default function App() {
 
   return (
     <Routes>
-      {/* Ruta pública */}
       <Route
         path="/login"
         element={usuario ? <Navigate to="/" replace /> : <LoginPage />}
       />
 
-      {/* Rutas protegidas — todas dentro del Layout */}
       <Route path="/" element={
         <RutaProtegida>
           <Layout />
         </RutaProtegida>
       }>
         <Route index element={<Dashboard />} />
-        <Route path="terceros"  element={<TercerosPage />} />
+        <Route path="terceros"   element={<TercerosPage />} />
         <Route path="inventario" element={<InventarioPage />} />
-        <Route path="compras"   element={<ComprasPage />} />
-        <Route path="ventas"    element={<VentasPage />} />
-        <Route path="precios"   element={<PreciosPage />} />
-        <Route path="traslados" element={<TrasladosPage />} />
-        <Route path="/usuarios" element={<UsuariosPage />} />
+        <Route path="compras"    element={<ComprasPage />} />
+        <Route path="ventas"     element={<VentasPage />} />
+        <Route path="precios"    element={<PreciosPage />} />
+        <Route path="traslados"  element={<TrasladosPage />} />
+        <Route path="usuarios"   element={<UsuariosPage />} />
+        <Route path="caja"       element={<CajaPage />} />
       </Route>
     </Routes>
   )
