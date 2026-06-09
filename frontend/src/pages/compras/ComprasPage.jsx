@@ -3,7 +3,9 @@ import { getCompras, deleteCompra } from '../../api/compras'
 import CompraModal from '../../components/compras/CompraModal'
 import LiquidacionModal from '../../components/compras/LiquidacionModal'
 import CompraDetalle from '../../components/compras/CompraDetalle'
+import AbonoModal from '../../components/cuentasPagar/AbonoModal'
 
+// ─── Iconos SVG inline ────────────────────────────────────────────────────────
 const IconPlus = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -26,7 +28,16 @@ const IconTrash = () => (
     <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
   </svg>
 )
+// ← nuevo icono para el botón Ver deuda
+const IconDeuda = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <line x1="2" y1="10" x2="22" y2="10" />
+  </svg>
+)
 
+// ─── Badge depósito (sin cambios) ─────────────────────────────────────────────
 function BadgeDeposito({ tiene, kilos }) {
   if (tiene) {
     return (
@@ -51,6 +62,34 @@ function BadgeDeposito({ tiene, kilos }) {
   )
 }
 
+// ─── Badge deuda ← nuevo ──────────────────────────────────────────────────────
+// Muestra el estado de la cuenta por pagar ligada a la compra.
+// Si la compra no tiene cuenta_por_pagar, no muestra nada (retorna null).
+function BadgeDeuda({ cuenta }) {
+  if (!cuenta) return null
+
+  // Colores según el estado que devuelve el backend
+  const estilos = {
+    pendiente: { bg: '#fef2f2', color: '#dc2626', label: 'Con deuda'  },
+    parcial:   { bg: '#fef2f2', color: '#dc2626', label: 'Con deuda'  },
+    pagado:    { bg: '#f0fdf4', color: '#16a34a', label: 'Pagado'     },
+  }
+
+  const s = estilos[cuenta.estado] || { bg: '#f1f5f9', color: '#475569', label: cuenta.estado }
+
+  return (
+    <span style={{
+      background: s.bg, color: s.color,
+      fontSize: '11px', fontWeight: 600,
+      padding: '2px 8px', borderRadius: '99px',
+      whiteSpace: 'nowrap',
+    }}>
+      {s.label}
+    </span>
+  )
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 export default function ComprasPage() {
   const [compras, setCompras]                         = useState([])
   const [loading, setLoading]                         = useState(true)
@@ -59,6 +98,9 @@ export default function ComprasPage() {
   const [detalleOpen, setDetalleOpen]                 = useState(false)
   const [compraSeleccionada, setCompraSeleccionada]   = useState(null)
   const [detalleSeleccionado, setDetalleSeleccionado] = useState(null)
+  // ← dos nuevos estados para el modal de abonos
+  const [abonoOpen, setAbonoOpen]                     = useState(false)
+  const [cuentaSeleccionada, setCuentaSeleccionada]   = useState(null)
 
   const cargarCompras = () => {
     setLoading(true)
@@ -87,6 +129,12 @@ export default function ComprasPage() {
     } catch {
       alert('No se pudo eliminar.')
     }
+  }
+
+  // ← nuevo handler: abre AbonoModal con la cuenta de esa compra
+  const handleVerDeuda = (cuenta) => {
+    setCuentaSeleccionada(cuenta)
+    setAbonoOpen(true)
   }
 
   const formatCOP = (val) => `$${Number(val || 0).toLocaleString('es-CO')}`
@@ -133,8 +181,8 @@ export default function ComprasPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: '#0f172a' }}>
-                {/* ← 'Caficultor' en vez de 'Proveedor' */}
-                {['#', 'Fecha', 'Caficultor', 'Total', 'Depósito', 'Acciones'].map(col => (
+                {/* ← agregamos columna 'Deuda' entre Depósito y Acciones */}
+                {['#', 'Fecha', 'Caficultor', 'Total', 'Depósito', 'Deuda', 'Acciones'].map(col => (
                   <th key={col} style={{
                     padding: '11px 16px', textAlign: 'left',
                     color: '#e2e8f0', fontWeight: 500, fontSize: '12px',
@@ -148,7 +196,7 @@ export default function ComprasPage() {
             <tbody>
               {compras.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{
+                  <td colSpan={7} style={{
                     padding: '40px', textAlign: 'center',
                     color: '#94a3b8', fontSize: '13px',
                   }}>
@@ -165,7 +213,6 @@ export default function ComprasPage() {
                   >
                     <td style={{ padding: '11px 16px', color: '#94a3b8' }}>{c.id}</td>
                     <td style={{ padding: '11px 16px', fontWeight: 500, color: '#0f172a' }}>{c.fecha}</td>
-                    {/* ← caficultor_nombre en vez de proveedor_nombre */}
                     <td style={{ padding: '11px 16px', color: '#475569' }}>{c.caficultor_nombre}</td>
                     <td style={{ padding: '11px 16px', fontWeight: 600, color: '#0f172a' }}>
                       {formatCOP(c.total)}
@@ -176,8 +223,14 @@ export default function ComprasPage() {
                         kilos={c.kilos_deposito_pendiente}
                       />
                     </td>
+
+                    {/* ← celda nueva de deuda */}
                     <td style={{ padding: '11px 16px' }}>
-                      <div style={{ display: 'flex', gap: '6px' }}>
+                      <BadgeDeuda cuenta={c.cuenta_por_pagar} />
+                    </td>
+
+                    <td style={{ padding: '11px 16px' }}>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => handleVerDetalle(c)}
                           style={{
@@ -191,6 +244,29 @@ export default function ComprasPage() {
                         >
                           <IconEye /> Ver
                         </button>
+
+                        {/* ← botón Ver deuda, solo visible si la compra tiene cuenta_por_pagar */}
+                        {c.cuenta_por_pagar && (
+                          <button
+                            onClick={() => handleVerDeuda(c.cuenta_por_pagar)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '4px',
+                              padding: '5px 10px', borderRadius: '5px', border: 'none',
+                              background: c.cuenta_por_pagar.estado === 'pagado'
+                                ? '#f0fdf4' : '#fef2f2',
+                              color: c.cuenta_por_pagar.estado === 'pagado'
+                                ? '#16a34a' : '#dc2626',
+                              fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background =
+                              c.cuenta_por_pagar.estado === 'pagado' ? '#dcfce7' : '#fee2e2'}
+                            onMouseLeave={e => e.currentTarget.style.background =
+                              c.cuenta_por_pagar.estado === 'pagado' ? '#f0fdf4' : '#fef2f2'}
+                          >
+                            <IconDeuda /> Ver deuda
+                          </button>
+                        )}
+
                         <button
                           onClick={() => handleEliminar(c.id)}
                           style={{
@@ -223,7 +299,7 @@ export default function ComprasPage() {
         </div>
       )}
 
-      {/* ── Modales ── */}
+      {/* ── Modales (sin cambios en los existentes) ── */}
       {modalOpen && (
         <CompraModal onClose={() => setModalOpen(false)} onSaved={cargarCompras} />
       )}
@@ -240,6 +316,18 @@ export default function ComprasPage() {
           onClose={() => {
             setLiquidacionOpen(false)
             setDetalleOpen(false)
+          }}
+          onSaved={cargarCompras}
+        />
+      )}
+
+      {/* ← modal de abonos nuevo */}
+      {abonoOpen && cuentaSeleccionada && (
+        <AbonoModal
+          cuenta={cuentaSeleccionada}
+          onClose={() => {
+            setAbonoOpen(false)
+            setCuentaSeleccionada(null)
           }}
           onSaved={cargarCompras}
         />
