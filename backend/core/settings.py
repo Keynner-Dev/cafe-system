@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Librerías externas
     'rest_framework',
+    'rest_framework.authtoken',
     'corsheaders',
     # Apps del proyecto
     'usuarios',      # ← debe ir ANTES que las demás apps del proyecto
@@ -98,3 +99,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS — permite que React se comunique con Django
 CORS_ALLOW_ALL_ORIGINS = True  # Solo en desarrollo
+
+# ─── Django REST Framework ────────────────────────────────────────────────────
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
