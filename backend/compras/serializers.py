@@ -13,18 +13,14 @@ class LiquidacionDepositoSerializer(serializers.ModelSerializer):
     class Meta:
         model = LiquidacionDeposito
         fields = '__all__'
-        # creado_por lo asigna la view automáticamente, no el frontend
         read_only_fields = ['creado_por', 'creado_en']
 
     def create(self, validated_data):
         liquidacion = LiquidacionDeposito.objects.create(**validated_data)
         detalle = liquidacion.detalle_compra
-
-        # Marcar como liquidado si ya no quedan kilos pendientes
         if detalle.kilos_pendientes_liquidar <= 0:
             detalle.liquidado = True
             detalle.save()
-
         return liquidacion
 
 
@@ -39,9 +35,7 @@ class DetalleCompraSerializer(serializers.ModelSerializer):
     class Meta:
         model = DetalleCompra
         fields = '__all__'
-        extra_kwargs = {
-            'compra': {'required': False}
-        }
+        extra_kwargs = {'compra': {'required': False}}
 
     def get_subtotal(self, obj):
         return float(obj.subtotal or 0)
@@ -53,19 +47,26 @@ class DetalleCompraSerializer(serializers.ModelSerializer):
         return float(obj.kilos_pendientes_liquidar or 0)
 
 
+class CuentaPorPagarResumenSerializer(serializers.Serializer):
+    """Resumen liviano de la cuenta por pagar ligada a una compra."""
+    id = serializers.IntegerField()
+    estado = serializers.CharField()
+    valor_total = serializers.DecimalField(max_digits=14, decimal_places=2)
+    valor_pagado = serializers.DecimalField(max_digits=14, decimal_places=2)
+    saldo = serializers.DecimalField(max_digits=14, decimal_places=2)
+
+
 class CompraSerializer(serializers.ModelSerializer):
     detalles = DetalleCompraSerializer(many=True)
-
-    # Antes era proveedor_nombre — ahora es caficultor_nombre
     caficultor_nombre = serializers.CharField(source='caficultor.nombre', read_only=True)
-
     total = serializers.SerializerMethodField()
     total_deposito_pendiente = serializers.SerializerMethodField()
     kilos_deposito_pendiente = serializers.SerializerMethodField()
     tiene_deposito_pendiente = serializers.SerializerMethodField()
-
-    # creado_por lo asigna la view, el frontend no lo envía
     creado_por = serializers.StringRelatedField(read_only=True)
+
+    # ← campo nuevo: devuelve la primera cuenta por pagar ligada a esta compra
+    cuenta_por_pagar = serializers.SerializerMethodField()
 
     class Meta:
         model = Compra
@@ -96,6 +97,18 @@ class CompraSerializer(serializers.ModelSerializer):
 
     def get_tiene_deposito_pendiente(self, obj):
         return obj.detalles.filter(es_deposito=True, liquidado=False).exists()
+
+    def get_cuenta_por_pagar(self, obj):
+        cuenta = obj.cuentas_por_pagar.first()
+        if not cuenta:
+            return None
+        return {
+            'id': cuenta.id,
+            'estado': cuenta.estado,
+            'valor_total': float(cuenta.valor_total),
+            'valor_pagado': float(cuenta.valor_pagado),
+            'saldo': float(cuenta.saldo),
+        }
 
     @transaction.atomic
     def create(self, validated_data):

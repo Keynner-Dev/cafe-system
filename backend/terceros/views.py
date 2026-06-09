@@ -10,18 +10,24 @@ class TerceroViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Tercero.objects.all()
+
         tipo = self.request.query_params.get('tipo')
-        buscar = self.request.query_params.get('buscar')
-        todos = self.request.query_params.get('todos')  # ← nuevo
+        buscar = (
+            self.request.query_params.get('search')
+            or self.request.query_params.get('buscar')
+        )
+        todos = self.request.query_params.get('todos')
 
         if tipo:
             queryset = queryset.filter(tipo__in=[tipo, 'ambos'])
+
         if buscar:
-            queryset = queryset.filter(nombre__icontains=buscar) | \
-                    queryset.filter(cedula__icontains=buscar)
+            queryset = (
+                queryset.filter(nombre__icontains=buscar)
+                | queryset.filter(cedula__icontains=buscar)
+            )
             return queryset.distinct()
 
-        # Solo devuelve todo si se pide explícitamente
         if not todos:
             return Tercero.objects.none()
 

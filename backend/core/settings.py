@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'dashboard',
     'caja',
     'gastos',
+    'cuentas_pagar',
 ]
 
 MIDDLEWARE = [

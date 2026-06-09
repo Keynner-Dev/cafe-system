@@ -10,7 +10,9 @@ import VentasPage from './pages/ventas/VentasPage'
 import PreciosPage from './pages/precios/PreciosPage'
 import TrasladosPage from './pages/inventario/TrasladosPage'
 import UsuariosPage from './pages/usuarios/UsuariosPage'
-import CajaPage from './pages/caja/CajaPage'      // ← nueva línea
+import CajaPage from './pages/caja/CajaPage'
+import GastosPage from './pages/gastos/GastosPage'
+import CuentasPagarPage from './pages/cuentasPagar/CuentasPagarPage'
 
 function RutaProtegida({ children }) {
   const { usuario, cargando } = useAuth()
@@ -63,6 +65,8 @@ export default function App() {
         <Route path="traslados"  element={<TrasladosPage />} />
         <Route path="usuarios"   element={<UsuariosPage />} />
         <Route path="caja"       element={<CajaPage />} />
+        <Route path="gastos"     element={<GastosPage />} />
+        <Route path="cuentas-pagar" element={<CuentasPagarPage />} />
       </Route>
     </Routes>
   )
