@@ -148,6 +148,17 @@ const SECTIONS = [
         ),
       },
       {
+        to: '/cuentas-cobrar',
+        label: 'Cuentas por cobrar',
+        icon: (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <rect x="2" y="5" width="20" height="14" rx="2"/>
+            <path d="M16 10h.01M12 10h.01M8 10h.01M16 14h.01M12 14h.01"/>
+            </svg>
+        ),
+      },
+      {
         to: '/precios',
         label: 'Precios diarios',
         icon: (
