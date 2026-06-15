@@ -19,25 +19,32 @@ const labelStyle = {
   color: '#475569', marginBottom: '5px',
 }
 
-// ← cedula y telefono_whatsapp agregados, tipo empieza en 'empresa'
 const initialForm = {
-  nombre:            '',
-  tipo:              'empresa',
-  cedula:            '',
-  telefono:          '',
-  telefono_whatsapp: '',
-  direccion:         '',
-  activo:            true,
+  nombre:    '',
+  tipo:      'caficultor',
+  cedula:    '',
+  telefono:  '',
+  direccion: '',
+  activo:    true,
 }
 
 export default function TerceroModal({ tercero, onClose, onSaved }) {
-  const [form, setForm]       = useState(initialForm)
+  const [form,    setForm]    = useState(initialForm)
+  const [numero,  setNumero]  = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState(null)
+  const [error,   setError]   = useState(null)
 
   useEffect(() => {
-    if (tercero) setForm(tercero)
-    else setForm(initialForm)
+    if (tercero) {
+      // Si el teléfono guardado ya tiene +57, lo separamos
+      const tel = tercero.telefono || ''
+      const limpio = tel.startsWith('+57') ? tel.replace('+57', '') : tel
+      setNumero(limpio)
+      setForm({ ...tercero, telefono: '' })
+    } else {
+      setForm(initialForm)
+      setNumero('')
+    }
   }, [tercero])
 
   const handleChange = (e) => {
@@ -45,13 +52,25 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
     setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
   }
 
+  const handleNumero = (e) => {
+    // Solo dígitos, máximo 10
+    const val = e.target.value.replace(/\D/g, '').slice(0, 10)
+    setNumero(val)
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
     try {
-      if (tercero) await updateTercero(tercero.id, form)
-      else         await createTercero(form)
+      const telefonoCompleto = numero ? `+57${numero}` : ''
+      const payload = {
+        ...form,
+        telefono:          telefonoCompleto,
+        telefono_whatsapp: telefonoCompleto,
+      }
+      if (tercero) await updateTercero(tercero.id, payload)
+      else         await createTercero(payload)
       onSaved()
       onClose()
     } catch {
@@ -81,21 +100,23 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
       <div style={{
         background: 'white', borderRadius: '12px',
         width: '100%', maxWidth: '480px',
-        maxHeight: '90vh', overflowY: 'auto',
+        maxHeight: '90vh',
         boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
         overflow: 'hidden',
+        display: 'flex', flexDirection: 'column',
       }}>
 
         {/* ── Cabecera ── */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           padding: '18px 20px', borderBottom: '1px solid #f1f5f9',
+          flexShrink: 0,
         }}>
           <div>
             <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
               {tercero ? 'Editar tercero' : 'Nuevo tercero'}
             </h2>
-            <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '2px' }}>
+            <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '2px', margin: '2px 0 0' }}>
               {tercero
                 ? `Modificando: ${tercero.nombre}`
                 : 'Completa los datos de la empresa o caficultor'}
@@ -116,7 +137,7 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
         </div>
 
         {/* ── Cuerpo ── */}
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ overflowY: 'auto', flex: 1 }}>
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
             {error && (
@@ -143,7 +164,7 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
               />
             </div>
 
-            {/* Tipo ← opciones actualizadas */}
+            {/* Tipo */}
             <div>
               <label style={labelStyle}>Tipo *</label>
               <select
@@ -159,7 +180,7 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
               </select>
             </div>
 
-            {/* Cédula ← campo nuevo */}
+            {/* Cédula */}
             <div>
               <label style={labelStyle}>
                 Cédula / NIT
@@ -177,35 +198,54 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
               />
             </div>
 
-            {/* Teléfono y WhatsApp en grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={labelStyle}>Teléfono</label>
+            {/* Teléfono unificado con selector país */}
+            <div>
+              <label style={labelStyle}>Teléfono</label>
+              <div style={{
+                display: 'flex', border: '1px solid #e2e8f0',
+                borderRadius: '6px', overflow: 'hidden',
+              }}
+                onFocusCapture={e => e.currentTarget.style.borderColor = '#16a34a'}
+                onBlurCapture={e  => e.currentTarget.style.borderColor = '#e2e8f0'}
+              >
+                {/* País fijo Colombia */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '0 10px', background: '#f8fafc',
+                  borderRight: '1px solid #e2e8f0', flexShrink: 0,
+                }}>
+                  <span style={{ fontSize: '16px', lineHeight: 1 }}>🇨🇴</span>
+                  <span style={{ fontSize: '13px', color: '#475569', fontWeight: 500 }}>+57</span>
+                </div>
+
+                {/* Input número */}
                 <input
-                  name="telefono"
-                  value={form.telefono || ''}
-                  onChange={handleChange}
-                  placeholder="Ej: 3001234567"
-                  style={inputStyle}
-                  onFocus={focusGreen} onBlur={blurGray}
+                  type="tel"
+                  value={numero}
+                  onChange={handleNumero}
+                  placeholder="300 123 4567"
+                  style={{
+                    flex: 1, border: 'none', outline: 'none',
+                    padding: '8px 12px', fontSize: '13px',
+                    color: '#0f172a', background: 'transparent',
+                  }}
                 />
+
+                {/* Preview número completo */}
+                {numero && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center',
+                    padding: '0 10px', fontSize: '11px',
+                    color: '#94a3b8', borderLeft: '1px solid #f1f5f9',
+                    whiteSpace: 'nowrap', background: '#f8fafc',
+                  }}>
+                    +57{numero}
+                  </div>
+                )}
               </div>
-              <div>
-                <label style={labelStyle}>
-                  WhatsApp
-                  <span style={{ color: '#94a3b8', fontWeight: 400, marginLeft: '4px' }}>
-                    (con código país)
-                  </span>
-                </label>
-                <input
-                  name="telefono_whatsapp"
-                  value={form.telefono_whatsapp || ''}
-                  onChange={handleChange}
-                  placeholder="Ej: 573001234567"
-                  style={inputStyle}
-                  onFocus={focusGreen} onBlur={blurGray}
-                />
-              </div>
+              <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0' }}>
+                Este número se usará también para WhatsApp
+              </p>
             </div>
 
             {/* Dirección */}
@@ -269,6 +309,7 @@ export default function TerceroModal({ tercero, onClose, onSaved }) {
           <div style={{
             display: 'flex', gap: '10px',
             padding: '16px 20px', borderTop: '1px solid #f1f5f9',
+            flexShrink: 0,
           }}>
             <button
               type="button"

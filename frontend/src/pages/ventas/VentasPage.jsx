@@ -205,8 +205,19 @@ export default function VentasPage() {
         <VentaModal onClose={() => setModalOpen(false)} onSaved={cargarVentas} />
       )}
       {detalleOpen && ventaSeleccionada && (
-        <VentaDetalle venta={ventaSeleccionada} onClose={() => setDetalleOpen(false)} />
-      )}
+        <VentaDetalle
+            venta={ventaSeleccionada}
+            onClose={() => setDetalleOpen(false)}
+            onUpdated={() => {
+            cargarVentas()
+            // Actualizar también la venta seleccionada con los datos nuevos
+            getVentas().then(res => {
+                const actualizada = res.data.find(v => v.id === ventaSeleccionada.id)
+                if (actualizada) setVentaSeleccionada(actualizada)
+            })
+            }}
+        />
+        )}
     </div>
   )
 }

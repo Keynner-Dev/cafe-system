@@ -1,6 +1,8 @@
 from django.db import models
 from inventario.models import Bodega
 from django.conf import settings
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 class Caja(models.Model):
@@ -62,3 +64,8 @@ class MovimientoCaja(models.Model):
         verbose_name = 'Movimiento de Caja'
         verbose_name_plural = 'Movimientos de Caja'
         ordering = ['-fecha']
+        
+@receiver(post_save, sender='inventario.Bodega')
+def crear_caja_automatica(sender, instance, created, **kwargs):
+    if created:
+        Caja.objects.get_or_create(bodega=instance)

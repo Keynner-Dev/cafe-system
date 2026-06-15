@@ -112,12 +112,23 @@ def trasladar(request):
             bodega_origen = Bodega.objects.get(id=bodega_origen_id)
             bodega_destino = Bodega.objects.get(id=bodega_destino_id)
 
+            # Costo promedio actual del origen — se transfiere al destino
+            from .models import CostoInventario
+            try:
+                costo_origen = CostoInventario.objects.get(
+                    bodega=bodega_origen, tipo_cafe=tipo_cafe
+                )
+                precio_traslado = costo_origen.costo_promedio
+            except CostoInventario.DoesNotExist:
+                precio_traslado = None
+
             MovimientoInventario.objects.create(
                 tipo='traslado_salida',
                 tipo_cafe=tipo_cafe,
                 bodega=bodega_origen,
                 bodega_destino=bodega_destino,
                 kilos=kilos,
+                precio_kilo=precio_traslado,
                 nota=nota or f'Traslado a {bodega_destino.nombre}'
             )
 
@@ -127,6 +138,7 @@ def trasladar(request):
                 bodega=bodega_destino,
                 bodega_destino=None,
                 kilos=kilos,
+                precio_kilo=precio_traslado,
                 nota=nota or f'Traslado desde {bodega_origen.nombre}'
             )
 

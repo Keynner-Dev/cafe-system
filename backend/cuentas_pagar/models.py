@@ -1,6 +1,8 @@
 from django.db import models
 from inventario.models import Bodega
 from django.conf import settings
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 class CuentaPorPagar(models.Model):
@@ -97,3 +99,49 @@ class AbonoCuentaPorPagar(models.Model):
         verbose_name = 'Abono'
         verbose_name_plural = 'Abonos'
         ordering = ['-fecha', '-creado_en']
+        
+@receiver(post_save, sender=CuentaPorPagar)
+def ingreso_caja_vale_creado(sender, instance, created, **kwargs):
+    """Al crear un vale, devuelve el dinero a la caja (la compra ya lo descontó)."""
+    if not created:
+        return
+
+    from caja.models import Caja, MovimientoCaja
+
+    try:
+        caja = Caja.objects.get(bodega=instance.bodega)
+    except Caja.DoesNotExist:
+        return
+
+    MovimientoCaja.objects.create(
+        caja=caja,
+        tipo='ingreso',
+        valor=instance.valor_total,
+        descripcion=f'Vale — {instance.caficultor.nombre}: {instance.descripcion}',
+        creado_por=instance.creado_por,
+    )
+
+
+@receiver(post_save, sender=AbonoCuentaPorPagar)
+def egreso_caja_abono_vale(sender, instance, created, **kwargs):
+    """Cada abono al vale descuenta de la caja solo si es en efectivo."""
+    if not created:
+        return
+    if instance.medio_pago != 'efectivo':
+        return
+
+    from caja.models import Caja, MovimientoCaja
+
+    try:
+        caja = Caja.objects.get(bodega=instance.cuenta.bodega)
+    except Caja.DoesNotExist:
+        return
+
+    MovimientoCaja.objects.create(
+        caja=caja,
+        tipo='egreso',
+        valor=instance.valor,
+        descripcion=f'Abono vale — {instance.cuenta.caficultor.nombre}: '
+                    f'{instance.cuenta.descripcion}',
+        creado_por=instance.creado_por,
+    )

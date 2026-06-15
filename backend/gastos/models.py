@@ -1,6 +1,8 @@
 from django.db import models
 from inventario.models import Bodega
 from django.conf import settings
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 class Gasto(models.Model):
@@ -33,3 +35,26 @@ class Gasto(models.Model):
         verbose_name = 'Gasto'
         verbose_name_plural = 'Gastos'
         ordering = ['-fecha', '-creado_en']
+        
+@receiver(post_save, sender=Gasto)
+def egreso_caja_gasto(sender, instance, created, **kwargs):
+    """Al crear un gasto en efectivo, descuenta de la caja de esa bodega."""
+    if not created:
+        return
+    if instance.medio_pago != 'efectivo':
+        return  # Transferencias no tocan la caja
+
+    from caja.models import Caja, MovimientoCaja
+
+    try:
+        caja = Caja.objects.get(bodega=instance.bodega)
+    except Caja.DoesNotExist:
+        return
+
+    MovimientoCaja.objects.create(
+        caja=caja,
+        tipo='egreso',
+        valor=instance.valor,
+        descripcion=f'Gasto — {instance.categoria}: {instance.descripcion}',
+        creado_por=instance.creado_por,
+    )
