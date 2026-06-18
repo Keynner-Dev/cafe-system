@@ -6,11 +6,21 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('SECRET_KEY', 'clave-local-insegura')
+# ─── Seguridad ────────────────────────────────────────────────────────────
+SECRET_KEY = os.getenv('SECRET_KEY')
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+if not SECRET_KEY:
+    if DEBUG:
+        # Solo para desarrollo local si olvidaste poner SECRET_KEY en .env
+        SECRET_KEY = 'django-insecure-solo-desarrollo-local-NUNCA-en-produccion'
+    else:
+        raise Exception(
+            'SECRET_KEY no está configurada. '
+            'Defínela como variable de entorno antes de desplegar a producción.'
+        )
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -19,11 +29,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # Librerías externas
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
-    # Apps del proyecto
     'usuarios',
     'terceros',
     'inventario',
@@ -40,6 +48,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -82,8 +91,6 @@ DATABASES = {
     }
 }
 
-# ─── Modelo de usuario personalizado ─────────────────────────────────────────
-# IMPORTANTE: esto le dice a Django que use nuestro modelo en vez del default
 AUTH_USER_MODEL = 'usuarios.Usuario'
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -99,12 +106,35 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STORAGES = {
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS — permite que React se comunique con Django
-CORS_ALLOW_ALL_ORIGINS = True  # Solo en desarrollo
+# ─── CORS — ya NO permitimos cualquier origen ────────────────────────────
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = os.getenv(
+    'CORS_ALLOWED_ORIGINS', 'http://localhost:5173'
+).split(',')
+CORS_ALLOW_CREDENTIALS = True
 
-# ─── Django REST Framework ────────────────────────────────────────────────────
+CSRF_TRUSTED_ORIGINS = (
+    os.getenv('CSRF_TRUSTED_ORIGINS').split(',')
+    if os.getenv('CSRF_TRUSTED_ORIGINS') else []
+)
+
+# ─── Seguridad extra solo en producción ──────────────────────────────────
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',

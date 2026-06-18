@@ -36,21 +36,42 @@ class DetalleVentaSerializer(serializers.ModelSerializer):
 
 class VentaSerializer(serializers.ModelSerializer):
     detalles = DetalleVentaSerializer(many=True)
-
-    # Antes era cliente_nombre — ahora es empresa_nombre
     empresa_nombre = serializers.CharField(source='empresa.nombre', read_only=True)
-
     numero_remision = serializers.CharField(read_only=True)
     total_kilos = serializers.SerializerMethodField()
     total_bultos = serializers.SerializerMethodField()
-
-    # creado_por solo lectura — lo asigna la view
     creado_por = serializers.StringRelatedField(read_only=True)
 
     class Meta:
         model = Venta
         fields = '__all__'
-        read_only_fields = ['creado_por', 'creado_en']
+        read_only_fields = ['creado_por', 'creado_en', 'flete_descontado']
+
+    # ── Seguridad: campos exclusivos del jefe ──
+    def get_fields(self):
+        """Bloquea escritura de precio_kilo_jefe y flete_caja si no es jefe."""
+        fields = super().get_fields()
+        request = self.context.get('request')
+        usuario = getattr(request, 'user', None)
+
+        if usuario and usuario.is_authenticated and usuario.rol != 'jefe':
+            if 'precio_kilo_jefe' in fields:
+                fields['precio_kilo_jefe'].read_only = True
+            if 'flete_caja' in fields:
+                fields['flete_caja'].read_only = True
+
+        return fields
+
+    def to_representation(self, instance):
+        """Oculta precio_kilo_jefe por completo si quien consulta no es jefe."""
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        usuario = getattr(request, 'user', None)
+
+        if usuario and usuario.is_authenticated and usuario.rol != 'jefe':
+            data.pop('precio_kilo_jefe', None)
+
+        return data
 
     def get_total_kilos(self, obj):
         try:
