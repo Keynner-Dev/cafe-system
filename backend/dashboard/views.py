@@ -32,27 +32,48 @@ def calcular_stock(tipo_cafe_id=None, bodega_id=None):
 
 
 def promedio_compra_periodo(fecha_inicio, fecha_fin, bodega_id=None):
-    """Precio promedio ponderado por kilo de compras normales (no depósito) en un rango."""
+    """Precio promedio ponderado por kilo de compras normales (no depósito) en un rango,
+    con desglose adicional por tipo de café."""
     detalles = DetalleCompra.objects.filter(
         es_deposito=False,
         precio_kilo__isnull=False,
         compra__fecha__gte=fecha_inicio,
         compra__fecha__lte=fecha_fin,
-    )
+    ).select_related('tipo_cafe')
     if bodega_id:
         detalles = detalles.filter(bodega_id=bodega_id)
 
     total_kilos = detalles.aggregate(total=Sum('kilos'))['total'] or Decimal('0')
+
     if total_kilos == 0:
-        return {'precio_promedio': 0, 'kilos': 0, 'cantidad_compras': 0}
+        return {'precio_promedio': 0, 'kilos': 0, 'cantidad_compras': 0, 'por_tipo': []}
 
     valor_total = sum(d.kilos * d.precio_kilo for d in detalles)
     cantidad_compras = detalles.values('compra_id').distinct().count()
+
+    tipos_presentes = {}
+    for d in detalles:
+        nombre = d.tipo_cafe.nombre
+        if nombre not in tipos_presentes:
+            tipos_presentes[nombre] = {'kilos': Decimal('0'), 'valor': Decimal('0')}
+        tipos_presentes[nombre]['kilos'] += d.kilos
+        tipos_presentes[nombre]['valor'] += d.kilos * d.precio_kilo
+
+    por_tipo = [
+        {
+            'tipo_cafe': nombre,
+            'precio_promedio': float(datos['valor'] / datos['kilos']) if datos['kilos'] > 0 else 0,
+            'kilos': float(datos['kilos']),
+        }
+        for nombre, datos in tipos_presentes.items()
+    ]
+    por_tipo.sort(key=lambda x: x['kilos'], reverse=True)
 
     return {
         'precio_promedio': float(valor_total / total_kilos),
         'kilos': float(total_kilos),
         'cantidad_compras': cantidad_compras,
+        'por_tipo': por_tipo,
     }
 
 
@@ -158,26 +179,20 @@ def dashboard_data(request):
             'cantidad': pendientes_cxp.count(),
         }
 
-    # ── Pendientes por gestionar (solo jefe) ──
+    # ── Pendientes por gestionar (solo jefe) — ahora solo precio, flete es automático ──
     pendientes_gestion = []
     if es_jefe:
         ventas_pendientes = Venta.objects.filter(
-            Q(precio_kilo_jefe__isnull=True) |
-            (Q(flete_valor__gt=0) & Q(flete_descontado=False))
-        ).distinct().order_by('-creado_en')[:10]
+            precio_kilo_jefe__isnull=True
+        ).order_by('-creado_en')[:10]
 
         for v in ventas_pendientes:
-            falta = []
-            if v.precio_kilo_jefe is None:
-                falta.append('precio')
-            if v.flete_valor > 0 and not v.flete_descontado:
-                falta.append('flete')
             pendientes_gestion.append({
                 'id': v.id,
                 'numero_remision': v.numero_remision,
                 'empresa': v.empresa.nombre,
                 'fecha': v.fecha,
-                'falta': falta,
+                'falta': ['precio'],
             })
 
     # ── Últimas compras ──

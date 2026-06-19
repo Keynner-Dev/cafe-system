@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { updateVenta } from '../../api/ventas'
-import { getCajas } from '../../api/caja'
 
 const IconX = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -43,22 +42,10 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
   const { usuario } = useAuth()
   const esJefe = usuario?.rol === 'jefe'
 
-  const [cajas,          setCajas]          = useState([])
-  const [cajasLoaded,    setCajasLoaded]    = useState(false)
-  const [fleteCaja,      setFleteCaja]      = useState(venta.flete_caja || '')
-  const [precioKilo,     setPrecioKilo]     = useState(venta.precio_kilo_jefe || '')
-  const [guardando,      setGuardando]      = useState(false)
-  const [error,          setError]          = useState('')
-  const [guardado,       setGuardado]       = useState(false)
-
-  // Cargar cajas solo cuando el jefe abre el detalle
-  useState(() => {
-    if (!esJefe) return
-    getCajas().then(res => {
-      setCajas(res.data)
-      setCajasLoaded(true)
-    })
-  }, [])
+  const [precioKilo, setPrecioKilo] = useState(venta.precio_kilo_jefe || '')
+  const [guardando, setGuardando]   = useState(false)
+  const [error, setError]           = useState('')
+  const [guardado, setGuardado]     = useState(false)
 
   const handleGuardarJefe = async () => {
     setGuardando(true)
@@ -66,7 +53,6 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
     try {
       await updateVenta(venta.id, {
         precio_kilo_jefe: precioKilo || null,
-        flete_caja:       fleteCaja  || null,
       })
       setGuardado(true)
       onUpdated?.()
@@ -82,7 +68,9 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
     if (e.target === e.currentTarget) onClose()
   }
 
-  const fletePendiente = Number(venta.flete_valor) > 0 && !venta.flete_descontado
+  const tieneCalidad = venta.detalles.some(
+    d => d.muestra || d.factor || d.humedad || d.pasilla
+  )
 
   return (
     <div
@@ -96,7 +84,7 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
     >
       <div style={{
         background: 'white', borderRadius: '12px',
-        width: '100%', maxWidth: '660px',
+        width: '100%', maxWidth: '720px',
         maxHeight: '90vh', overflowY: 'auto',
         boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
         display: 'flex', flexDirection: 'column',
@@ -160,9 +148,8 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
                 Gestión del jefe
               </p>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', alignItems: 'start' }}>
 
-                {/* Precio de venta por kilo */}
                 <div>
                   <label style={{ ...labelStyle, color: '#92400e' }}>
                     Precio de venta por kilo
@@ -184,58 +171,25 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
                       onBlur={e  => e.target.style.borderColor = '#e2e8f0'}
                     />
                   </div>
-                  {precioKilo && venta.total_kilos && (
-                    <p style={{ fontSize: '11px', color: '#92400e', margin: '4px 0 0' }}>
-                      Total venta: {fmt(Number(precioKilo) * Number(venta.total_kilos))}
-                    </p>
-                  )}
                 </div>
 
-                {/* Caja que asume el flete */}
                 <div>
                   <label style={{ ...labelStyle, color: '#92400e' }}>
-                    Caja que paga el flete
-                    {fletePendiente && (
-                      <span style={{
-                        marginLeft: '6px', background: '#fef2f2', color: '#dc2626',
-                        padding: '1px 6px', borderRadius: '4px', fontSize: '10px',
-                      }}>
-                        Pendiente
-                      </span>
-                    )}
-                    {venta.flete_descontado && (
-                      <span style={{
-                        marginLeft: '6px', background: '#f0fdf4', color: '#16a34a',
-                        padding: '1px 6px', borderRadius: '4px', fontSize: '10px',
-                      }}>
-                        Descontado
-                      </span>
-                    )}
+                    Utilidad de la remisión
                   </label>
-                  {venta.flete_descontado ? (
+                  {venta.utilidad_total !== null && venta.utilidad_total !== undefined ? (
                     <div style={{
-                      ...inputStyle, background: '#f8fafc', color: '#64748b',
+                      padding: '8px 12px', borderRadius: '6px',
+                      background: venta.utilidad_total >= 0 ? '#f0fdf4' : '#fef2f2',
+                      border: `1px solid ${venta.utilidad_total >= 0 ? '#bbf7d0' : '#fecaca'}`,
+                      fontSize: '16px', fontWeight: 700,
+                      color: venta.utilidad_total >= 0 ? '#16a34a' : '#dc2626',
                     }}>
-                      {cajas.find(c => c.id === venta.flete_caja)?.bodega_nombre || 'Caja asignada'}
+                      {fmt(venta.utilidad_total)}
                     </div>
-                  ) : Number(venta.flete_valor) > 0 ? (
-                    <select
-                      value={fleteCaja}
-                      onChange={e => setFleteCaja(e.target.value)}
-                      style={{ ...inputStyle, background: 'white' }}
-                      onFocus={e => e.target.style.borderColor = '#f59e0b'}
-                      onBlur={e  => e.target.style.borderColor = '#e2e8f0'}
-                    >
-                      <option value="">Sin asignar</option>
-                      {cajas.map(c => (
-                        <option key={c.id} value={c.id}>{c.bodega_nombre}</option>
-                      ))}
-                    </select>
                   ) : (
-                    <div style={{
-                      ...inputStyle, background: '#f8fafc', color: '#94a3b8',
-                    }}>
-                      Sin flete en esta remisión
+                    <div style={{ ...inputStyle, background: '#f8fafc', color: '#94a3b8' }}>
+                      Asigna el precio para calcularla
                     </div>
                   )}
                 </div>
@@ -262,7 +216,7 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
                     cursor: guardando ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  {guardado ? '✓ Guardado' : guardando ? 'Guardando...' : 'Guardar'}
+                  {guardado ? '✓ Guardado' : guardando ? 'Guardando...' : 'Guardar precio'}
                 </button>
               </div>
             </div>
@@ -276,14 +230,17 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
             }}>
               Mercancía
             </p>
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ background: '#0f172a' }}>
-                    {['Tipo', 'Bodega', 'Bultos', 'Kilos'].map((col, i) => (
+                    {['Tipo', 'Bodega', 'Bultos', 'Kilos',
+                      ...(tieneCalidad ? ['Muestra', 'Factor', 'Humedad %', 'Pasilla %'] : [])
+                    ].map((col, i) => (
                       <th key={col} style={{
                         padding: '9px 14px', textAlign: i >= 2 ? 'right' : 'left',
                         color: '#e2e8f0', fontWeight: 500, fontSize: '11px',
+                        whiteSpace: 'nowrap',
                       }}>
                         {col}
                       </th>
@@ -308,6 +265,22 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
                       <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>
                         {Number(d.kilos).toLocaleString('es-CO')} kg
                       </td>
+                      {tieneCalidad && (
+                        <>
+                          <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>
+                            {d.muestra || '—'}
+                          </td>
+                          <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>
+                            {d.factor ?? '—'}
+                          </td>
+                          <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>
+                            {d.humedad ?? '—'}
+                          </td>
+                          <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>
+                            {d.pasilla ?? '—'}
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                   <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
@@ -322,6 +295,7 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
                     <td style={{ padding: '9px 14px', fontWeight: 700, color: '#0f172a', textAlign: 'right' }}>
                       {Number(venta.total_kilos).toLocaleString('es-CO')} kg
                     </td>
+                    {tieneCalidad && <td colSpan={4} />}
                   </tr>
                 </tbody>
               </table>
@@ -367,7 +341,7 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
             </div>
           </div>
 
-          {/* ── Flete ── */}
+          {/* ── Flete — informativo, asignado automáticamente ── */}
           {Number(venta.flete_valor) > 0 && (
             <div style={{
               background: '#f0fdf4', border: '1px solid #bbf7d0',
@@ -379,8 +353,25 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
                   Flete
                 </p>
                 {venta.flete_pagadero_por && (
-                  <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>
+                  <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 2px' }}>
                     Pagadero por: {venta.flete_pagadero_por}
+                  </p>
+                )}
+                {venta.flete_caja_bodega ? (
+                  <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>
+                    Caja a cargo: <strong>{venta.flete_caja_bodega}</strong>
+                    {venta.flete_descontado && (
+                      <span style={{
+                        marginLeft: '6px', background: '#dcfce7', color: '#15803d',
+                        padding: '1px 6px', borderRadius: '4px', fontSize: '10px',
+                      }}>
+                        Descontado
+                      </span>
+                    )}
+                  </p>
+                ) : (
+                  <p style={{ fontSize: '11px', color: '#94a3b8', margin: 0 }}>
+                    Caja sin asignar
                   </p>
                 )}
               </div>

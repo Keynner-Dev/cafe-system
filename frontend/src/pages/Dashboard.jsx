@@ -339,19 +339,36 @@ export default function Dashboard() {
         </div>
 
         {promedioActual.kilos > 0 ? (
-          <>
+        <>
             <p style={{ fontSize: '28px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-              {formatCOP(promedioActual.precio_promedio)}
-              <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 400 }}> / kg promedio pagado</span>
+            {formatCOP(promedioActual.precio_promedio)}
+            <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 400 }}> / kg promedio pagado</span>
             </p>
             <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
-              {formatKg(promedioActual.kilos)} comprados en {promedioActual.cantidad_compras} compra(s)
+            {formatKg(promedioActual.kilos)} comprados en {promedioActual.cantidad_compras} compra(s)
             </p>
-          </>
+
+            {promedioActual.por_tipo && promedioActual.por_tipo.length > 1 && (
+            <div style={{
+                marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #f1f5f9',
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px',
+            }}>
+                {promedioActual.por_tipo.map((t, i) => (
+                <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 12px' }}>
+                    <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>{t.tipo_cafe}</p>
+                    <p style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: '2px 0 0' }}>
+                    {formatCOP(t.precio_promedio)}<span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 400 }}>/kg</span>
+                    </p>
+                    <p style={{ fontSize: '10px', color: '#94a3b8', margin: '2px 0 0' }}>{formatKg(t.kilos)}</p>
+                </div>
+                ))}
+            </div>
+            )}
+        </>
         ) : (
-          <p style={{ color: '#94a3b8', fontSize: '13px' }}>
+        <p style={{ color: '#94a3b8', fontSize: '13px' }}>
             Sin compras registradas en este periodo
-          </p>
+        </p>
         )}
       </div>
 

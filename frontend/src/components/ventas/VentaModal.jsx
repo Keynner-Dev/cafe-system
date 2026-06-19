@@ -57,7 +57,10 @@ function Seccion({ label }) {
 }
 
 const hoy = new Date().toISOString().split('T')[0]
-const detalleVacio = { tipo_cafe: '', bodega: '', bultos: '', kilos: '' }
+const detalleVacio = {
+  tipo_cafe: '', bodega: '', bultos: '', kilos: '',
+  muestra: '', factor: '', humedad: '', pasilla: '',
+}
 const initialForm = {
   fecha: hoy, empresa: '', cuenta: '',          // ← "empresa" en vez de "cliente"
   conductor_nombre: '', conductor_cedula: '',
@@ -157,26 +160,33 @@ export default function VentaModal({ onClose, onSaved }) {
     e.preventDefault()
     e.stopPropagation()
     if (!form.empresa) {
-      setError('Debes seleccionar una empresa.')
-      return
+        setError('Debes seleccionar una empresa.')
+        return
     }
     if (loading || submitted) return
     setSubmitted(true)
     setLoading(true)
     setError(null)
     try {
-      await createVenta({ ...form, detalles })
-      onSaved()
-      onClose()
+        const detallesLimpios = detalles.map(d => ({
+        ...d,
+        muestra: d.muestra || null,
+        factor: d.factor === '' ? null : d.factor,
+        humedad: d.humedad === '' ? null : d.humedad,
+        pasilla: d.pasilla === '' ? null : d.pasilla,
+        }))
+        await createVenta({ ...form, detalles: detallesLimpios })
+        onSaved()
+        onClose()
     } catch (err) {
-      setSubmitted(false)
-      const data = err.response?.data
-      if (data?.stock) setError(data.stock.join(' | '))
-      else setError('Error al guardar. Verifica los datos.')
+        setSubmitted(false)
+        const data = err.response?.data
+        if (data?.stock) setError(data.stock.join(' | '))
+        else setError('Error al guardar. Verifica los datos.')
     } finally {
-      setLoading(false)
+        setLoading(false)
     }
-  }
+    }
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) onClose()
@@ -395,6 +405,46 @@ export default function VentaModal({ onClose, onSaved }) {
                         style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
                         onFocus={focusGreen} onBlur={blurGray}
                       />
+                    </div>
+                    {/* ── Campos opcionales de calidad ── */}
+                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #e2e8f0' }}>
+                        <p style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                            Calidad (opcional)
+                        </p>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px' }}>
+                            <div>
+                            <label style={{ ...labelStyle, fontSize: '11px' }}>Muestra</label>
+                            <input type="text" name="muestra" value={d.muestra}
+                                onChange={e => handleDetalleChange(i, e)} placeholder="Ref."
+                                style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+                                onFocus={focusGreen} onBlur={blurGray}
+                            />
+                            </div>
+                            <div>
+                            <label style={{ ...labelStyle, fontSize: '11px' }}>Factor</label>
+                            <input type="number" name="factor" value={d.factor} step="0.01"
+                                onChange={e => handleDetalleChange(i, e)} placeholder="0.00"
+                                style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+                                onFocus={focusGreen} onBlur={blurGray}
+                            />
+                            </div>
+                            <div>
+                            <label style={{ ...labelStyle, fontSize: '11px' }}>Humedad %</label>
+                            <input type="number" name="humedad" value={d.humedad} step="0.01"
+                                onChange={e => handleDetalleChange(i, e)} placeholder="0.00"
+                                style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+                                onFocus={focusGreen} onBlur={blurGray}
+                            />
+                            </div>
+                            <div>
+                            <label style={{ ...labelStyle, fontSize: '11px' }}>Pasilla %</label>
+                            <input type="number" name="pasilla" value={d.pasilla} step="0.01"
+                                onChange={e => handleDetalleChange(i, e)} placeholder="0.00"
+                                style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+                                onFocus={focusGreen} onBlur={blurGray}
+                            />
+                            </div>
+                        </div>
                     </div>
                   </div>
                   {detalles.length > 1 && (
