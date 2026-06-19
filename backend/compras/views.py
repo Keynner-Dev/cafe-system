@@ -1,6 +1,7 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, permissions
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
 from django.db import transaction
 from .models import Compra, DetalleCompra, LiquidacionDeposito
 from .serializers import CompraSerializer, LiquidacionDepositoSerializer
@@ -11,13 +12,26 @@ from django.dispatch import receiver
 
 class CompraViewSet(viewsets.ModelViewSet):
     serializer_class = CompraSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Compra.objects.prefetch_related('cuentas_por_pagar').all()
+        usuario = self.request.user
+        qs = Compra.objects.prefetch_related('cuentas_por_pagar', 'detalles').all()
+
+        # Administrador solo ve compras que involucran su bodega
+        if usuario.rol == 'administrador':
+            qs = qs.filter(detalles__bodega=usuario.bodega).distinct()
+
         caficultor_id = self.request.query_params.get('caficultor')
         if caficultor_id:
             qs = qs.filter(caficultor_id=caficultor_id)
         return qs
+
+    def get_serializer_context(self):
+        # Necesario para que CompraSerializer.validate() sepa el rol del usuario
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
@@ -25,6 +39,7 @@ class CompraViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def destroy(self, request, *args, **kwargs):
+        # get_object() ya usa get_queryset() filtrado por bodega
         compra = self.get_object()
         MovimientoInventario.objects.filter(
             referencia=f'compra-{compra.id}'
@@ -34,22 +49,37 @@ class CompraViewSet(viewsets.ModelViewSet):
 
 
 class LiquidacionDepositoViewSet(viewsets.ModelViewSet):
-    queryset = LiquidacionDeposito.objects.all()
     serializer_class = LiquidacionDepositoSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        usuario = self.request.user
+        qs = LiquidacionDeposito.objects.select_related('detalle_compra__bodega')
+
+        if usuario.rol == 'administrador':
+            qs = qs.filter(detalle_compra__bodega=usuario.bodega)
+
+        return qs
 
     def perform_create(self, serializer):
-        user = self.request.user if self.request.user.is_authenticated else None
-        serializer.save(creado_por=user)
-        
+        usuario = self.request.user
+        detalle = serializer.validated_data.get('detalle_compra')
+
+        if usuario.rol == 'administrador' and detalle and detalle.bodega != usuario.bodega:
+            raise PermissionDenied('No tienes acceso a esta bodega.')
+
+        serializer.save(creado_por=usuario)
+
+
 @receiver(post_save, sender=DetalleCompra)
 def egreso_caja_compra_normal(sender, instance, created, **kwargs):
     """Al crear un detalle de compra normal, descuenta de la caja de esa bodega."""
     if not created:
         return
     if instance.es_deposito:
-        return  # Depósito no toca la caja hasta liquidar
+        return
     if not instance.precio_kilo:
-        return  # Sin precio no hay movimiento
+        return
 
     from caja.models import Caja, MovimientoCaja
 

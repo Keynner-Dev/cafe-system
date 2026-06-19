@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 from django.db import transaction
 from .models import Compra, DetalleCompra, LiquidacionDeposito
 from inventario.models import MovimientoInventario
@@ -48,7 +49,6 @@ class DetalleCompraSerializer(serializers.ModelSerializer):
 
 
 class CuentaPorPagarResumenSerializer(serializers.Serializer):
-    """Resumen liviano de la cuenta por pagar ligada a una compra."""
     id = serializers.IntegerField()
     estado = serializers.CharField()
     valor_total = serializers.DecimalField(max_digits=14, decimal_places=2)
@@ -64,8 +64,6 @@ class CompraSerializer(serializers.ModelSerializer):
     kilos_deposito_pendiente = serializers.SerializerMethodField()
     tiene_deposito_pendiente = serializers.SerializerMethodField()
     creado_por = serializers.StringRelatedField(read_only=True)
-
-    # ← campo nuevo: devuelve la primera cuenta por pagar ligada a esta compra
     cuenta_por_pagar = serializers.SerializerMethodField()
 
     class Meta:
@@ -109,6 +107,22 @@ class CompraSerializer(serializers.ModelSerializer):
             'valor_pagado': float(cuenta.valor_pagado),
             'saldo': float(cuenta.saldo),
         }
+
+    # ── Seguridad: administrador solo puede comprar para su propia bodega ──
+    def validate(self, data):
+        request = self.context.get('request')
+        usuario = getattr(request, 'user', None)
+        detalles = data.get('detalles', [])
+
+        if usuario and usuario.is_authenticated and usuario.rol == 'administrador':
+            for i, detalle in enumerate(detalles):
+                bodega = detalle.get('bodega')
+                if bodega and bodega != usuario.bodega:
+                    raise serializers.ValidationError({
+                        'detalles': f'Línea {i+1}: no tienes acceso a la bodega {bodega.nombre}.'
+                    })
+
+        return data
 
     @transaction.atomic
     def create(self, validated_data):

@@ -1,5 +1,6 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, permissions
 from rest_framework.decorators import action, api_view
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Sum
@@ -25,24 +26,52 @@ def get_stock(tipo_cafe_id, bodega_id):
     return entradas - salidas
 
 
+class SoloJefeEscritura(permissions.BasePermission):
+    """Cualquier usuario autenticado puede leer (GET).
+    Solo el jefe puede crear, editar o eliminar (datos maestros)."""
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return request.user.is_authenticated
+        return request.user.is_authenticated and request.user.rol == 'jefe'
+
+
 class TipoCafeViewSet(viewsets.ModelViewSet):
     queryset = TipoCafe.objects.all()
     serializer_class = TipoCafeSerializer
+    permission_classes = [SoloJefeEscritura]
 
 
 class BodegaViewSet(viewsets.ModelViewSet):
     queryset = Bodega.objects.all()
     serializer_class = BodegaSerializer
+    permission_classes = [SoloJefeEscritura]
 
 
 class MovimientoInventarioViewSet(viewsets.ModelViewSet):
-    queryset = MovimientoInventario.objects.all()
     serializer_class = MovimientoInventarioSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        usuario = self.request.user
+        qs = MovimientoInventario.objects.all()
+
+        # Administrador solo ve movimientos de su propia bodega
+        if usuario.rol == 'administrador':
+            qs = qs.filter(bodega=usuario.bodega)
+
+        return qs
 
     @action(detail=False, methods=['get'])
     def stock(self, request):
+        usuario = request.user
         bodega_id = request.query_params.get('bodega')
         tipo_cafe_id = request.query_params.get('tipo_cafe')
+
+        # Administrador no puede consultar el stock de otra bodega
+        if usuario.rol == 'administrador':
+            if bodega_id and str(bodega_id) != str(usuario.bodega_id):
+                raise PermissionDenied('No tienes acceso a esta bodega.')
+            bodega_id = usuario.bodega_id
 
         movimientos = MovimientoInventario.objects.all()
         if bodega_id:
@@ -67,6 +96,7 @@ class MovimientoInventarioViewSet(viewsets.ModelViewSet):
 
 @api_view(['POST'])
 def trasladar(request):
+    usuario = request.user
     tipo_cafe_id = request.data.get('tipo_cafe')
     bodega_origen_id = request.data.get('bodega_origen')
     bodega_destino_id = request.data.get('bodega_destino')
@@ -83,6 +113,13 @@ def trasladar(request):
         return Response(
             {'error': 'La bodega origen y destino no pueden ser la misma.'},
             status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Seguridad: administrador solo puede trasladar DESDE su propia bodega
+    if usuario.rol == 'administrador' and str(bodega_origen_id) != str(usuario.bodega_id):
+        return Response(
+            {'error': 'Solo puedes trasladar café desde tu propia bodega.'},
+            status=status.HTTP_403_FORBIDDEN
         )
 
     kilos = Decimal(str(kilos))
@@ -112,7 +149,6 @@ def trasladar(request):
             bodega_origen = Bodega.objects.get(id=bodega_origen_id)
             bodega_destino = Bodega.objects.get(id=bodega_destino_id)
 
-            # Costo promedio actual del origen — se transfiere al destino
             from .models import CostoInventario
             try:
                 costo_origen = CostoInventario.objects.get(
