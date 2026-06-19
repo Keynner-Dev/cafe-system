@@ -5,7 +5,7 @@ from .views import TipoCafeViewSet, BodegaViewSet, MovimientoInventarioViewSet, 
 router = DefaultRouter()
 router.register(r'tipos-cafe', TipoCafeViewSet)
 router.register(r'bodegas', BodegaViewSet)
-router.register(r'movimientos', MovimientoInventarioViewSet)
+router.register(r'movimientos', MovimientoInventarioViewSet, basename='movimientoinventario')
 
 urlpatterns = router.urls + [
     path('trasladar/', trasladar),

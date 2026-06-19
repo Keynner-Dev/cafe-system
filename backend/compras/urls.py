@@ -3,6 +3,6 @@ from .views import CompraViewSet, LiquidacionDepositoViewSet
 
 router = DefaultRouter()
 router.register(r'compras', CompraViewSet, basename='compras')
-router.register(r'liquidaciones', LiquidacionDepositoViewSet)
+router.register(r'liquidaciones', LiquidacionDepositoViewSet, basename='liquidaciondeposito')
 
 urlpatterns = router.urls
