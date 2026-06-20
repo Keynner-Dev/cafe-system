@@ -226,7 +226,7 @@ export default function Sidebar() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
+            boxShadow: '0 2px 2px rgba(0,0,0,0.3)',
         }}>
             <img
             src="/logo.png"
