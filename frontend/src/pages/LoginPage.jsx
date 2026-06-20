@@ -60,22 +60,19 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{
-            width: '56px', height: '56px',
-            background: '#16a34a', borderRadius: '14px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 12px',
-            boxShadow: '0 4px 14px rgba(22,163,74,0.3)',
-          }}>
-            <IconCafe />
-          </div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-            Café San
-          </h1>
-          <p style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
-            Jimmi Martínez
-          </p>
-        </div>
+            <img
+                src="/logo.png"
+                alt="Café San"
+                style={{
+                width: '180px',
+                margin: '0 auto 8px',
+                display: 'block',
+                }}
+            />
+            <p style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
+                Jimmi Martínez
+            </p>
+            </div>
 
         {/* Tarjeta */}
         <div style={{

@@ -211,34 +211,22 @@ export default function Sidebar() {
     }}>
 
       {/* ── Logo ── */}
-      <div style={{
-        padding: '20px 16px 16px',
-        borderBottom: '1px solid #1e293b',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '32px', height: '32px',
-            background: '#16a34a', borderRadius: '8px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-              <path d="M2 21h20M6 21V8l6-5 6 5v13M10 21v-5h4v5"/>
-            </svg>
-          </div>
-          <div>
-            <div style={{
-              color: '#f8fafc', fontSize: '15px',
-              fontWeight: 600, letterSpacing: '-0.3px',
-            }}>
-              Café San
-            </div>
-            <div style={{ color: '#64748b', fontSize: '11px', marginTop: '1px' }}>
-              Jimmi Martínez
-            </div>
-          </div>
+        <div style={{
+            padding: '16px 16px 14px',
+            borderBottom: '1px solid #1e293b',
+        }}>
+            <img
+                src="/logo.png"
+                alt="Café San Joaquín"
+                style={{
+                width: '100%',
+                maxHeight: '72px',
+                objectFit: 'contain',
+                objectPosition: 'left center',
+                }}
+            />
         </div>
-      </div>
+
 
       {/* ── Nav ── */}
       <nav style={{ padding: '12px 8px', flex: 1 }}>
