@@ -216,7 +216,7 @@ export default function Sidebar() {
             borderBottom: '1px solid #1e293b',
         }}>
             <img
-                src="/logo.png"
+                src="/LogoCafeSan.png"
                 alt="Café San Joaquín"
                 style={{
                 width: '100%',
