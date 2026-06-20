@@ -217,12 +217,13 @@ export default function Sidebar() {
         }}>
             <img
                 src="/LogoCafeSan.png"
-                alt="Café San Joaquín"
+                alt="Café San"
                 style={{
                 width: '100%',
                 maxHeight: '72px',
                 objectFit: 'contain',
                 objectPosition: 'left center',
+                mixBlendMode: 'luminosity',
                 }}
             />
         </div>
