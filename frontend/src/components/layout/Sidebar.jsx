@@ -212,7 +212,7 @@ export default function Sidebar() {
 
       {/* ── Logo ── */}
         <div style={{
-        padding: '16px',
+        padding: '5px',
         borderBottom: '1px solid #1e293b',
         display: 'flex',
         justifyContent: 'center',
