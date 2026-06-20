@@ -223,7 +223,6 @@ export default function Sidebar() {
                 maxHeight: '72px',
                 objectFit: 'contain',
                 objectPosition: 'left center',
-                mixBlendMode: 'luminosity',
                 }}
             />
         </div>
