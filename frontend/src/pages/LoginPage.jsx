@@ -70,7 +70,7 @@ export default function LoginPage() {
             <IconCafe />
           </div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-            Café System
+            Café San
           </h1>
           <p style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
             Jimmi Martínez
@@ -202,7 +202,7 @@ export default function LoginPage() {
         </div>
 
         <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '11px', marginTop: '16px' }}>
-          Café System · Gestión de café
+          Café San · Gestión de café
         </p>
       </div>
     </div>

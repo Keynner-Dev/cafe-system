@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react'
 
-const initialForm = { nombre: '', descripcion: '', activo: true }
+const crearFormularioInicial = (campos) => {
+  const form = { activo: true }
+
+  campos.forEach(campo => {
+    form[campo.name] = ''
+  })
+
+  return form
+}
 
 // ── Íconos SVG inline ──
 const IconoCerrar = () => (
@@ -19,14 +27,17 @@ const IconoAlerta = () => (
 )
 
 export default function ItemModal({ titulo, item, campos, onClose, onSubmit }) {
-  const [form, setForm] = useState(initialForm)
+  const [form, setForm] = useState({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (item) setForm(item)
-    else setForm(initialForm)
-  }, [item])
+  if (item) {
+    setForm(item)
+  } else {
+    setForm(crearFormularioInicial(campos))
+  }
+}, [item, campos])
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target

@@ -231,7 +231,7 @@ export default function Sidebar() {
               color: '#f8fafc', fontSize: '15px',
               fontWeight: 600, letterSpacing: '-0.3px',
             }}>
-              Café System
+              Café San
             </div>
             <div style={{ color: '#64748b', fontSize: '11px', marginTop: '1px' }}>
               Jimmi Martínez
