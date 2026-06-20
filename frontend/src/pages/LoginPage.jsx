@@ -61,7 +61,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
             <img
-                src="/LogoCafeSan.png"
+                src="/logo.png"
                 alt="Café San"
                 style={{
                 width: '180px',

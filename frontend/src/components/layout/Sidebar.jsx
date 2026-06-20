@@ -216,7 +216,7 @@ export default function Sidebar() {
             borderBottom: '1px solid #1e293b',
         }}>
             <img
-                src="/LogoCafeSan.png"
+                src="/logo.png"
                 alt="Café San"
                 style={{
                 width: '100%',
