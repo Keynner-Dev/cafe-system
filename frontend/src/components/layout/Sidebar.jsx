@@ -232,8 +232,8 @@ export default function Sidebar() {
             src="/logo.png"
             alt="Café San Joaquín"
             style={{
-                width: '85px',
-                height: '85px',
+                width: '100px',
+                height: '100px',
                 objectFit: 'contain',
             }}
             />
