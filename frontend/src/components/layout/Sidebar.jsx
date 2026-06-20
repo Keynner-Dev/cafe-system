@@ -212,20 +212,32 @@ export default function Sidebar() {
 
       {/* ── Logo ── */}
         <div style={{
-            padding: '16px 16px 14px',
+            padding: '20px 16px 16px',
             borderBottom: '1px solid #1e293b',
-        }}>
-            <img
+            display: 'flex',
+            justifyContent: 'center',
+            }}>
+            <div style={{
+                background: '#1e293b',
+                borderRadius: '12px',
+                padding: '10px',
+                width: '120px',
+                height: '120px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+            }}>
+                <img
                 src="/logo.png"
-                alt="Café San"
+                alt="Café San Joaquín"
                 style={{
-                width: '100%',
-                maxHeight: '72px',
-                objectFit: 'contain',
-                objectPosition: 'left center',
+                    width: '100px',
+                    height: '100px',
+                    objectFit: 'contain',
                 }}
-            />
-        </div>
+                />
+            </div>
+            </div>
 
 
       {/* ── Nav ── */}
