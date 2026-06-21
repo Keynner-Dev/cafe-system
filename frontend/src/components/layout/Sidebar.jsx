@@ -220,7 +220,7 @@ export default function Sidebar() {
         <div style={{
             background: 'white',
             borderRadius: '50%',
-            padding: '0px',
+            padding: '2px',
             width: '90px',
             height: '90px',
             display: 'flex',
@@ -232,8 +232,8 @@ export default function Sidebar() {
             src="/logo.png"
             alt="Café San Joaquín"
             style={{
-                width: '120px',
-                height: '120px',
+                width: '90px',
+                height: '90px',
                 objectFit: 'contain',
             }}
             />
