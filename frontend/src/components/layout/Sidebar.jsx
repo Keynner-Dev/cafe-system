@@ -230,7 +230,7 @@ export default function Sidebar() {
         }}>
             <img
             src="/logo.png"
-            alt="Café San Joaquín"
+            alt="Café San"
             style={{
                 width: '87px',
                 height: '87px',

@@ -32,6 +32,26 @@ const IconSearch = () => (
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 )
+const IconWhatsApp = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.522 5.851L.057 23.5l5.799-1.52A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.006-1.368l-.36-.214-3.722.976.993-3.624-.235-.372A9.818 9.818 0 1 1 12 21.818z"/>
+  </svg>
+)
+const IconPrint = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 6 2 18 2 18 9"/>
+    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+    <rect x="6" y="14" width="12" height="8"/>
+  </svg>
+)
+const IconCheck = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+    stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+)
 
 const inputStyle = {
   width: '100%', boxSizing: 'border-box',
@@ -51,17 +71,240 @@ const labelStyle = {
 const hoy = new Date().toISOString().split('T')[0]
 const detalleVacio = { tipo_cafe: '', bodega: '', kilos: '', precio_kilo: '', es_deposito: false }
 
+function formatCOP(val) {
+  return `$${Number(val || 0).toLocaleString('es-CO')}`
+}
+
+// ── Pantalla de éxito con botones WhatsApp e Imprimir ──
+function PantallaExito({ compra, onClose, onNuevaCompra }) {
+
+  const armarMensajeWhatsApp = () => {
+    const fecha = new Date(compra.fecha + 'T12:00:00').toLocaleDateString('es-CO', {
+      day: '2-digit', month: 'long', year: 'numeric',
+    })
+    let msg = `*☕ Café San Joaquín*\n`
+    msg += `*Compra #${compra.id}*\n`
+    msg += `📅 ${fecha}\n`
+    msg += `👤 ${compra.caficultor_nombre}\n\n`
+    msg += `*Detalle:*\n`
+    compra.detalles.forEach(d => {
+      if (d.es_deposito) {
+        msg += `• ${d.tipo_cafe_nombre} — ${d.kilos} kg *(DEPÓSITO — liquidar después)*\n`
+      } else {
+        const subtotal = Number(d.kilos) * Number(d.precio_kilo)
+        msg += `• ${d.tipo_cafe_nombre} — ${d.kilos} kg × ${formatCOP(d.precio_kilo)}/kg = *${formatCOP(subtotal)}*\n`
+      }
+    })
+    msg += `\n💰 *Total: ${formatCOP(compra.total)}*`
+    if (compra.nota) msg += `\n📝 ${compra.nota}`
+    return encodeURIComponent(msg)
+  }
+
+  const handleWhatsApp = () => {
+    const msg = armarMensajeWhatsApp()
+    window.open(`https://wa.me/?text=${msg}`, '_blank')
+  }
+
+  const handleImprimir = () => {
+    const fecha = new Date(compra.fecha + 'T12:00:00').toLocaleDateString('es-CO', {
+      day: '2-digit', month: 'long', year: 'numeric',
+    })
+    const detallesHTML = compra.detalles.map(d => {
+      if (d.es_deposito) {
+        return `
+          <tr>
+            <td>${d.tipo_cafe_nombre}</td>
+            <td>${d.bodega_nombre}</td>
+            <td>${d.kilos} kg</td>
+            <td colspan="2" style="color:#ca8a04;font-weight:600;">DEPÓSITO — liquidar después</td>
+          </tr>`
+      }
+      const subtotal = Number(d.kilos) * Number(d.precio_kilo)
+      return `
+        <tr>
+          <td>${d.tipo_cafe_nombre}</td>
+          <td>${d.bodega_nombre}</td>
+          <td>${d.kilos} kg</td>
+          <td>${formatCOP(d.precio_kilo)}/kg</td>
+          <td style="font-weight:600;">${formatCOP(subtotal)}</td>
+        </tr>`
+    }).join('')
+
+    const ventana = window.open('', '_blank', 'width=700,height=600')
+    ventana.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Compra #${compra.id} — Café San Joaquín</title>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 32px; color: #0f172a; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+          .logo-area h1 { font-size: 20px; font-weight: 700; color: #0f172a; }
+          .logo-area p { font-size: 12px; color: #64748b; margin-top: 2px; }
+          .compra-info { text-align: right; }
+          .compra-info .num { font-size: 22px; font-weight: 700; color: #16a34a; }
+          .compra-info .fecha { font-size: 12px; color: #64748b; margin-top: 2px; }
+          .caficultor { background: #f8fafc; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; }
+          .caficultor label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+          .caficultor p { font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 3px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th { background: #0f172a; color: white; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+          td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
+          tr:nth-child(even) td { background: #f8fafc; }
+          .total-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; }
+          .total-box span { font-size: 13px; color: #475569; }
+          .total-box strong { font-size: 20px; font-weight: 700; color: #16a34a; }
+          .nota { margin-top: 16px; font-size: 12px; color: #64748b; }
+          .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
+          @media print { body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo-area">
+            <h1>☕ Café San Joaquín</h1>
+            <p>NIT. 901659573-6</p>
+          </div>
+          <div class="compra-info">
+            <div class="num">Compra #${compra.id}</div>
+            <div class="fecha">${fecha}</div>
+          </div>
+        </div>
+
+        <div class="caficultor">
+          <label>Caficultor</label>
+          <p>${compra.caficultor_nombre}</p>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Tipo de café</th>
+              <th>Bodega</th>
+              <th>Kilos</th>
+              <th>Precio/kg</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${detallesHTML}
+          </tbody>
+        </table>
+
+        <div class="total-box">
+          <span>Total a pagar:</span>
+          <strong>${formatCOP(compra.total)}</strong>
+        </div>
+
+        ${compra.nota ? `<p class="nota">📝 <strong>Nota:</strong> ${compra.nota}</p>` : ''}
+
+        <div class="footer">
+          Café San Joaquín SAS · Generado el ${new Date().toLocaleDateString('es-CO')}
+        </div>
+
+        <script>window.onload = () => window.print()</script>
+      </body>
+      </html>
+    `)
+    ventana.document.close()
+  }
+
+  return (
+    <div style={{ padding: '32px 24px', textAlign: 'center' }}>
+      {/* Ícono de éxito */}
+      <div style={{
+        width: 64, height: 64, borderRadius: '50%',
+        background: '#16a34a', display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        margin: '0 auto 16px',
+        boxShadow: '0 4px 16px rgba(22,163,74,0.3)',
+      }}>
+        <IconCheck />
+      </div>
+
+      <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>
+        ¡Compra registrada!
+      </h2>
+      <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 4px' }}>
+        Compra <strong>#{compra.id}</strong> — {compra.caficultor_nombre}
+      </p>
+      <p style={{ fontSize: 18, fontWeight: 700, color: '#16a34a', margin: '0 0 28px' }}>
+        {formatCOP(compra.total)}
+      </p>
+
+      {/* Botones principales */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+        <button
+          onClick={handleWhatsApp}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 8, padding: '11px', borderRadius: 8, border: 'none',
+            background: '#25D366', color: 'white',
+            fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#1ebe5d'}
+          onMouseLeave={e => e.currentTarget.style.background = '#25D366'}
+        >
+          <IconWhatsApp /> Enviar por WhatsApp
+        </button>
+        <button
+          onClick={handleImprimir}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 8, padding: '11px', borderRadius: 8,
+            border: '1px solid #e2e8f0', background: 'white',
+            color: '#0f172a', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+          onMouseLeave={e => e.currentTarget.style.background = 'white'}
+        >
+          <IconPrint /> Imprimir
+        </button>
+      </div>
+
+      {/* Botones secundarios */}
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button
+          onClick={onNuevaCompra}
+          style={{
+            flex: 1, padding: '9px', borderRadius: 8,
+            border: '1px solid #bbf7d0', background: '#f0fdf4',
+            color: '#16a34a', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+          onMouseLeave={e => e.currentTarget.style.background = '#f0fdf4'}
+        >
+          Nueva compra
+        </button>
+        <button
+          onClick={onClose}
+          style={{
+            flex: 1, padding: '9px', borderRadius: 8,
+            border: '1px solid #e2e8f0', background: 'white',
+            color: '#475569', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+          onMouseLeave={e => e.currentTarget.style.background = 'white'}
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function CompraModal({ onClose, onSaved }) {
-  // ── form ahora usa "caficultor" en vez de "proveedor" ──
   const [form, setForm]         = useState({ caficultor: '', fecha: hoy, nota: '' })
   const [detalles, setDetalles] = useState([{ ...detalleVacio }])
+  const [compraCreadada,        setCompraCreadada] = useState(null)
 
-  // ── estados del buscador de caficultor ──
-  const [busqueda, setBusqueda]                         = useState('')
-  const [resultados, setResultados]                     = useState([])
-  const [dropdownVisible, setDropdownVisible]           = useState(false)
+  const [busqueda, setBusqueda]                             = useState('')
+  const [resultados, setResultados]                         = useState([])
+  const [dropdownVisible, setDropdownVisible]               = useState(false)
   const [caficultorSeleccionado, setCaficultorSeleccionado] = useState(null)
-  const [buscando, setBuscando]                         = useState(false)
+  const [buscando, setBuscando]                             = useState(false)
   const dropdownRef = useRef(null)
 
   const [tiposCafe, setTiposCafe]   = useState([])
@@ -76,18 +319,15 @@ export default function CompraModal({ onClose, onSaved }) {
     getPreciosHoy().then(res => setPreciosHoy(res.data))
   }, [])
 
-  // Cerrar dropdown al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target))
         setDropdownVisible(false)
-      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Buscar caficultores cuando el texto cambia (debounce simple con useEffect)
   useEffect(() => {
     if (busqueda.length < 2) {
       setResultados([])
@@ -97,12 +337,9 @@ export default function CompraModal({ onClose, onSaved }) {
     setBuscando(true)
     const timer = setTimeout(() => {
       getTerceros({ buscar: busqueda, tipo: 'caficultor' })
-        .then(res => {
-          setResultados(res.data)
-          setDropdownVisible(true)
-        })
+        .then(res => { setResultados(res.data); setDropdownVisible(true) })
         .finally(() => setBuscando(false))
-    }, 300) // espera 300ms después de que el usuario deja de escribir
+    }, 300)
     return () => clearTimeout(timer)
   }, [busqueda])
 
@@ -128,9 +365,7 @@ export default function CompraModal({ onClose, onSaved }) {
       const precioHoy = preciosHoy.find(p => String(p.tipo_cafe) === String(value))
       if (precioHoy) nuevos[index].precio_kilo = precioHoy.precio
     }
-    if (name === 'es_deposito' && checked) {
-      nuevos[index].precio_kilo = ''
-    }
+    if (name === 'es_deposito' && checked) nuevos[index].precio_kilo = ''
     setDetalles(nuevos)
   }
 
@@ -147,10 +382,7 @@ export default function CompraModal({ onClose, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.caficultor) {
-      setError('Debes seleccionar un caficultor.')
-      return
-    }
+    if (!form.caficultor) { setError('Debes seleccionar un caficultor.'); return }
     for (const d of detalles) {
       if (!d.es_deposito && !d.precio_kilo) {
         setError('Las compras normales requieren precio por kilo.')
@@ -160,14 +392,23 @@ export default function CompraModal({ onClose, onSaved }) {
     setLoading(true)
     setError(null)
     try {
-      await createCompra({ ...form, detalles })
-      onSaved()
-      onClose()
+      const res = await createCompra({ ...form, detalles })
+      onSaved()                        // refresca la lista en el padre
+      setCompraCreadada(res.data)      // muestra pantalla de éxito
     } catch {
       setError('Error al guardar la compra. Verifica los datos.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleNuevaCompra = () => {
+    setCompraCreadada(null)
+    setForm({ caficultor: '', fecha: hoy, nota: '' })
+    setDetalles([{ ...detalleVacio }])
+    setBusqueda('')
+    setCaficultorSeleccionado(null)
+    setError(null)
   }
 
   const handleBackdropClick = (e) => {
@@ -189,371 +430,358 @@ export default function CompraModal({ onClose, onSaved }) {
     >
       <div style={{
         background: 'white', borderRadius: '12px',
-        width: '100%', maxWidth: '720px',
+        width: '100%', maxWidth: compraCreadada ? '420px' : '720px',
         maxHeight: '90vh', overflowY: 'auto',
         boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+        transition: 'max-width 0.2s',
       }}>
 
-        {/* ── Cabecera ── */}
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '18px 20px', borderBottom: '1px solid #f1f5f9',
-          position: 'sticky', top: 0, background: 'white', zIndex: 1,
-        }}>
-          <div>
-            <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
-              Nueva compra
-            </h2>
-            <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '2px' }}>
-              Registra los detalles de la compra de café
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: '30px', height: '30px', borderRadius: '6px',
-              border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f172a' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8' }}
-          >
-            <IconX />
-          </button>
-        </div>
-
-        {/* ── Cuerpo ── */}
-        <form onSubmit={handleSubmit}>
-          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-            {error && (
-              <div style={{
-                background: '#fef2f2', border: '1px solid #fecaca',
-                borderRadius: '6px', padding: '10px 12px',
-                color: '#dc2626', fontSize: '12px',
-              }}>
-                {error}
+        {/* ── Si la compra fue creada, muestra pantalla de éxito ── */}
+        {compraCreadada ? (
+          <PantallaExito
+            compra={compraCreadada}
+            onClose={onClose}
+            onNuevaCompra={handleNuevaCompra}
+          />
+        ) : (
+          <>
+            {/* ── Cabecera ── */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '18px 20px', borderBottom: '1px solid #f1f5f9',
+              position: 'sticky', top: 0, background: 'white', zIndex: 1,
+            }}>
+              <div>
+                <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
+                  Nueva compra
+                </h2>
+                <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '2px' }}>
+                  Registra los detalles de la compra de café
+                </p>
               </div>
-            )}
+              <button
+                onClick={onClose}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: '30px', height: '30px', borderRadius: '6px',
+                  border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f172a' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8' }}
+              >
+                <IconX />
+              </button>
+            </div>
 
-            {/* Datos generales */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {/* ── Cuerpo ── */}
+            <form onSubmit={handleSubmit}>
+              <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-              {/* ── Buscador de caficultor ── */}
-              <div ref={dropdownRef} style={{ position: 'relative' }}>
-                <label style={labelStyle}>Caficultor *</label>
-                <div style={{ position: 'relative' }}>
-                  {/* Ícono de búsqueda a la izquierda */}
-                  <span style={{
-                    position: 'absolute', left: '10px', top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#94a3b8', pointerEvents: 'none',
-                    display: 'flex', alignItems: 'center',
-                  }}>
-                    <IconSearch />
-                  </span>
-                  <input
-                    type="text"
-                    value={busqueda}
-                    onChange={e => {
-                      setBusqueda(e.target.value)
-                      // Si el usuario empieza a editar después de haber seleccionado, limpiamos la selección
-                      if (caficultorSeleccionado) limpiarCaficultor()
-                    }}
-                    placeholder="Buscar por nombre o cédula..."
-                    style={{ ...inputStyle, paddingLeft: '32px', paddingRight: caficultorSeleccionado ? '32px' : '12px' }}
-                    onFocus={focusGreen}
-                    onBlur={blurGray}
-                    autoComplete="off"
-                  />
-                  {/* Botón X para limpiar */}
-                  {caficultorSeleccionado && (
-                    <button
-                      type="button"
-                      onClick={limpiarCaficultor}
-                      style={{
-                        position: 'absolute', right: '8px', top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none', border: 'none',
-                        cursor: 'pointer', color: '#94a3b8',
-                        display: 'flex', alignItems: 'center', padding: '2px',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.color = '#dc2626'}
-                      onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
-                    >
-                      <IconX />
-                    </button>
-                  )}
-                </div>
-
-                {/* Dropdown de resultados */}
-                {dropdownVisible && (
+                {error && (
                   <div style={{
-                    position: 'absolute', top: '100%', left: 0, right: 0,
-                    background: 'white', border: '1px solid #e2e8f0',
-                    borderRadius: '6px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-                    zIndex: 10, marginTop: '2px', maxHeight: '200px', overflowY: 'auto',
+                    background: '#fef2f2', border: '1px solid #fecaca',
+                    borderRadius: '6px', padding: '10px 12px',
+                    color: '#dc2626', fontSize: '12px',
                   }}>
-                    {buscando ? (
-                      <div style={{ padding: '10px 12px', color: '#94a3b8', fontSize: '12px' }}>
-                        Buscando...
-                      </div>
-                    ) : resultados.length === 0 ? (
-                      <div style={{ padding: '10px 12px', color: '#94a3b8', fontSize: '12px' }}>
-                        No se encontraron caficultores.
-                      </div>
-                    ) : (
-                      resultados.map(r => (
-                        <div
-                          key={r.id}
-                          onClick={() => seleccionarCaficultor(r)}
-                          style={{
-                            padding: '9px 12px', cursor: 'pointer',
-                            fontSize: '13px', color: '#0f172a',
-                            borderBottom: '1px solid #f1f5f9',
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'white'}
-                        >
-                          <span style={{ fontWeight: 500 }}>{r.nombre}</span>
-                          {r.cedula && (
-                            <span style={{ color: '#94a3b8', fontSize: '12px', marginLeft: '8px' }}>
-                              {r.cedula}
-                            </span>
-                          )}
-                        </div>
-                      ))
-                    )}
+                    {error}
                   </div>
                 )}
 
-                {/* Input hidden para validación del formulario */}
-                <input
-                  type="text"
-                  required
-                  value={form.caficultor}
-                  onChange={() => {}}
-                  style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
-                  tabIndex={-1}
-                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+
+                  {/* Buscador caficultor */}
+                  <div ref={dropdownRef} style={{ position: 'relative' }}>
+                    <label style={labelStyle}>Caficultor *</label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{
+                        position: 'absolute', left: '10px', top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#94a3b8', pointerEvents: 'none',
+                        display: 'flex', alignItems: 'center',
+                      }}>
+                        <IconSearch />
+                      </span>
+                      <input
+                        type="text"
+                        value={busqueda}
+                        onChange={e => {
+                          setBusqueda(e.target.value)
+                          if (caficultorSeleccionado) limpiarCaficultor()
+                        }}
+                        placeholder="Buscar por nombre o cédula..."
+                        style={{ ...inputStyle, paddingLeft: '32px', paddingRight: caficultorSeleccionado ? '32px' : '12px' }}
+                        onFocus={focusGreen} onBlur={blurGray}
+                        autoComplete="off"
+                      />
+                      {caficultorSeleccionado && (
+                        <button
+                          type="button" onClick={limpiarCaficultor}
+                          style={{
+                            position: 'absolute', right: '8px', top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: '#94a3b8', display: 'flex', alignItems: 'center', padding: '2px',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.color = '#dc2626'}
+                          onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+                        >
+                          <IconX />
+                        </button>
+                      )}
+                    </div>
+
+                    {dropdownVisible && (
+                      <div style={{
+                        position: 'absolute', top: '100%', left: 0, right: 0,
+                        background: 'white', border: '1px solid #e2e8f0',
+                        borderRadius: '6px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                        zIndex: 10, marginTop: '2px', maxHeight: '200px', overflowY: 'auto',
+                      }}>
+                        {buscando ? (
+                          <div style={{ padding: '10px 12px', color: '#94a3b8', fontSize: '12px' }}>Buscando...</div>
+                        ) : resultados.length === 0 ? (
+                          <div style={{ padding: '10px 12px', color: '#94a3b8', fontSize: '12px' }}>No se encontraron caficultores.</div>
+                        ) : resultados.map(r => (
+                          <div
+                            key={r.id} onClick={() => seleccionarCaficultor(r)}
+                            style={{
+                              padding: '9px 12px', cursor: 'pointer',
+                              fontSize: '13px', color: '#0f172a',
+                              borderBottom: '1px solid #f1f5f9',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                          >
+                            <span style={{ fontWeight: 500 }}>{r.nombre}</span>
+                            {r.cedula && (
+                              <span style={{ color: '#94a3b8', fontSize: '12px', marginLeft: '8px' }}>{r.cedula}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <input
+                      type="text" required value={form.caficultor} onChange={() => {}}
+                      style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+                      tabIndex={-1}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Fecha *</label>
+                    <input
+                      type="date" value={form.fecha}
+                      onChange={e => setForm({ ...form, fecha: e.target.value })}
+                      required style={inputStyle}
+                      onFocus={focusGreen} onBlur={blurGray}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Nota</label>
+                  <textarea
+                    value={form.nota}
+                    onChange={e => setForm({ ...form, nota: e.target.value })}
+                    rows={2} placeholder="Observación opcional"
+                    style={{ ...inputStyle, resize: 'vertical', minHeight: '60px' }}
+                    onFocus={focusGreen} onBlur={blurGray}
+                  />
+                </div>
+
+                {/* Detalles */}
+                <div>
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    marginBottom: '12px',
+                  }}>
+                    <p style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
+                      Detalles de la compra
+                    </p>
+                    <button
+                      type="button" onClick={agregarDetalle}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '5px',
+                        padding: '6px 12px', borderRadius: '6px',
+                        border: '1px solid #bbf7d0', background: '#f0fdf4',
+                        color: '#16a34a', fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#f0fdf4'}
+                    >
+                      <IconPlus /> Agregar línea
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {detalles.map((detalle, index) => (
+                      <div key={index} style={{
+                        border: detalle.es_deposito ? '1px solid #fde68a' : '1px solid #e2e8f0',
+                        borderRadius: '8px', padding: '14px',
+                        background: detalle.es_deposito ? '#fffbeb' : '#f8fafc',
+                      }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px' }}>
+                          <div>
+                            <label style={{ ...labelStyle, fontSize: '11px' }}>Tipo de café *</label>
+                            <select name="tipo_cafe" value={detalle.tipo_cafe}
+                              onChange={e => handleDetalleChange(index, e)} required
+                              style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+                              onFocus={focusGreen} onBlur={blurGray}
+                            >
+                              <option value="">Selecciona</option>
+                              {tiposCafe.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ ...labelStyle, fontSize: '11px' }}>Bodega *</label>
+                            <select name="bodega" value={detalle.bodega}
+                              onChange={e => handleDetalleChange(index, e)} required
+                              style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+                              onFocus={focusGreen} onBlur={blurGray}
+                            >
+                              <option value="">Selecciona</option>
+                              {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ ...labelStyle, fontSize: '11px' }}>Kilos *</label>
+                            <input type="number" name="kilos" value={detalle.kilos}
+                              onChange={e => handleDetalleChange(index, e)}
+                              required min="0" step="0.01" placeholder="0.00"
+                              style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+                              onFocus={focusGreen} onBlur={blurGray}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ ...labelStyle, fontSize: '11px' }}>
+                              Precio/kg {detalle.es_deposito ? '(depósito)' : '*'}
+                            </label>
+                            <input type="number" name="precio_kilo" value={detalle.precio_kilo}
+                              onChange={e => handleDetalleChange(index, e)}
+                              disabled={detalle.es_deposito}
+                              min="0" step="0.01"
+                              placeholder={detalle.es_deposito ? 'Al liquidar' : '0.00'}
+                              style={detalle.es_deposito
+                                ? { ...inputDisabledStyle, fontSize: '12px', padding: '6px 10px' }
+                                : { ...inputStyle, fontSize: '12px', padding: '6px 10px' }
+                              }
+                              onFocus={focusGreen} onBlur={blurGray}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          marginTop: '10px',
+                        }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <div style={{ position: 'relative', width: '36px', height: '20px' }}>
+                              <input type="checkbox" name="es_deposito" checked={detalle.es_deposito}
+                                onChange={e => handleDetalleChange(index, e)}
+                                style={{ opacity: 0, width: 0, height: 0 }}
+                              />
+                              <span style={{
+                                position: 'absolute', inset: 0, borderRadius: '99px',
+                                background: detalle.es_deposito ? '#ca8a04' : '#e2e8f0',
+                                transition: 'background 0.2s', cursor: 'pointer',
+                              }}>
+                                <span style={{
+                                  position: 'absolute', width: '14px', height: '14px',
+                                  borderRadius: '50%', background: 'white', top: '3px',
+                                  left: detalle.es_deposito ? '19px' : '3px',
+                                  transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                                }} />
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '12px', color: '#475569' }}>
+                              Es depósito
+                              <span style={{ color: '#94a3b8', marginLeft: '4px' }}>(liquidar después)</span>
+                            </span>
+                          </label>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {!detalle.es_deposito && detalle.kilos && detalle.precio_kilo && (
+                              <span style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a' }}>
+                                ${(Number(detalle.kilos) * Number(detalle.precio_kilo)).toLocaleString('es-CO')}
+                              </span>
+                            )}
+                            {detalle.es_deposito && detalle.kilos && (
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#ca8a04' }}>
+                                {detalle.kilos} kg en depósito
+                              </span>
+                            )}
+                            {detalles.length > 1 && (
+                              <button type="button" onClick={() => eliminarDetalle(index)}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '4px',
+                                  padding: '4px 8px', borderRadius: '5px', border: 'none',
+                                  background: '#fef2f2', color: '#dc2626',
+                                  fontSize: '11px', fontWeight: 500, cursor: 'pointer',
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                                onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}
+                              >
+                                <IconTrash /> Eliminar
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Total */}
+                <div style={{
+                  background: '#f0fdf4', border: '1px solid #bbf7d0',
+                  borderRadius: '8px', padding: '14px 16px',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: '#475569' }}>
+                    Total a pagar hoy:
+                  </span>
+                  <span style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a' }}>
+                    ${totalCompra.toLocaleString('es-CO')}
+                  </span>
+                </div>
+
               </div>
 
-              <div>
-                <label style={labelStyle}>Fecha *</label>
-                <input
-                  type="date"
-                  value={form.fecha}
-                  onChange={e => setForm({ ...form, fecha: e.target.value })}
-                  required
-                  style={inputStyle}
-                  onFocus={focusGreen} onBlur={blurGray}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={labelStyle}>Nota</label>
-              <textarea
-                value={form.nota}
-                onChange={e => setForm({ ...form, nota: e.target.value })}
-                rows={2}
-                placeholder="Observación opcional"
-                style={{ ...inputStyle, resize: 'vertical', minHeight: '60px' }}
-                onFocus={focusGreen} onBlur={blurGray}
-              />
-            </div>
-
-            {/* ── Detalles ── */}
-            <div>
+              {/* Pie */}
               <div style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                marginBottom: '12px',
+                display: 'flex', gap: '10px',
+                padding: '16px 20px', borderTop: '1px solid #f1f5f9',
+                position: 'sticky', bottom: 0, background: 'white',
               }}>
-                <p style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
-                  Detalles de la compra
-                </p>
-                <button
-                  type="button"
-                  onClick={agregarDetalle}
+                <button type="button" onClick={onClose}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '5px',
-                    padding: '6px 12px', borderRadius: '6px',
-                    border: '1px solid #bbf7d0', background: '#f0fdf4',
-                    color: '#16a34a', fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                    flex: 1, padding: '9px',
+                    border: '1px solid #e2e8f0', borderRadius: '6px',
+                    background: 'white', color: '#475569',
+                    fontSize: '13px', fontWeight: 500, cursor: 'pointer',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
-                  onMouseLeave={e => e.currentTarget.style.background = '#f0fdf4'}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'white'}
                 >
-                  <IconPlus /> Agregar línea
+                  Cancelar
+                </button>
+                <button type="submit" disabled={loading}
+                  style={{
+                    flex: 1, padding: '9px', border: 'none', borderRadius: '6px',
+                    background: loading ? '#86efac' : '#16a34a', color: 'white',
+                    fontSize: '13px', fontWeight: 500,
+                    cursor: loading ? 'not-allowed' : 'pointer', transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#15803d' }}
+                  onMouseLeave={e => { if (!loading) e.currentTarget.style.background = '#16a34a' }}
+                >
+                  {loading ? 'Guardando...' : 'Registrar compra'}
                 </button>
               </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {detalles.map((detalle, index) => (
-                  <div key={index} style={{
-                    border: detalle.es_deposito ? '1px solid #fde68a' : '1px solid #e2e8f0',
-                    borderRadius: '8px', padding: '14px',
-                    background: detalle.es_deposito ? '#fffbeb' : '#f8fafc',
-                  }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px' }}>
-                      <div>
-                        <label style={{ ...labelStyle, fontSize: '11px' }}>Tipo de café *</label>
-                        <select name="tipo_cafe" value={detalle.tipo_cafe}
-                          onChange={e => handleDetalleChange(index, e)} required
-                          style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
-                          onFocus={focusGreen} onBlur={blurGray}
-                        >
-                          <option value="">Selecciona</option>
-                          {tiposCafe.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label style={{ ...labelStyle, fontSize: '11px' }}>Bodega *</label>
-                        <select name="bodega" value={detalle.bodega}
-                          onChange={e => handleDetalleChange(index, e)} required
-                          style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
-                          onFocus={focusGreen} onBlur={blurGray}
-                        >
-                          <option value="">Selecciona</option>
-                          {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label style={{ ...labelStyle, fontSize: '11px' }}>Kilos *</label>
-                        <input type="number" name="kilos" value={detalle.kilos}
-                          onChange={e => handleDetalleChange(index, e)}
-                          required min="0" step="0.01" placeholder="0.00"
-                          style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
-                          onFocus={focusGreen} onBlur={blurGray}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ ...labelStyle, fontSize: '11px' }}>
-                          Precio/kg {detalle.es_deposito ? '(depósito)' : '*'}
-                        </label>
-                        <input type="number" name="precio_kilo" value={detalle.precio_kilo}
-                          onChange={e => handleDetalleChange(index, e)}
-                          disabled={detalle.es_deposito}
-                          min="0" step="0.01"
-                          placeholder={detalle.es_deposito ? 'Al liquidar' : '0.00'}
-                          style={detalle.es_deposito
-                            ? { ...inputDisabledStyle, fontSize: '12px', padding: '6px 10px' }
-                            : { ...inputStyle, fontSize: '12px', padding: '6px 10px' }
-                          }
-                          onFocus={focusGreen} onBlur={blurGray}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      marginTop: '10px',
-                    }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                        <div style={{ position: 'relative', width: '36px', height: '20px' }}>
-                          <input type="checkbox" name="es_deposito" checked={detalle.es_deposito}
-                            onChange={e => handleDetalleChange(index, e)}
-                            style={{ opacity: 0, width: 0, height: 0 }}
-                          />
-                          <span style={{
-                            position: 'absolute', inset: 0, borderRadius: '99px',
-                            background: detalle.es_deposito ? '#ca8a04' : '#e2e8f0',
-                            transition: 'background 0.2s', cursor: 'pointer',
-                          }}>
-                            <span style={{
-                              position: 'absolute', width: '14px', height: '14px',
-                              borderRadius: '50%', background: 'white', top: '3px',
-                              left: detalle.es_deposito ? '19px' : '3px',
-                              transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                            }} />
-                          </span>
-                        </div>
-                        <span style={{ fontSize: '12px', color: '#475569' }}>
-                          Es depósito
-                          <span style={{ color: '#94a3b8', marginLeft: '4px' }}>(liquidar después)</span>
-                        </span>
-                      </label>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        {!detalle.es_deposito && detalle.kilos && detalle.precio_kilo && (
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a' }}>
-                            ${(Number(detalle.kilos) * Number(detalle.precio_kilo)).toLocaleString('es-CO')}
-                          </span>
-                        )}
-                        {detalle.es_deposito && detalle.kilos && (
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#ca8a04' }}>
-                            {detalle.kilos} kg en depósito
-                          </span>
-                        )}
-                        {detalles.length > 1 && (
-                          <button type="button" onClick={() => eliminarDetalle(index)}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: '4px',
-                              padding: '4px 8px', borderRadius: '5px', border: 'none',
-                              background: '#fef2f2', color: '#dc2626',
-                              fontSize: '11px', fontWeight: 500, cursor: 'pointer',
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
-                            onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}
-                          >
-                            <IconTrash /> Eliminar
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Total */}
-            <div style={{
-              background: '#f0fdf4', border: '1px solid #bbf7d0',
-              borderRadius: '8px', padding: '14px 16px',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            }}>
-              <span style={{ fontSize: '13px', fontWeight: 500, color: '#475569' }}>
-                Total a pagar hoy:
-              </span>
-              <span style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a' }}>
-                ${totalCompra.toLocaleString('es-CO')}
-              </span>
-            </div>
-
-          </div>
-
-          {/* ── Pie ── */}
-          <div style={{
-            display: 'flex', gap: '10px',
-            padding: '16px 20px', borderTop: '1px solid #f1f5f9',
-            position: 'sticky', bottom: 0, background: 'white',
-          }}>
-            <button type="button" onClick={onClose}
-              style={{
-                flex: 1, padding: '9px',
-                border: '1px solid #e2e8f0', borderRadius: '6px',
-                background: 'white', color: '#475569',
-                fontSize: '13px', fontWeight: 500, cursor: 'pointer',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-              onMouseLeave={e => e.currentTarget.style.background = 'white'}
-            >
-              Cancelar
-            </button>
-            <button type="submit" disabled={loading}
-              style={{
-                flex: 1, padding: '9px', border: 'none', borderRadius: '6px',
-                background: loading ? '#86efac' : '#16a34a', color: 'white',
-                fontSize: '13px', fontWeight: 500,
-                cursor: loading ? 'not-allowed' : 'pointer', transition: 'background 0.15s',
-              }}
-              onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#15803d' }}
-              onMouseLeave={e => { if (!loading) e.currentTarget.style.background = '#16a34a' }}
-            >
-              {loading ? 'Guardando...' : 'Registrar compra'}
-            </button>
-          </div>
-        </form>
+            </form>
+          </>
+        )}
       </div>
     </div>
   )

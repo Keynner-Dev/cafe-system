@@ -1,7 +1,12 @@
-from django.urls import path
-from . import views
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import CajaViewSet, MovimientoCajaViewSet, TrasladoDineroViewSet
+
+router = DefaultRouter()
+router.register(r'cajas',     CajaViewSet,           basename='caja')
+router.register(r'movimientos', MovimientoCajaViewSet, basename='movimiento')
+router.register(r'traslados', TrasladoDineroViewSet,  basename='traslado-dinero')
 
 urlpatterns = [
-    path('', views.CajaListView.as_view(), name='caja-list'),
-    path('<int:caja_id>/movimientos/', views.MovimientoCajaListCreateView.as_view(), name='movimientos-list'),
+    path('', include(router.urls)),
 ]

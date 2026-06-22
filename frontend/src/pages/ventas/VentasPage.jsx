@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getVentas, deleteVenta } from '../../api/ventas'
+import { useAuth } from '../../context/AuthContext'
 import VentaModal from '../../components/ventas/VentaModal'
 import VentaDetalle from '../../components/ventas/VentaDetalle'
 
@@ -26,7 +27,13 @@ const IconTrash = () => (
   </svg>
 )
 
+const fmt = (n) =>
+  Number(n).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
+
 export default function VentasPage() {
+  const { usuario } = useAuth()
+  const esJefe = usuario?.rol === 'jefe'
+
   const [ventas, setVentas]                       = useState([])
   const [loading, setLoading]                     = useState(true)
   const [modalOpen, setModalOpen]                 = useState(false)
@@ -57,10 +64,16 @@ export default function VentasPage() {
     }
   }
 
+  const columnas = [
+    'Remisión', 'Fecha', 'Empresa', 'Kilos', 'Bultos', 'Flete',
+    ...(esJefe ? ['Utilidad'] : []),
+    'Acciones',
+  ]
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-      {/* ── Encabezado ── */}
+      {/* Encabezado */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
@@ -86,7 +99,7 @@ export default function VentasPage() {
         </button>
       </div>
 
-      {/* ── Tabla ── */}
+      {/* Tabla */}
       {loading ? (
         <div style={{ color: '#94a3b8', fontSize: '13px', padding: '20px 0' }}>
           Cargando ventas...
@@ -99,8 +112,7 @@ export default function VentasPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: '#0f172a' }}>
-                {/* ← 'Empresa' en vez de 'Cliente' */}
-                {['Remisión', 'Fecha', 'Empresa', 'Kilos', 'Bultos', 'Flete', 'Acciones'].map(col => (
+                {columnas.map(col => (
                   <th key={col} style={{
                     padding: '11px 16px', textAlign: 'left',
                     color: '#e2e8f0', fontWeight: 500, fontSize: '12px',
@@ -114,7 +126,7 @@ export default function VentasPage() {
             <tbody>
               {ventas.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{
+                  <td colSpan={columnas.length} style={{
                     padding: '40px', textAlign: 'center',
                     color: '#94a3b8', fontSize: '13px',
                   }}>
@@ -140,7 +152,6 @@ export default function VentasPage() {
                     <td style={{ padding: '11px 16px', fontWeight: 500, color: '#0f172a' }}>
                       {v.fecha}
                     </td>
-                    {/* ← empresa_nombre en vez de cliente_nombre */}
                     <td style={{ padding: '11px 16px', color: '#475569' }}>
                       {v.empresa_nombre}
                     </td>
@@ -151,8 +162,31 @@ export default function VentasPage() {
                       {v.total_bultos}
                     </td>
                     <td style={{ padding: '11px 16px', color: '#475569' }}>
-                      ${Number(v.flete_valor || 0).toLocaleString('es-CO')}
+                      {fmt(v.flete_valor || 0)}
                     </td>
+
+                    {/* Columna utilidad — solo jefe */}
+                    {esJefe && (
+                      <td style={{ padding: '11px 16px' }}>
+                        {v.utilidad_total !== null && v.utilidad_total !== undefined ? (
+                          <span style={{
+                            fontWeight: 700,
+                            color: v.utilidad_total >= 0 ? '#16a34a' : '#dc2626',
+                          }}>
+                            {fmt(v.utilidad_total)}
+                          </span>
+                        ) : (
+                          <span style={{
+                            fontSize: '11px', color: '#94a3b8',
+                            background: '#fef9c3', padding: '2px 8px',
+                            borderRadius: 99, fontWeight: 500,
+                          }}>
+                            Sin precio
+                          </span>
+                        )}
+                      </td>
+                    )}
+
                     <td style={{ padding: '11px 16px' }}>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button
@@ -200,24 +234,23 @@ export default function VentasPage() {
         </div>
       )}
 
-      {/* ── Modales ── */}
+      {/* Modales */}
       {modalOpen && (
         <VentaModal onClose={() => setModalOpen(false)} onSaved={cargarVentas} />
       )}
       {detalleOpen && ventaSeleccionada && (
         <VentaDetalle
-            venta={ventaSeleccionada}
-            onClose={() => setDetalleOpen(false)}
-            onUpdated={() => {
+          venta={ventaSeleccionada}
+          onClose={() => setDetalleOpen(false)}
+          onUpdated={() => {
             cargarVentas()
-            // Actualizar también la venta seleccionada con los datos nuevos
             getVentas().then(res => {
-                const actualizada = res.data.find(v => v.id === ventaSeleccionada.id)
-                if (actualizada) setVentaSeleccionada(actualizada)
+              const actualizada = res.data.find(v => v.id === ventaSeleccionada.id)
+              if (actualizada) setVentaSeleccionada(actualizada)
             })
-            }}
+          }}
         />
-        )}
+      )}
     </div>
   )
 }

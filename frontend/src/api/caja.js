@@ -1,10 +1,16 @@
 import api from './axios';
 
-// Obtener todas las cajas (jefe ve todas, admin solo la suya)
-export const getCajas = () => api.get('/caja/');
+// Cajas
+export const getCajas = () => api.get('/caja/cajas/');
 
-// Obtener movimientos de una caja
-export const getMovimientos = (cajaId) => api.get(`/caja/${cajaId}/movimientos/`);
+// Movimientos
+export const getMovimientos = (cajaId) => api.get(`/caja/movimientos/?caja=${cajaId}`);
+export const createMovimiento = (datos) => api.post('/caja/movimientos/', datos);
 
-// Registrar un nuevo movimiento
-export const createMovimiento = (cajaId, datos) => api.post(`/caja/${cajaId}/movimientos/`, datos);
+// Cierre / apertura
+export const cerrarCaja = (cajaId, datos) => api.post(`/caja/cajas/${cajaId}/cerrar/`, datos);
+export const abrirCaja  = (cajaId)        => api.post(`/caja/cajas/${cajaId}/abrir/`);
+
+// Traslados de dinero
+export const getTraslados      = ()      => api.get('/caja/traslados/');
+export const createTraslado    = (datos) => api.post('/caja/traslados/', datos);

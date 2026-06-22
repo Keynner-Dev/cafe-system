@@ -17,7 +17,7 @@ export default function MovimientoModal({ caja, cajas, onCerrar, onGuardado }) {
     tipo: 'ingreso',
     valor: '',
     descripcion: '',
-    caja_id: caja.id,
+    caja: caja.id,
   });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
@@ -35,7 +35,8 @@ export default function MovimientoModal({ caja, cajas, onCerrar, onGuardado }) {
     }
     setGuardando(true);
     try {
-      await createMovimiento(form.caja_id, {
+      await createMovimiento({
+        caja: form.caja,
         tipo: form.tipo,
         valor: form.valor,
         descripcion: form.descripcion,
@@ -97,8 +98,8 @@ export default function MovimientoModal({ caja, cajas, onCerrar, onGuardado }) {
               <div>
                 <label style={labelStyle}>Caja (bodega)</label>
                 <select
-                  name="caja_id"
-                  value={form.caja_id}
+                  name="caja"
+                  value={form.caja}
                   onChange={handleChange}
                   style={inputStyle}
                 >
