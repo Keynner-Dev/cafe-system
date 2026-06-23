@@ -2,6 +2,7 @@ import api from './axios';
 
 // Cajas
 export const getCajas = () => api.get('/caja/cajas/');
+export const getCajasDestino = () => api.get('/caja/cajas/destinos/');
 
 // Movimientos
 export const getMovimientos = (cajaId) => api.get(`/caja/movimientos/?caja=${cajaId}`);

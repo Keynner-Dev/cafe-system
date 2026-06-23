@@ -47,6 +47,20 @@ class TrasladoDineroSerializer(serializers.ModelSerializer):
         read_only_fields = ['creado_por', 'creado_en']
 
 
+class CajaDestinoSerializer(serializers.ModelSerializer):
+    """Serializer liviano para poblar selectores de traslado.
+    No expone saldo_actual: el administrador no debe ver el saldo
+    de cajas de otras bodegas, solo elegir a cuál trasladar."""
+    bodega_nombre = serializers.CharField(
+        source='bodega.nombre',
+        read_only=True
+    )
+
+    class Meta:
+        model = Caja
+        fields = ['id', 'bodega', 'bodega_nombre']
+
+
 class CajaSerializer(serializers.ModelSerializer):
     bodega_nombre = serializers.CharField(
         source='bodega.nombre',

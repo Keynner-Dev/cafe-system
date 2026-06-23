@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getCajas, getMovimientos, cerrarCaja, abrirCaja, createTraslado } from '../../api/caja';
+import { getCajas, getCajasDestino, getMovimientos, cerrarCaja, abrirCaja, createTraslado } from '../../api/caja';
 import { useAuth } from '../../context/AuthContext';
 import MovimientoModal from '../../components/caja/MovimientoModal';
 
@@ -146,6 +146,8 @@ function CierreModal({ caja, onCerrar, onConfirmar }) {
 }
 
 // ── Modal traslado de dinero ──────────────────────────────────────────────────
+// `cajas`: lista para poblar destino (jefe → todas con saldo; admin → cajasDestino sin saldo)
+// `cajaOrigen`: objeto COMPLETO de la caja propia del admin (con saldo real), o null si es jefe
 function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
   const cajasDestino = cajas.filter(c => c.id !== cajaOrigen?.id);
 
@@ -158,7 +160,9 @@ function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
 
-  const cajaOrigenActual = cajas.find(c => c.id === Number(form.caja_origen));
+  // Si hay cajaOrigen fijo (admin), el saldo real viene de ahí (dato propio, sí permitido).
+  // Si es jefe, busca el saldo en la lista `cajas` (que sí trae saldo_actual completo).
+  const cajaOrigenActual = cajaOrigen || cajas.find(c => c.id === Number(form.caja_origen));
   const saldoDisponible  = Number(cajaOrigenActual?.saldo_actual || 0);
 
   const handleSubmit = async () => {
@@ -225,9 +229,17 @@ function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
               style={{ ...inputStyle, background: cajaOrigen ? '#f8fafc' : 'white' }}
               onFocus={e => e.target.style.borderColor = '#16a34a'}
               onBlur={e => e.target.style.borderColor = '#e2e8f0'}>
-              {cajas.map(c => (
-                <option key={c.id} value={c.id}>{c.bodega_nombre} — {formatCOP(c.saldo_actual)}</option>
-              ))}
+              {cajaOrigen ? (
+                // Admin: caja fija, con su saldo real (dato propio permitido)
+                <option value={cajaOrigen.id}>
+                  {cajaOrigen.bodega_nombre} — {formatCOP(cajaOrigen.saldo_actual)}
+                </option>
+              ) : (
+                // Jefe: puede elegir cualquier caja como origen, todas con saldo
+                cajas.map(c => (
+                  <option key={c.id} value={c.id}>{c.bodega_nombre} — {formatCOP(c.saldo_actual)}</option>
+                ))
+              )}
             </select>
             {cajaOrigenActual && (
               <p style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
@@ -241,7 +253,7 @@ function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
             <IconTransfer />
           </div>
 
-          {/* Destino */}
+          {/* Destino — nunca muestra saldo, ya sea lista de jefe o de admin */}
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#475569', marginBottom: 5 }}>
               Caja destino</label>
@@ -252,7 +264,7 @@ function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
               onBlur={e => e.target.style.borderColor = '#e2e8f0'}>
               <option value="">Selecciona una caja</option>
               {cajas.filter(c => c.id !== Number(form.caja_origen)).map(c => (
-                <option key={c.id} value={c.id}>{c.bodega_nombre} — {formatCOP(c.saldo_actual)}</option>
+                <option key={c.id} value={c.id}>{c.bodega_nombre}</option>
               ))}
             </select>
           </div>
@@ -302,6 +314,7 @@ export default function CajaPage() {
   const esJefe = usuario?.rol === 'jefe';
 
   const [cajas,            setCajas]            = useState([]);
+  const [cajasDestino,     setCajasDestino]     = useState([]); // solo se usa para admin
   const [cajaSeleccionada, setCajaSeleccionada] = useState(null);
   const [movimientos,      setMovimientos]      = useState([]);
   const [cargandoCajas,    setCargandoCajas]    = useState(true);
@@ -320,6 +333,12 @@ export default function CajaPage() {
         if (!esJefe && data.length > 0) setCajaSeleccionada(data[0]);
       })
       .finally(() => setCargandoCajas(false));
+
+    // El admin solo recibe su propia caja en getCajas(), así que necesita
+    // esta lista aparte (sin saldo) para saber a qué otras cajas puede trasladar.
+    if (!esJefe) {
+      getCajasDestino().then(res => setCajasDestino(res.data));
+    }
   }, []);
 
   useEffect(() => {
@@ -357,6 +376,10 @@ export default function CajaPage() {
     ? cajas.find(c => c.id === cajaSeleccionada.id) || cajaSeleccionada
     : null;
   const cajaEstaAbierta = cajaActual?.abierta !== false;
+
+  // Jefe: usa `cajas` (todas, con saldo) para decidir si mostrar el botón.
+  // Admin: usa `cajasDestino` (todas, sin saldo) porque `cajas` solo trae la suya.
+  const puedeTrasladar = esJefe ? cajas.length > 1 : cajasDestino.length > 1;
 
   if (cargandoCajas) {
     return (
@@ -403,8 +426,8 @@ export default function CajaPage() {
             )
           )}
 
-          {/* Trasladar dinero — siempre visible si hay más de una caja */}
-          {cajas.length > 1 && (
+          {/* Trasladar dinero */}
+          {puedeTrasladar && (
             <button onClick={() => setModalTraslado(true)}
               style={{ display: 'flex', alignItems: 'center', gap: 8,
                 background: 'white', color: '#0f172a',
@@ -649,7 +672,7 @@ export default function CajaPage() {
       )}
       {modalTraslado && (
         <TrasladoModal
-          cajas={cajas}
+          cajas={esJefe ? cajas : cajasDestino}
           cajaOrigen={!esJefe ? cajaActual : null}
           onCerrar={() => setModalTraslado(false)}
           onConfirmar={() => { setModalTraslado(false); refrescar(); }} />

@@ -8,7 +8,7 @@ from django.db import transaction
 from .models import Caja, MovimientoCaja, CierreCaja, TrasladoDinero
 from .serializers import (
     CajaSerializer, MovimientoCajaSerializer,
-    CierreCajaSerializer, TrasladoDineroSerializer
+    CierreCajaSerializer, TrasladoDineroSerializer, CajaDestinoSerializer
 )
 
 
@@ -70,6 +70,17 @@ class CajaViewSet(viewsets.ReadOnlyModelViewSet):
         caja.abierta = True
         caja.save()
         return Response(CajaSerializer(caja).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='destinos')
+    def destinos(self, request):
+        """Lista TODAS las cajas (sin saldo_actual) para poblar el
+        selector de caja destino en traslados, sin importar el rol
+        del usuario. El administrador necesita ver a dónde puede
+        trasladar dinero aunque solo opere desde su propia caja como
+        origen, sin que esto le exponga saldos de otras bodegas."""
+        cajas = Caja.objects.select_related('bodega').all()
+        serializer = CajaDestinoSerializer(cajas, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class MovimientoCajaViewSet(viewsets.ModelViewSet):
