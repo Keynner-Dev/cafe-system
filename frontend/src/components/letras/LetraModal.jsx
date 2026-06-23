@@ -31,7 +31,7 @@ export default function LetraModal({ onClose, onCreated }) {
     setCaficultor(null);
     debounceRef.current = setTimeout(() => {
       if (texto.length < 2) { setResultados([]); return; }
-      getTerceros({ buscar: texto, tipo: 'caficultor' }).then(setResultados);
+      getTerceros({ buscar: texto, tipo: 'caficultor' }).then(res => setResultados(res.data));
     }, 300);
   };
 

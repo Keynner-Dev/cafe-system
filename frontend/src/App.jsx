@@ -13,7 +13,7 @@ import UsuariosPage from './pages/usuarios/UsuariosPage'
 import CajaPage from './pages/caja/CajaPage'
 import GastosPage from './pages/gastos/GastosPage'
 import CuentasPagarPage from './pages/cuentasPagar/CuentasPagarPage'
-import LetrasPage from './pages/letras/LetrasPage'   // ← reemplaza el import de CuentasCobrarPage
+import LetrasPage from './pages/letras/LetrasPage'
 
 
 function RutaProtegida({ children }) {
