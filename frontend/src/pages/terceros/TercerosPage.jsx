@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { getTerceros, deleteTercero } from '../../api/terceros'
 import TerceroModal from '../../components/terceros/TerceroModal'
+import TerceroPerfil from '../../components/terceros/TerceroPerfil'
 
-// ─── Iconos SVG inline ────────────────────────────────────────────────────────
 const IconPlus = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -31,12 +31,18 @@ const IconTrash = () => (
     <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
   </svg>
 )
+const IconEye = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+    <circle cx="12" cy="12" r="3"/>
+  </svg>
+)
 
-// ─── Badge de tipo ────────────────────────────────────────────────────────────
 const TIPO_STYLE = {
-  cliente:   { bg: '#eff6ff', color: '#2563eb', label: 'Cliente'   },
-  proveedor: { bg: '#fefce8', color: '#ca8a04', label: 'Proveedor' },
-  ambos:     { bg: '#f5f3ff', color: '#7c3aed', label: 'Ambos'     },
+  empresa:    { bg: '#eff6ff', color: '#2563eb', label: 'Empresa'    },
+  caficultor: { bg: '#fefce8', color: '#ca8a04', label: 'Caficultor' },
+  ambos:      { bg: '#f5f3ff', color: '#7c3aed', label: 'Ambos'      },
 }
 
 function BadgeTipo({ tipo }) {
@@ -53,7 +59,6 @@ function BadgeTipo({ tipo }) {
   )
 }
 
-// ─── Badge de estado ──────────────────────────────────────────────────────────
 function BadgeEstado({ activo }) {
   return (
     <span style={{
@@ -67,17 +72,17 @@ function BadgeEstado({ activo }) {
   )
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
 export default function TercerosPage() {
   const [terceros, setTerceros]           = useState([])
   const [loading, setLoading]             = useState(true)
   const [modalOpen, setModalOpen]         = useState(false)
   const [terceroEditando, setTerceroEdit] = useState(null)
+  const [perfilId, setPerfilId]           = useState(null)
   const [filtro, setFiltro]               = useState('')
 
   const cargarTerceros = () => {
     setLoading(true)
-    getTerceros({ todos: true})
+    getTerceros({ todos: true })
       .then(res => setTerceros(res.data))
       .catch(err => console.error(err))
       .finally(() => setLoading(false))
@@ -85,7 +90,7 @@ export default function TercerosPage() {
 
   useEffect(() => { cargarTerceros() }, [])
 
-  const handleNuevo = () => { setTerceroEdit(null); setModalOpen(true) }
+  const handleNuevo  = () => { setTerceroEdit(null); setModalOpen(true) }
   const handleEditar = (t) => { setTerceroEdit(t); setModalOpen(true) }
 
   const handleEliminar = async (id) => {
@@ -100,26 +105,25 @@ export default function TercerosPage() {
 
   const tercerosFiltrados = terceros.filter(t => {
     const texto = filtro.toLowerCase().trim()
-
     return (
-        (t.nombre || '').toLowerCase().includes(texto) ||
-        (t.cedula || '').toString().includes(texto) ||
-        (t.telefono || '').toString().includes(texto) ||
-        (t.telefono_whatsapp || '').toString().includes(texto)
+      (t.nombre || '').toLowerCase().includes(texto) ||
+      (t.cedula || '').toString().includes(texto) ||
+      (t.telefono || '').toString().includes(texto) ||
+      (t.telefono_whatsapp || '').toString().includes(texto)
     )
-    })
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-      {/* ── Encabezado ── */}
+      {/* Encabezado */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
             Terceros
           </h1>
           <p style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
-            Gestión de clientes y proveedores
+            Gestión de caficultores y empresas
           </p>
         </div>
         <button
@@ -138,19 +142,18 @@ export default function TercerosPage() {
         </button>
       </div>
 
-      {/* ── Barra de búsqueda ── */}
+      {/* Barra de búsqueda */}
       <div style={{ position: 'relative', maxWidth: '320px' }}>
         <span style={{
           position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)',
-          color: '#94a3b8', pointerEvents: 'none',
-          display: 'flex', alignItems: 'center',
+          color: '#94a3b8', pointerEvents: 'none', display: 'flex', alignItems: 'center',
         }}>
           <IconSearch />
         </span>
         <input
           value={filtro}
           onChange={e => setFiltro(e.target.value)}
-          placeholder="Buscar por nombre..."
+          placeholder="Buscar por nombre o cédula..."
           style={{
             width: '100%', boxSizing: 'border-box',
             paddingLeft: '34px', paddingRight: '12px',
@@ -164,7 +167,7 @@ export default function TercerosPage() {
         />
       </div>
 
-      {/* ── Tabla ── */}
+      {/* Tabla */}
       {loading ? (
         <div style={{ color: '#94a3b8', fontSize: '13px', padding: '20px 0' }}>
           Cargando terceros...
@@ -177,7 +180,7 @@ export default function TercerosPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: '#0f172a' }}>
-                {['#', 'Nombre', 'Tipo', 'Teléfono', 'Estado', 'Acciones'].map(col => (
+                {['#', 'Nombre', 'Tipo', 'Cédula', 'Teléfono', 'Estado', 'Acciones'].map(col => (
                   <th key={col} style={{
                     padding: '11px 16px', textAlign: 'left',
                     color: '#e2e8f0', fontWeight: 500, fontSize: '12px',
@@ -191,15 +194,15 @@ export default function TercerosPage() {
             <tbody>
               {tercerosFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{
+                  <td colSpan={7} style={{
                     padding: '40px', textAlign: 'center',
                     color: '#94a3b8', fontSize: '13px',
                   }}>
-                    {filtro ? 'No se encontraron resultados para tu búsqueda.' : 'No hay terceros registrados aún.'}
+                    {filtro ? 'No se encontraron resultados.' : 'No hay terceros registrados aún.'}
                   </td>
                 </tr>
               ) : (
-                tercerosFiltrados.map((t, idx) => (
+                tercerosFiltrados.map((t) => (
                   <tr
                     key={t.id}
                     style={{ borderTop: '1px solid #f1f5f9', transition: 'background 0.1s' }}
@@ -209,10 +212,24 @@ export default function TercerosPage() {
                     <td style={{ padding: '11px 16px', color: '#94a3b8' }}>{t.id}</td>
                     <td style={{ padding: '11px 16px', fontWeight: 500, color: '#0f172a' }}>{t.nombre}</td>
                     <td style={{ padding: '11px 16px' }}><BadgeTipo tipo={t.tipo} /></td>
+                    <td style={{ padding: '11px 16px', color: '#475569' }}>{t.cedula || '—'}</td>
                     <td style={{ padding: '11px 16px', color: '#475569' }}>{t.telefono || '—'}</td>
                     <td style={{ padding: '11px 16px' }}><BadgeEstado activo={t.activo} /></td>
                     <td style={{ padding: '11px 16px' }}>
                       <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          onClick={() => setPerfilId(t.id)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '4px',
+                            padding: '5px 10px', borderRadius: '5px', border: 'none',
+                            background: '#f0fdf4', color: '#16a34a',
+                            fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#f0fdf4'}
+                        >
+                          <IconEye /> Perfil
+                        </button>
                         <button
                           onClick={() => handleEditar(t)}
                           style={{
@@ -247,11 +264,9 @@ export default function TercerosPage() {
             </tbody>
           </table>
 
-          {/* Pie de tabla con conteo */}
           {tercerosFiltrados.length > 0 && (
             <div style={{
-              padding: '10px 16px',
-              borderTop: '1px solid #f1f5f9',
+              padding: '10px 16px', borderTop: '1px solid #f1f5f9',
               color: '#94a3b8', fontSize: '12px',
             }}>
               {filtro
@@ -263,12 +278,18 @@ export default function TercerosPage() {
         </div>
       )}
 
-      {/* ── Modal ── */}
+      {/* Modales */}
       {modalOpen && (
         <TerceroModal
           tercero={terceroEditando}
           onClose={() => setModalOpen(false)}
           onSaved={cargarTerceros}
+        />
+      )}
+      {perfilId && (
+        <TerceroPerfil
+          terceroId={perfilId}
+          onClose={() => setPerfilId(null)}
         />
       )}
     </div>
