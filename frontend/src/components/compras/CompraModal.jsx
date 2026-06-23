@@ -3,6 +3,7 @@ import { createCompra } from '../../api/compras'
 import { getTerceros } from '../../api/terceros'
 import { getTiposCafe, getBodegas } from '../../api/inventario'
 import { getPreciosHoy } from '../../api/precios'
+import { getLetrasPendientesCaficultor } from '../../api/letras'
 
 const IconX = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -30,6 +31,14 @@ const IconSearch = () => (
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="11" cy="11" r="8" />
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+)
+const IconAlert = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+    <line x1="12" y1="9" x2="12" y2="13"/>
+    <line x1="12" y1="17" x2="12.01" y2="17"/>
   </svg>
 )
 const IconWhatsApp = () => (
@@ -213,7 +222,6 @@ function PantallaExito({ compra, onClose, onNuevaCompra }) {
 
   return (
     <div style={{ padding: '32px 24px', textAlign: 'center' }}>
-      {/* Ícono de éxito */}
       <div style={{
         width: 64, height: 64, borderRadius: '50%',
         background: '#16a34a', display: 'flex',
@@ -234,7 +242,6 @@ function PantallaExito({ compra, onClose, onNuevaCompra }) {
         {formatCOP(compra.total)}
       </p>
 
-      {/* Botones principales */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
         <button
           onClick={handleWhatsApp}
@@ -264,7 +271,6 @@ function PantallaExito({ compra, onClose, onNuevaCompra }) {
         </button>
       </div>
 
-      {/* Botones secundarios */}
       <div style={{ display: 'flex', gap: 10 }}>
         <button
           onClick={onNuevaCompra}
@@ -295,6 +301,73 @@ function PantallaExito({ compra, onClose, onNuevaCompra }) {
   )
 }
 
+// ── NUEVO: Notificación flotante de letras pendientes ──
+function NotificacionLetras({ letras, letraElegida, valorAbono, onElegirLetra, onCambiarValor }) {
+  if (!letras || letras.length === 0) return null
+
+  return (
+    <div style={{
+      border: '1px solid #fde68a', background: '#fffbeb',
+      borderRadius: '8px', padding: '14px 16px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+        <div style={{ color: '#ca8a04', flexShrink: 0, marginTop: '1px' }}>
+          <IconAlert />
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#92400e' }}>
+            Este caficultor tiene {letras.length} letra{letras.length > 1 ? 's' : ''} pendiente{letras.length > 1 ? 's' : ''}
+          </p>
+          <p style={{ margin: '2px 0 10px', fontSize: '12px', color: '#a16207' }}>
+            Puedes abonar a una de ellas con esta compra. El abono entrará a la caja.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {letras.map(letra => (
+              <label key={letra.id} style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '8px 10px', borderRadius: '6px', cursor: 'pointer',
+                background: letraElegida === letra.id ? '#fef3c7' : 'white',
+                border: `1px solid ${letraElegida === letra.id ? '#fbbf24' : '#fde68a'}`,
+              }}>
+                <input
+                  type="radio"
+                  name="letra"
+                  checked={letraElegida === letra.id}
+                  onChange={() => onElegirLetra(letra.id, letra.saldo)}
+                  style={{ accentColor: '#ca8a04' }}
+                />
+                <span style={{ fontSize: '12px', color: '#78350f', flex: 1 }}>
+                  Saldo pendiente: <strong>{formatCOP(letra.saldo)}</strong>
+                  {' '}({new Date(letra.fecha_creacion).toLocaleDateString('es-CO')})
+                </span>
+              </label>
+            ))}
+          </div>
+
+          {letraElegida && (
+            <div style={{ marginTop: '10px' }}>
+              <label style={{ ...labelStyle, fontSize: '11px', color: '#92400e' }}>
+                Valor a abonar a la letra
+              </label>
+              <input
+                type="number"
+                value={valorAbono}
+                onChange={e => onCambiarValor(e.target.value)}
+                placeholder="0"
+                min="0"
+                style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px', borderColor: '#fde68a' }}
+                onFocus={e => e.target.style.borderColor = '#ca8a04'}
+                onBlur={e => e.target.style.borderColor = '#fde68a'}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function CompraModal({ onClose, onSaved }) {
   const [form, setForm]         = useState({ caficultor: '', fecha: hoy, nota: '' })
   const [detalles, setDetalles] = useState([{ ...detalleVacio }])
@@ -312,6 +385,11 @@ export default function CompraModal({ onClose, onSaved }) {
   const [preciosHoy, setPreciosHoy] = useState([])
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState(null)
+
+  // ── NUEVO: estado de letras pendientes ──
+  const [letrasPendientes, setLetrasPendientes] = useState([])
+  const [letraElegida, setLetraElegida]         = useState(null)
+  const [valorAbono, setValorAbono]             = useState('')
 
   useEffect(() => {
     getTiposCafe().then(res => setTiposCafe(res.data))
@@ -348,6 +426,13 @@ export default function CompraModal({ onClose, onSaved }) {
     setForm(prev => ({ ...prev, caficultor: tercero.id }))
     setBusqueda(tercero.nombre)
     setDropdownVisible(false)
+
+    // ── NUEVO: consulta letras pendientes de este caficultor ──
+    setLetraElegida(null)
+    setValorAbono('')
+    getLetrasPendientesCaficultor(tercero.id)
+      .then(data => setLetrasPendientes(data))
+      .catch(() => setLetrasPendientes([]))
   }
 
   const limpiarCaficultor = () => {
@@ -355,6 +440,15 @@ export default function CompraModal({ onClose, onSaved }) {
     setForm(prev => ({ ...prev, caficultor: '' }))
     setBusqueda('')
     setResultados([])
+    // ── NUEVO: limpia también el estado de letras ──
+    setLetrasPendientes([])
+    setLetraElegida(null)
+    setValorAbono('')
+  }
+
+  const elegirLetra = (letraId, saldo) => {
+    setLetraElegida(letraId)
+    setValorAbono(String(saldo)) // sugiere abonar el saldo completo por defecto
   }
 
   const handleDetalleChange = (index, e) => {
@@ -389,14 +483,32 @@ export default function CompraModal({ onClose, onSaved }) {
         return
       }
     }
+    // ── NUEVO: valida el abono a letra si fue elegida ──
+    if (letraElegida) {
+      const letra = letrasPendientes.find(l => l.id === letraElegida)
+      if (!valorAbono || Number(valorAbono) <= 0) {
+        setError('Ingresa el valor a abonar a la letra seleccionada.')
+        return
+      }
+      if (Number(valorAbono) > Number(letra.saldo)) {
+        setError(`El abono no puede superar el saldo de la letra (${formatCOP(letra.saldo)}).`)
+        return
+      }
+    }
+
     setLoading(true)
     setError(null)
     try {
-      const res = await createCompra({ ...form, detalles })
-      onSaved()                        // refresca la lista en el padre
-      setCompraCreadada(res.data)      // muestra pantalla de éxito
-    } catch {
-      setError('Error al guardar la compra. Verifica los datos.')
+      const payload = { ...form, detalles }
+      // ── NUEVO: incluye el abono a letra si aplica ──
+      if (letraElegida) {
+        payload.abono_letra = { letra_id: letraElegida, valor: Number(valorAbono) }
+      }
+      const res = await createCompra(payload)
+      onSaved()
+      setCompraCreadada(res.data)
+    } catch (err) {
+      setError(err?.response?.data?.abono_letra?.[0] || 'Error al guardar la compra. Verifica los datos.')
     } finally {
       setLoading(false)
     }
@@ -409,6 +521,10 @@ export default function CompraModal({ onClose, onSaved }) {
     setBusqueda('')
     setCaficultorSeleccionado(null)
     setError(null)
+    // ── NUEVO: reinicia estado de letras ──
+    setLetrasPendientes([])
+    setLetraElegida(null)
+    setValorAbono('')
   }
 
   const handleBackdropClick = (e) => {
@@ -436,7 +552,6 @@ export default function CompraModal({ onClose, onSaved }) {
         transition: 'max-width 0.2s',
       }}>
 
-        {/* ── Si la compra fue creada, muestra pantalla de éxito ── */}
         {compraCreadada ? (
           <PantallaExito
             compra={compraCreadada}
@@ -445,7 +560,6 @@ export default function CompraModal({ onClose, onSaved }) {
           />
         ) : (
           <>
-            {/* ── Cabecera ── */}
             <div style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               padding: '18px 20px', borderBottom: '1px solid #f1f5f9',
@@ -473,7 +587,6 @@ export default function CompraModal({ onClose, onSaved }) {
               </button>
             </div>
 
-            {/* ── Cuerpo ── */}
             <form onSubmit={handleSubmit}>
               <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
@@ -489,7 +602,6 @@ export default function CompraModal({ onClose, onSaved }) {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
-                  {/* Buscador caficultor */}
                   <div ref={dropdownRef} style={{ position: 'relative' }}>
                     <label style={labelStyle}>Caficultor *</label>
                     <div style={{ position: 'relative' }}>
@@ -579,6 +691,15 @@ export default function CompraModal({ onClose, onSaved }) {
                   </div>
                 </div>
 
+                {/* ── NUEVO: notificación flotante de letras pendientes ── */}
+                <NotificacionLetras
+                  letras={letrasPendientes}
+                  letraElegida={letraElegida}
+                  valorAbono={valorAbono}
+                  onElegirLetra={elegirLetra}
+                  onCambiarValor={setValorAbono}
+                />
+
                 <div>
                   <label style={labelStyle}>Nota</label>
                   <textarea
@@ -590,7 +711,6 @@ export default function CompraModal({ onClose, onSaved }) {
                   />
                 </div>
 
-                {/* Detalles */}
                 <div>
                   <div style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -732,23 +852,37 @@ export default function CompraModal({ onClose, onSaved }) {
                   </div>
                 </div>
 
-                {/* Total */}
+                {/* ── Total + resumen del abono a letra ── */}
                 <div style={{
                   background: '#f0fdf4', border: '1px solid #bbf7d0',
                   borderRadius: '8px', padding: '14px 16px',
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  display: 'flex', flexDirection: 'column', gap: '8px',
                 }}>
-                  <span style={{ fontSize: '13px', fontWeight: 500, color: '#475569' }}>
-                    Total a pagar hoy:
-                  </span>
-                  <span style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a' }}>
-                    ${totalCompra.toLocaleString('es-CO')}
-                  </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 500, color: '#475569' }}>
+                      Total a pagar hoy:
+                    </span>
+                    <span style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a' }}>
+                      ${totalCompra.toLocaleString('es-CO')}
+                    </span>
+                  </div>
+                  {letraElegida && Number(valorAbono) > 0 && (
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      paddingTop: '8px', borderTop: '1px solid #bbf7d0',
+                    }}>
+                      <span style={{ fontSize: '12px', color: '#92400e' }}>
+                        + Abono a letra (entra a caja):
+                      </span>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#ca8a04' }}>
+                        {formatCOP(valorAbono)}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
               </div>
 
-              {/* Pie */}
               <div style={{
                 display: 'flex', gap: '10px',
                 padding: '16px 20px', borderTop: '1px solid #f1f5f9',

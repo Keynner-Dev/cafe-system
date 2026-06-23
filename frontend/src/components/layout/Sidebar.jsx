@@ -148,13 +148,15 @@ const SECTIONS = [
         ),
       },
       {
-        to: '/cuentas-cobrar',
-        label: 'Cuentas por cobrar',
+        to: '/letras',
+        label: 'Letras de cambio',
         icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <rect x="2" y="5" width="20" height="14" rx="2"/>
-            <path d="M16 10h.01M12 10h.01M8 10h.01M16 14h.01M12 14h.01"/>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            style={{ flexShrink: 0 }}>
+            <path d="M14 14l-7 7M7 7l10 10"/>
+            <circle cx="6" cy="6" r="3"/>
+            <circle cx="18" cy="18" r="3"/>
             </svg>
         ),
       },

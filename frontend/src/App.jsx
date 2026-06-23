@@ -13,7 +13,7 @@ import UsuariosPage from './pages/usuarios/UsuariosPage'
 import CajaPage from './pages/caja/CajaPage'
 import GastosPage from './pages/gastos/GastosPage'
 import CuentasPagarPage from './pages/cuentasPagar/CuentasPagarPage'
-import CuentasCobrarPage from './pages/cuentasCobrar/CuentasCobrarPage';
+import LetrasPage from './pages/letras/LetrasPage'   // ← reemplaza el import de CuentasCobrarPage
 
 
 function RutaProtegida({ children }) {
@@ -69,7 +69,7 @@ export default function App() {
         <Route path="caja"       element={<CajaPage />} />
         <Route path="gastos"     element={<GastosPage />} />
         <Route path="cuentas-pagar" element={<CuentasPagarPage />} />
-        <Route path="/cuentas-cobrar" element={<CuentasCobrarPage />} />
+        <Route path="letras"     element={<LetrasPage />} />
       </Route>
     </Routes>
   )

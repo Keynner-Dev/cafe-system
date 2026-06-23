@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { getCuentasCobrar, deleteCuentaCobrar } from '../../api/cuentasCobrar';
+import { getLetras } from '../../api/letras';
 import { useAuth } from '../../context/AuthContext';
-import CuentaCobrarModal from '../../components/cuentasCobrar/CuentaCobrarModal';
-import AbonoCobroModal from '../../components/cuentasCobrar/AbonoCobroModal';
+import LetraModal from '../../components/letras/LetraModal';
+import AbonoLetraModal from '../../components/letras/AbonoLetraModal';
 
 const fmt = (n) =>
   Number(n).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
@@ -13,34 +13,34 @@ const BADGE = {
   pagado:    { bg: '#f0fdf4', color: '#16a34a' },
 };
 
-export default function CuentasCobrarPage() {
+export default function LetrasPage() {
   const { user } = useAuth();
-  const esJefe   = user?.rol === 'jefe';
+  const esJefe = user?.rol === 'jefe';
 
-  const [cuentas,      setCuentas]      = useState([]);
-  const [loading,      setLoading]      = useState(true);
+  const [letras, setLetras] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState('');
-  const [modalCrear,   setModalCrear]   = useState(false);
-  const [cuentaAbono,  setCuentaAbono]  = useState(null);
+  const [modalCrear, setModalCrear] = useState(false);
+  const [letraAbono, setLetraAbono] = useState(null);
 
   const cargar = () => {
     setLoading(true);
     const params = {};
     if (filtroEstado) params.estado = filtroEstado;
-    getCuentasCobrar(params)
-      .then(setCuentas)
+    getLetras(params)
+      .then(setLetras)
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { cargar(); }, [filtroEstado]);
 
-  const totales = cuentas.reduce(
-    (acc, c) => ({
-      total:   acc.total   + Number(c.valor_total),
-      cobrado: acc.cobrado + Number(c.valor_cobrado),
-      saldo:   acc.saldo   + Number(c.saldo),
+  const totales = letras.reduce(
+    (acc, l) => ({
+      total: acc.total + Number(l.valor_total),
+      abonado: acc.abonado + Number(l.valor_abonado),
+      saldo: acc.saldo + Number(l.saldo),
     }),
-    { total: 0, cobrado: 0, saldo: 0 }
+    { total: 0, abonado: 0, saldo: 0 }
   );
 
   return (
@@ -52,10 +52,10 @@ export default function CuentasCobrarPage() {
       }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#0f172a' }}>
-            Cuentas por cobrar
+            Letras de cambio
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>
-            Seguimiento de deudas de empresas
+            Adelantos de dinero a caficultores
           </p>
         </div>
         <button
@@ -73,7 +73,7 @@ export default function CuentasCobrarPage() {
             stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
-          Nueva cuenta
+          Nueva letra
         </button>
       </div>
 
@@ -83,8 +83,8 @@ export default function CuentasCobrarPage() {
         gap: 16, marginBottom: 24,
       }}>
         {[
-          { label: 'Total por cobrar', value: fmt(totales.total),   color: '#2563eb', bg: '#eff6ff' },
-          { label: 'Ya cobrado',       value: fmt(totales.cobrado), color: '#16a34a', bg: '#f0fdf4' },
+          { label: 'Total adelantado', value: fmt(totales.total),   color: '#2563eb', bg: '#eff6ff' },
+          { label: 'Ya abonado',       value: fmt(totales.abonado), color: '#16a34a', bg: '#f0fdf4' },
           { label: 'Saldo pendiente',  value: fmt(totales.saldo),   color: '#dc2626', bg: '#fef2f2' },
         ].map(({ label, value, color, bg }) => (
           <div key={label} style={{
@@ -101,7 +101,7 @@ export default function CuentasCobrarPage() {
               padding: '3px 8px', borderRadius: 4, fontSize: 11,
               background: bg, color,
             }}>
-              {cuentas.length} cuenta{cuentas.length !== 1 ? 's' : ''}
+              {letras.length} letra{letras.length !== 1 ? 's' : ''}
             </div>
           </div>
         ))}
@@ -123,7 +123,7 @@ export default function CuentasCobrarPage() {
               padding: '5px 14px', borderRadius: 6, fontSize: 12,
               fontWeight: 500, cursor: 'pointer',
               background: filtroEstado === e ? '#0f172a' : '#f8fafc',
-              color:      filtroEstado === e ? 'white'   : '#475569',
+              color: filtroEstado === e ? 'white' : '#475569',
               border: `1px solid ${filtroEstado === e ? '#0f172a' : '#e2e8f0'}`,
             }}
           >
@@ -140,7 +140,7 @@ export default function CuentasCobrarPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: '#0f172a' }}>
-              {['Empresa', 'Bodega', 'Total', 'Cobrado', 'Saldo', 'Estado', 'Fecha', ''].map((h) => (
+              {['Caficultor', 'Bodega', 'Adelantado', 'Abonado', 'Saldo', 'Estado', 'Fecha', ''].map((h) => (
                 <th key={h} style={{
                   padding: '12px 16px', textAlign: 'left',
                   fontSize: 12, fontWeight: 600, color: '#e2e8f0',
@@ -163,40 +163,39 @@ export default function CuentasCobrarPage() {
                   <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
                 </td>
               </tr>
-            ) : cuentas.length === 0 ? (
+            ) : letras.length === 0 ? (
               <tr>
                 <td colSpan={8} style={{
                   textAlign: 'center', padding: '40px 0',
                   color: '#94a3b8', fontSize: 14,
                 }}>
-                  No hay cuentas registradas
+                  No hay letras registradas
                 </td>
               </tr>
             ) : (
-              cuentas.map((c, idx) => {
-                const saldo = Number(c.valor_total) - Number(c.valor_cobrado);
-                const b     = BADGE[c.estado] || BADGE.pendiente;
+              letras.map((l) => {
+                const b = BADGE[l.estado] || BADGE.pendiente;
                 return (
                   <tr
-                    key={c.id}
+                    key={l.id}
                     style={{ borderTop: '1px solid #f1f5f9' }}
                     onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                   >
                     <td style={{ padding: '14px 16px', fontSize: 14, fontWeight: 500, color: '#0f172a' }}>
-                      {c.empresa_nombre}
+                      {l.caficultor_nombre}
                     </td>
                     <td style={{ padding: '14px 16px', fontSize: 13, color: '#64748b' }}>
-                      {c.bodega_nombre}
+                      {l.bodega_nombre}
                     </td>
                     <td style={{ padding: '14px 16px', fontSize: 14, color: '#0f172a' }}>
-                      {fmt(c.valor_total)}
+                      {fmt(l.valor_total)}
                     </td>
                     <td style={{ padding: '14px 16px', fontSize: 14, color: '#16a34a' }}>
-                      {fmt(c.valor_cobrado)}
+                      {fmt(l.valor_abonado)}
                     </td>
                     <td style={{ padding: '14px 16px', fontSize: 14, fontWeight: 600, color: '#dc2626' }}>
-                      {fmt(saldo)}
+                      {fmt(l.saldo)}
                     </td>
                     <td style={{ padding: '14px 16px' }}>
                       <span style={{
@@ -204,16 +203,16 @@ export default function CuentasCobrarPage() {
                         padding: '4px 10px', borderRadius: 6,
                         fontSize: 12, fontWeight: 600,
                       }}>
-                        {c.estado.charAt(0).toUpperCase() + c.estado.slice(1)}
+                        {l.estado.charAt(0).toUpperCase() + l.estado.slice(1)}
                       </span>
                     </td>
                     <td style={{ padding: '14px 16px', fontSize: 12, color: '#94a3b8' }}>
-                      {new Date(c.fecha_creacion).toLocaleDateString('es-CO')}
+                      {new Date(l.fecha_creacion).toLocaleDateString('es-CO')}
                     </td>
                     <td style={{ padding: '14px 16px' }}>
-                      {c.estado !== 'pagado' && (
+                      {l.estado !== 'pagado' && (
                         <button
-                          onClick={() => setCuentaAbono(c)}
+                          onClick={() => setLetraAbono(l)}
                           style={{
                             padding: '6px 14px', borderRadius: 6,
                             background: '#eff6ff', color: '#2563eb',
@@ -223,7 +222,7 @@ export default function CuentasCobrarPage() {
                           onMouseEnter={(e) => e.currentTarget.style.background = '#dbeafe'}
                           onMouseLeave={(e) => e.currentTarget.style.background = '#eff6ff'}
                         >
-                          Ver cobros
+                          Ver abonos
                         </button>
                       )}
                     </td>
@@ -237,15 +236,15 @@ export default function CuentasCobrarPage() {
 
       {/* Modales */}
       {modalCrear && (
-        <CuentaCobrarModal
+        <LetraModal
           onClose={() => setModalCrear(false)}
           onCreated={cargar}
         />
       )}
-      {cuentaAbono && (
-        <AbonoCobroModal
-          cuenta={cuentaAbono}
-          onClose={() => setCuentaAbono(null)}
+      {letraAbono && (
+        <AbonoLetraModal
+          letra={letraAbono}
+          onClose={() => setLetraAbono(null)}
           onUpdated={cargar}
         />
       )}

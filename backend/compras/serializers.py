@@ -66,6 +66,9 @@ class CompraSerializer(serializers.ModelSerializer):
     creado_por = serializers.StringRelatedField(read_only=True)
     cuenta_por_pagar = serializers.SerializerMethodField()
 
+    # ← NUEVO: opcional, solo se usa en el create(), nunca se devuelve en la respuesta
+    abono_letra = serializers.DictField(write_only=True, required=False)
+
     class Meta:
         model = Compra
         fields = '__all__'
@@ -108,7 +111,6 @@ class CompraSerializer(serializers.ModelSerializer):
             'saldo': float(cuenta.saldo),
         }
 
-    # ── Seguridad: administrador solo puede comprar para su propia bodega ──
     def validate(self, data):
         request = self.context.get('request')
         usuario = getattr(request, 'user', None)
@@ -122,11 +124,32 @@ class CompraSerializer(serializers.ModelSerializer):
                         'detalles': f'Línea {i+1}: no tienes acceso a la bodega {bodega.nombre}.'
                     })
 
+        # ← Valida el abono a letra si viene en el payload
+        abono_letra = data.get('abono_letra')
+        if abono_letra:
+            from letras_cambio.models import LetraCambio
+            try:
+                letra = LetraCambio.objects.get(pk=abono_letra.get('letra_id'))
+            except LetraCambio.DoesNotExist:
+                raise serializers.ValidationError({'abono_letra': 'Letra no encontrada.'})
+
+            valor = abono_letra.get('valor')
+            if not valor or float(valor) <= 0:
+                raise serializers.ValidationError({'abono_letra': 'El valor del abono debe ser mayor a cero.'})
+            if float(valor) > float(letra.saldo):
+                raise serializers.ValidationError({
+                    'abono_letra': f'El abono (${valor}) supera el saldo de la letra (${letra.saldo}).'
+                })
+            if usuario and usuario.rol == 'administrador' and letra.bodega != usuario.bodega:
+                raise serializers.ValidationError({'abono_letra': 'No tienes acceso a esta letra.'})
+
         return data
 
     @transaction.atomic
     def create(self, validated_data):
         detalles_data = validated_data.pop('detalles')
+        abono_letra_data = validated_data.pop('abono_letra', None)  # ← extrae antes de crear
+
         compra = Compra.objects.create(**validated_data)
 
         for detalle_data in detalles_data:
@@ -139,6 +162,19 @@ class CompraSerializer(serializers.ModelSerializer):
                 precio_kilo=detalle.precio_kilo,
                 referencia=f'compra-{compra.id}',
                 nota=f'{"[DEPÓSITO] " if detalle.es_deposito else ""}Entrada por compra #{compra.id}'
+            )
+            # La señal post_save de DetalleCompra ya genera el egreso de caja automáticamente
+
+        # ← Si viene un abono a letra, se crea ligado a esta compra.
+        # El AbonoLetra dispara su propia señal post_save que registra el ingreso en caja.
+        if abono_letra_data:
+            from letras_cambio.models import LetraCambio, AbonoLetra
+            letra = LetraCambio.objects.get(pk=abono_letra_data['letra_id'])
+            AbonoLetra.objects.create(
+                letra=letra,
+                valor=abono_letra_data['valor'],
+                compra=compra,
+                creado_por=compra.creado_por,
             )
 
         return compra

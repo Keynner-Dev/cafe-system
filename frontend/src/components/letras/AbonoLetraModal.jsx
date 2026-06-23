@@ -1,24 +1,24 @@
 import { useState, useEffect } from 'react';
-import { getAbonos, createAbono } from '../../api/cuentasCobrar';
+import { getAbonosLetra, createAbonoLetra } from '../../api/letras';
 
 const fmt = (n) =>
   Number(n).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
-export default function AbonoCobroModal({ cuenta, onClose, onUpdated }) {
-  const [abonos,  setAbonos]  = useState([]);
-  const [valor,   setValor]   = useState('');
-  const [notas,   setNotas]   = useState('');
+export default function AbonoLetraModal({ letra, onClose, onUpdated }) {
+  const [abonos, setAbonos] = useState([]);
+  const [valor, setValor] = useState('');
+  const [notas, setNotas] = useState('');
   const [loading, setLoading] = useState(true);
-  const [saving,  setSaving]  = useState(false);
-  const [error,   setError]   = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    getAbonos(cuenta.id)
+    getAbonosLetra(letra.id)
       .then(setAbonos)
       .finally(() => setLoading(false));
-  }, [cuenta.id]);
+  }, [letra.id]);
 
-  const saldo = Number(cuenta.valor_total) - Number(cuenta.valor_cobrado);
+  const saldo = Number(letra.valor_total) - Number(letra.valor_abonado);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,13 +27,13 @@ export default function AbonoCobroModal({ cuenta, onClose, onUpdated }) {
     setSaving(true);
     setError('');
     try {
-      await createAbono(cuenta.id, { valor: Number(valor), notas });
+      await createAbonoLetra(letra.id, { valor: Number(valor), notas });
       setValor(''); setNotas('');
-      const updated = await getAbonos(cuenta.id);
+      const updated = await getAbonosLetra(letra.id);
       setAbonos(updated);
       onUpdated?.();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al registrar el abono.');
+      setError(err.response?.data?.detail || err.response?.data?.[0] || 'Error al registrar el abono.');
     } finally {
       setSaving(false);
     }
@@ -44,7 +44,7 @@ export default function AbonoCobroModal({ cuenta, onClose, onUpdated }) {
     parcial:   { bg: '#fefce8', color: '#ca8a04' },
     pagado:    { bg: '#f0fdf4', color: '#16a34a' },
   };
-  const b = badgeEstado[cuenta.estado] || badgeEstado.pendiente;
+  const b = badgeEstado[letra.estado] || badgeEstado.pendiente;
 
   return (
     <div style={{
@@ -67,16 +67,13 @@ export default function AbonoCobroModal({ cuenta, onClose, onUpdated }) {
         }}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 16, color: '#0f172a' }}>
-              Abonos de cobranza
+              Abonos a letra
             </div>
             <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
-              {cuenta.empresa_nombre}
+              {letra.caficultor_nombre}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-          >
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
               stroke="#94a3b8" strokeWidth="2" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -91,9 +88,9 @@ export default function AbonoCobroModal({ cuenta, onClose, onUpdated }) {
           borderBottom: '1px solid #f1f5f9',
         }}>
           {[
-            { label: 'Total',   value: fmt(cuenta.valor_total)   },
-            { label: 'Cobrado', value: fmt(cuenta.valor_cobrado) },
-            { label: 'Saldo',   value: fmt(saldo)                },
+            { label: 'Adelantado', value: fmt(letra.valor_total) },
+            { label: 'Abonado',    value: fmt(letra.valor_abonado) },
+            { label: 'Saldo',      value: fmt(saldo) },
           ].map(({ label, value }) => (
             <div key={label} style={{
               background: '#f8fafc', borderRadius: 8,
@@ -117,7 +114,7 @@ export default function AbonoCobroModal({ cuenta, onClose, onUpdated }) {
               background: b.bg, color: b.color,
               padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
             }}>
-              {cuenta.estado.charAt(0).toUpperCase() + cuenta.estado.slice(1)}
+              {letra.estado.charAt(0).toUpperCase() + letra.estado.slice(1)}
             </span>
           </div>
 
@@ -155,6 +152,11 @@ export default function AbonoCobroModal({ cuenta, onClose, onUpdated }) {
                     <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 14 }}>
                       {fmt(a.valor)}
                     </div>
+                    {a.compra && (
+                      <div style={{ fontSize: 11, color: '#2563eb', marginTop: 2 }}>
+                        Abonado automáticamente desde Compra #{a.compra}
+                      </div>
+                    )}
                     {a.notas && (
                       <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{a.notas}</div>
                     )}
@@ -167,14 +169,19 @@ export default function AbonoCobroModal({ cuenta, onClose, onUpdated }) {
             </div>
           )}
 
-          {/* Formulario nuevo abono */}
+          {/* Formulario nuevo abono manual */}
           {saldo > 0 && (
             <>
               <div style={{
                 fontSize: 13, fontWeight: 600, color: '#374151',
-                marginBottom: 10, marginTop: 4,
+                marginBottom: 4, marginTop: 4,
               }}>
-                Registrar abono
+                Registrar abono manual
+              </div>
+              <div style={{
+                fontSize: 12, color: '#94a3b8', marginBottom: 10,
+              }}>
+                Este abono entrará a la caja de la bodega como ingreso.
               </div>
               <form onSubmit={handleSubmit}>
                 <div style={{ marginBottom: 12 }}>
@@ -196,7 +203,7 @@ export default function AbonoCobroModal({ cuenta, onClose, onUpdated }) {
                       fontSize: 14, outline: 'none',
                     }}
                     onFocus={(e) => e.target.style.borderColor = '#16a34a'}
-                    onBlur={(e)  => e.target.style.borderColor = '#e2e8f0'}
+                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                   />
                 </div>
                 <div style={{ marginBottom: 12 }}>
@@ -207,7 +214,7 @@ export default function AbonoCobroModal({ cuenta, onClose, onUpdated }) {
                     type="text"
                     value={notas}
                     onChange={(e) => setNotas(e.target.value)}
-                    placeholder="Referencia de pago, transferencia, etc."
+                    placeholder="Referencia del abono..."
                     style={{
                       width: '100%', boxSizing: 'border-box',
                       marginTop: 6, padding: '9px 12px',
@@ -215,7 +222,7 @@ export default function AbonoCobroModal({ cuenta, onClose, onUpdated }) {
                       fontSize: 14, outline: 'none',
                     }}
                     onFocus={(e) => e.target.style.borderColor = '#16a34a'}
-                    onBlur={(e)  => e.target.style.borderColor = '#e2e8f0'}
+                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                   />
                 </div>
                 {error && (

@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     'caja',
     'gastos',
     'cuentas_pagar',
-    'cuentas_cobrar',
+    'letras_cambio',
 ]
 
 MIDDLEWARE = [
