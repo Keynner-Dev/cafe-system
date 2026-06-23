@@ -5,15 +5,15 @@ import { getBodegas } from '../../api/inventario';
 import { useAuth } from '../../context/AuthContext';
 
 export default function LetraModal({ onClose, onCreated }) {
-  const { user } = useAuth();
-  const esJefe = user?.rol === 'jefe';
+  const { usuario } = useAuth();
+  const esJefe = usuario?.rol === 'jefe';
 
   const [bodegas, setBodegas] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [dropdown, setDropdown] = useState(false);
   const [resultados, setResultados] = useState([]);
   const [caficultor, setCaficultor] = useState(null);
-  const [bodega, setBodega] = useState(user?.bodega?.toString() || '');
+  const [bodega, setBodega] = useState(usuario?.bodega_id?.toString() || '');
   const [valorTotal, setValorTotal] = useState('');
   const [notas, setNotas] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,8 +21,8 @@ export default function LetraModal({ onClose, onCreated }) {
   const debounceRef = useRef(null);
 
   useEffect(() => {
-    if (esJefe) getBodegas().then(setBodegas);
-  }, [esJefe]);
+    if (esJefe) getBodegas().then(res => setBodegas(res.data));
+   }, [esJefe]);
 
   const buscarCaficultores = (texto) => {
     clearTimeout(debounceRef.current);
@@ -50,7 +50,7 @@ export default function LetraModal({ onClose, onCreated }) {
     try {
       await createLetra({
         caficultor: caficultor.id,
-        bodega: bodega || undefined,
+        bodega: esJefe ? bodega : usuario?.bodega_id,
         valor_total: Number(valorTotal),
         notas,
       });
