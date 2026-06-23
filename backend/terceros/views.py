@@ -12,6 +12,10 @@ class TerceroViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        # Para acciones de detalle, siempre devolver todos
+        if self.action in ['retrieve', 'update', 'partial_update', 'destroy', 'perfil']:
+            return Tercero.objects.all()
+
         queryset = Tercero.objects.all()
 
         tipo = self.request.query_params.get('tipo')
@@ -40,7 +44,6 @@ class TerceroViewSet(viewsets.ModelViewSet):
     def perfil(self, request, pk=None):
         tercero = self.get_object()
 
-        # ── Compras ──────────────────────────────────────────────────────────
         from compras.models import Compra
         compras_qs = Compra.objects.filter(caficultor=tercero).prefetch_related('detalles').order_by('-fecha')
         compras = []
@@ -62,13 +65,10 @@ class TerceroViewSet(viewsets.ModelViewSet):
                 ],
             })
 
-        # ── Cuentas por pagar (Vales) ─────────────────────────────────────
         cuentas = []
         try:
             from cuentas_pagar.models import CuentaPorPagar
-            cuentas_qs = CuentaPorPagar.objects.filter(
-                caficultor=tercero
-            ).order_by('-creado_en')
+            cuentas_qs = CuentaPorPagar.objects.filter(caficultor=tercero).order_by('-creado_en')
             for cp in cuentas_qs:
                 cuentas.append({
                     'id': cp.id,
@@ -81,13 +81,10 @@ class TerceroViewSet(viewsets.ModelViewSet):
         except Exception:
             pass
 
-        # ── Letras de cambio ──────────────────────────────────────────────
         letras = []
         try:
             from letras_cambio.models import LetraCambio
-            letras_qs = LetraCambio.objects.filter(
-                caficultor=tercero
-            ).order_by('-creado_en')
+            letras_qs = LetraCambio.objects.filter(caficultor=tercero).order_by('-creado_en')
             for l in letras_qs:
                 letras.append({
                     'id': l.id,
