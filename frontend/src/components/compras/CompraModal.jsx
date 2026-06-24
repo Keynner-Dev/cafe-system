@@ -397,7 +397,7 @@ function NotificacionLetras({ letras, letraElegida, valorAbono, onElegirLetra, o
 export default function CompraModal({ onClose, onSaved }) {
   const { usuario } = useAuth()
   const esAdministrador = usuario?.rol === 'administrador'
-  const bodegaUsuario = usuario?.bodega
+  const bodegaUsuario = usuario?.bodega_id
   const bodegaUsuarioNombre = usuario?.bodega_nombre
 
   const [form, setForm]         = useState({ caficultor: '', fecha: hoy, nota: '' })
