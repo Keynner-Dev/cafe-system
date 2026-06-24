@@ -31,6 +31,23 @@ const IconSearch = () => (
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 )
+const IconPrint = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 6 2 18 2 18 9" />
+    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+    <rect x="6" y="14" width="12" height="8" />
+  </svg>
+)
+const IconCheck = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+    stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+)
+
+const formatCOP = (val) =>
+  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val || 0)
 
 const inputStyle = {
   width: '100%', boxSizing: 'border-box',
@@ -56,13 +73,220 @@ function Seccion({ label }) {
   )
 }
 
+// ── Pantalla de éxito con botón Imprimir ──────────────────────────────────────
+function PantallaExito({ venta, onClose, onNuevaRemision }) {
+  const handleImprimir = () => {
+    const fecha = new Date(venta.fecha + 'T12:00:00').toLocaleDateString('es-CO', {
+      day: '2-digit', month: 'long', year: 'numeric',
+    })
+
+    const filasDetalle = venta.detalles.map(d => `
+      <tr>
+        <td>${d.tipo_cafe_nombre}</td>
+        <td>${d.bodega_nombre}</td>
+        <td style="text-align:center">${d.bultos}</td>
+        <td style="text-align:right">${Number(d.kilos).toLocaleString('es-CO')} kg</td>
+        ${d.muestra || d.factor || d.humedad || d.pasilla ? `
+        <td style="font-size:11px;color:#64748b">
+          ${d.muestra ? `M: ${d.muestra} ` : ''}
+          ${d.factor  ? `F: ${d.factor} `  : ''}
+          ${d.humedad ? `H: ${d.humedad}% ` : ''}
+          ${d.pasilla ? `P: ${d.pasilla}%`  : ''}
+        </td>` : '<td style="color:#cbd5e1">—</td>'}
+      </tr>
+    `).join('')
+
+    const ventana = window.open('', '_blank', 'width=800,height=700')
+    ventana.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>${venta.numero_remision} — Café San Joaquín</title>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 32px; color: #0f172a; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+          .logo-area h1 { font-size: 20px; font-weight: 700; color: #0f172a; }
+          .logo-area p { font-size: 12px; color: #64748b; margin-top: 2px; }
+          .rem-info { text-align: right; }
+          .rem-info .num { font-size: 22px; font-weight: 700; color: #16a34a; }
+          .rem-info .fecha { font-size: 12px; color: #64748b; margin-top: 2px; }
+          .empresa-box { background: #f8fafc; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; }
+          .empresa-box label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+          .empresa-box p { font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 3px; }
+          .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+          .info-box { background: #f8fafc; border-radius: 8px; padding: 12px 14px; }
+          .info-box label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
+          .info-box p { font-size: 13px; color: #0f172a; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th { background: #0f172a; color: white; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+          td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
+          tr:nth-child(even) td { background: #f8fafc; }
+          .totales { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 16px; display: flex; gap: 32px; align-items: center; margin-bottom: 16px; }
+          .totales span { font-size: 13px; color: #475569; }
+          .totales strong { font-size: 16px; font-weight: 700; color: #16a34a; display: block; margin-top: 2px; }
+          .flete-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px; }
+          .nota { margin-bottom: 16px; font-size: 12px; color: #64748b; }
+          .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
+          @media print { body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo-area">
+            <h1>☕ Café San Joaquín</h1>
+            <p>NIT. 901659573-6</p>
+          </div>
+          <div class="rem-info">
+            <div class="num">${venta.numero_remision}</div>
+            <div class="fecha">${fecha}</div>
+          </div>
+        </div>
+
+        <div class="empresa-box">
+          <label>Empresa compradora</label>
+          <p>${venta.empresa_nombre}</p>
+          ${venta.cuenta ? `<p style="font-size:12px;color:#64748b;margin-top:4px">Cuenta: ${venta.cuenta}</p>` : ''}
+        </div>
+
+        <div class="grid2">
+          <div class="info-box">
+            <label>Conductor</label>
+            <p>${venta.conductor_nombre} — CC ${venta.conductor_cedula}</p>
+            ${venta.conductor_telefono ? `<p style="font-size:12px;color:#64748b">${venta.conductor_telefono}</p>` : ''}
+            ${venta.conductor_direccion ? `<p style="font-size:12px;color:#64748b">${venta.conductor_direccion}</p>` : ''}
+          </div>
+          <div class="info-box">
+            <label>Vehículo</label>
+            <p>Placas: <strong>${venta.vehiculo_placas}</strong></p>
+            ${venta.vehiculo_clase || venta.vehiculo_marca ? `<p style="font-size:12px;color:#64748b">${[venta.vehiculo_clase, venta.vehiculo_marca, venta.vehiculo_color, venta.vehiculo_modelo].filter(Boolean).join(' · ')}</p>` : ''}
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Tipo de café</th>
+              <th>Bodega</th>
+              <th style="text-align:center">Bultos</th>
+              <th style="text-align:right">Kilos</th>
+              <th>Calidad</th>
+            </tr>
+          </thead>
+          <tbody>${filasDetalle}</tbody>
+        </table>
+
+        <div class="totales">
+          <div>
+            <span>Total bultos</span>
+            <strong>${venta.total_bultos}</strong>
+          </div>
+          <div>
+            <span>Total kilos</span>
+            <strong>${Number(venta.total_kilos).toLocaleString('es-CO')} kg</strong>
+          </div>
+        </div>
+
+        ${venta.flete_valor && Number(venta.flete_valor) > 0 ? `
+        <div class="flete-box">
+          <strong>Flete:</strong> ${formatCOP(venta.flete_valor)}
+          ${venta.flete_pagadero_por ? ` — pagadero por: ${venta.flete_pagadero_por}` : ''}
+        </div>` : ''}
+
+        ${venta.nota ? `<p class="nota">📝 <strong>Nota:</strong> ${venta.nota}</p>` : ''}
+
+        <div class="footer">
+          Café San Joaquín SAS · Generado el ${new Date().toLocaleDateString('es-CO')}
+        </div>
+
+        <script>window.onload = () => window.print()</script>
+      </body>
+      </html>
+    `)
+    ventana.document.close()
+  }
+
+  return (
+    <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+      {/* Ícono de éxito */}
+      <div style={{
+        width: 64, height: 64, borderRadius: '50%',
+        background: '#16a34a', display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        margin: '0 auto 16px',
+        boxShadow: '0 4px 16px rgba(22,163,74,0.3)',
+      }}>
+        <IconCheck />
+      </div>
+
+      <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>
+        ¡Remisión registrada!
+      </h2>
+      <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 4px' }}>
+        <strong style={{ color: '#16a34a' }}>{venta.numero_remision}</strong> — {venta.empresa_nombre}
+      </p>
+      <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 28px' }}>
+        {venta.total_bultos} bultos · {Number(venta.total_kilos).toLocaleString('es-CO')} kg
+      </p>
+
+      {/* Botón imprimir */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+        <button
+          onClick={handleImprimir}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 8, padding: '11px', borderRadius: 8,
+            border: '1px solid #e2e8f0', background: 'white',
+            color: '#0f172a', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+          onMouseLeave={e => e.currentTarget.style.background = 'white'}
+        >
+          <IconPrint /> Imprimir remisión
+        </button>
+      </div>
+
+      {/* Acciones secundarias */}
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button
+          onClick={onNuevaRemision}
+          style={{
+            flex: 1, padding: '9px', borderRadius: 8,
+            border: '1px solid #e2e8f0', background: 'white',
+            color: '#475569', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+          onMouseLeave={e => e.currentTarget.style.background = 'white'}
+        >
+          Nueva remisión
+        </button>
+        <button
+          onClick={onClose}
+          style={{
+            flex: 1, padding: '9px', borderRadius: 8,
+            border: 'none', background: '#16a34a',
+            color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#15803d'}
+          onMouseLeave={e => e.currentTarget.style.background = '#16a34a'}
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const hoy = new Date().toISOString().split('T')[0]
 const detalleVacio = {
   tipo_cafe: '', bodega: '', bultos: '', kilos: '',
   muestra: '', factor: '', humedad: '', pasilla: '',
 }
 const initialForm = {
-  fecha: hoy, empresa: '', cuenta: '',          // ← "empresa" en vez de "cliente"
+  fecha: hoy, empresa: '', cuenta: '',
   conductor_nombre: '', conductor_cedula: '',
   conductor_direccion: '', conductor_telefono: '',
   vehiculo_clase: '', vehiculo_placas: '',
@@ -73,13 +297,14 @@ const initialForm = {
 export default function VentaModal({ onClose, onSaved }) {
   const [form, setForm]         = useState(initialForm)
   const [detalles, setDetalles] = useState([{ ...detalleVacio }])
+  const [ventaGuardada, setVentaGuardada] = useState(null) // ← nuevo: guarda la venta al crear
 
   // ── estados del buscador de empresa ──
-  const [busqueda, setBusqueda]                     = useState('')
-  const [resultados, setResultados]                 = useState([])
-  const [dropdownVisible, setDropdownVisible]       = useState(false)
+  const [busqueda, setBusqueda]                       = useState('')
+  const [resultados, setResultados]                   = useState([])
+  const [dropdownVisible, setDropdownVisible]         = useState(false)
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState(null)
-  const [buscando, setBuscando]                     = useState(false)
+  const [buscando, setBuscando]                       = useState(false)
   const dropdownRef = useRef(null)
 
   const [tiposCafe, setTiposCafe] = useState([])
@@ -160,36 +385,71 @@ export default function VentaModal({ onClose, onSaved }) {
     e.preventDefault()
     e.stopPropagation()
     if (!form.empresa) {
-        setError('Debes seleccionar una empresa.')
-        return
+      setError('Debes seleccionar una empresa.')
+      return
     }
     if (loading || submitted) return
     setSubmitted(true)
     setLoading(true)
     setError(null)
     try {
-        const detallesLimpios = detalles.map(d => ({
+      const detallesLimpios = detalles.map(d => ({
         ...d,
         muestra: d.muestra || null,
-        factor: d.factor === '' ? null : d.factor,
+        factor:  d.factor  === '' ? null : d.factor,
         humedad: d.humedad === '' ? null : d.humedad,
         pasilla: d.pasilla === '' ? null : d.pasilla,
-        }))
-        await createVenta({ ...form, detalles: detallesLimpios })
-        onSaved()
-        onClose()
+      }))
+      const res = await createVenta({ ...form, detalles: detallesLimpios })
+      onSaved()
+      setVentaGuardada(res.data) // ← muestra pantalla de éxito con los datos reales
     } catch (err) {
-        setSubmitted(false)
-        const data = err.response?.data
-        if (data?.stock) setError(data.stock.join(' | '))
-        else setError('Error al guardar. Verifica los datos.')
+      setSubmitted(false)
+      const data = err.response?.data
+      if (data?.stock) setError(data.stock.join(' | '))
+      else setError('Error al guardar. Verifica los datos.')
     } finally {
-        setLoading(false)
+      setLoading(false)
     }
-    }
+  }
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) onClose()
+  }
+
+  // ── Si ya se guardó, mostrar pantalla de éxito ──
+  if (ventaGuardada) {
+    return (
+      <div
+        onClick={handleBackdropClick}
+        style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(15, 23, 42, 0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 50, padding: '16px',
+        }}
+      >
+        <div style={{
+          background: 'white', borderRadius: '12px',
+          width: '100%', maxWidth: '420px',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+          padding: '8px',
+        }}>
+          <PantallaExito
+            venta={ventaGuardada}
+            onClose={onClose}
+            onNuevaRemision={() => {
+              setVentaGuardada(null)
+              setForm(initialForm)
+              setDetalles([{ ...detalleVacio }])
+              setEmpresaSeleccionada(null)
+              setBusqueda('')
+              setSubmitted(false)
+            }}
+          />
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -406,47 +666,34 @@ export default function VentaModal({ onClose, onSaved }) {
                         onFocus={focusGreen} onBlur={blurGray}
                       />
                     </div>
-                    {/* ── Campos opcionales de calidad ── */}
-                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #e2e8f0' }}>
-                        <p style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                            Calidad (opcional)
-                        </p>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px' }}>
-                            <div>
-                            <label style={{ ...labelStyle, fontSize: '11px' }}>Muestra</label>
-                            <input type="text" name="muestra" value={d.muestra}
-                                onChange={e => handleDetalleChange(i, e)} placeholder="Ref."
-                                style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
-                                onFocus={focusGreen} onBlur={blurGray}
-                            />
-                            </div>
-                            <div>
-                            <label style={{ ...labelStyle, fontSize: '11px' }}>Factor</label>
-                            <input type="number" name="factor" value={d.factor} step="0.01"
-                                onChange={e => handleDetalleChange(i, e)} placeholder="0.00"
-                                style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
-                                onFocus={focusGreen} onBlur={blurGray}
-                            />
-                            </div>
-                            <div>
-                            <label style={{ ...labelStyle, fontSize: '11px' }}>Humedad %</label>
-                            <input type="number" name="humedad" value={d.humedad} step="0.01"
-                                onChange={e => handleDetalleChange(i, e)} placeholder="0.00"
-                                style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
-                                onFocus={focusGreen} onBlur={blurGray}
-                            />
-                            </div>
-                            <div>
-                            <label style={{ ...labelStyle, fontSize: '11px' }}>Pasilla %</label>
-                            <input type="number" name="pasilla" value={d.pasilla} step="0.01"
-                                onChange={e => handleDetalleChange(i, e)} placeholder="0.00"
-                                style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
-                                onFocus={focusGreen} onBlur={blurGray}
-                            />
-                            </div>
+                  </div>
+
+                  {/* ── Campos opcionales de calidad ── */}
+                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #e2e8f0' }}>
+                    <p style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                      Calidad (opcional)
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px' }}>
+                      {[
+                        { name: 'muestra', label: 'Muestra', type: 'text',   placeholder: 'Ref.' },
+                        { name: 'factor',  label: 'Factor',  type: 'number', placeholder: '0.00' },
+                        { name: 'humedad', label: 'Humedad %', type: 'number', placeholder: '0.00' },
+                        { name: 'pasilla', label: 'Pasilla %', type: 'number', placeholder: '0.00' },
+                      ].map(f => (
+                        <div key={f.name}>
+                          <label style={{ ...labelStyle, fontSize: '11px' }}>{f.label}</label>
+                          <input type={f.type} name={f.name} value={d[f.name]}
+                            onChange={e => handleDetalleChange(i, e)}
+                            placeholder={f.placeholder}
+                            step={f.type === 'number' ? '0.01' : undefined}
+                            style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+                            onFocus={focusGreen} onBlur={blurGray}
+                          />
                         </div>
+                      ))}
                     </div>
                   </div>
+
                   {detalles.length > 1 && (
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
                       <button type="button" onClick={() => eliminarDetalle(i)}
