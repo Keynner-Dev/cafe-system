@@ -14,4 +14,8 @@ urlpatterns = [
     path('api/gastos/', include('gastos.urls')),
     path('api/cuentas-pagar/', include('cuentas_pagar.urls')),
     path('api/letras/', include('letras_cambio.urls')),
+
+    # Portal caficultor — endpoint público, sin autenticación, separado
+    # a propósito de api/terceros/ (que requiere login interno).
+    path('api/portal/', include('terceros.urls_publico')),
 ]

@@ -14,6 +14,7 @@ import CajaPage from './pages/caja/CajaPage'
 import GastosPage from './pages/gastos/GastosPage'
 import CuentasPagarPage from './pages/cuentasPagar/CuentasPagarPage'
 import LetrasPage from './pages/letras/LetrasPage'
+import PortalCaficultorPage from './pages/portal/PortalCaficultorPage'
 
 
 function RutaProtegida({ children }) {
@@ -48,6 +49,11 @@ export default function App() {
 
   return (
     <Routes>
+      {/* Portal caficultor — página pública, SIN autenticación de usuario
+          interno y SIN el Layout/sidebar del panel admin. Por eso vive
+          fuera de RutaProtegida y antes que cualquier otra cosa. */}
+      <Route path="/portal" element={<PortalCaficultorPage />} />
+
       <Route
         path="/login"
         element={usuario ? <Navigate to="/" replace /> : <LoginPage />}

@@ -129,10 +129,32 @@ class TrasladoDineroViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
-        usuario     = self.request.user
-        caja_origen  = serializer.validated_data.get('caja_origen')
-        caja_destino = serializer.validated_data.get('caja_destino')
-        valor        = serializer.validated_data.get('valor')
+        usuario = self.request.user
+
+        # ── Re-obtenemos caja_origen y caja_destino con select_for_update() ──
+        # Esto bloquea esas filas en la base de datos hasta que termine esta
+        # transacción completa. Si llega otra petición de traslado para la
+        # MISMA caja mientras esta sigue en curso, esa otra petición tiene
+        # que ESPERAR a que esta termine (commit o rollback) antes de poder
+        # leer el saldo. Así evitamos que dos traslados simultáneos lean el
+        # mismo saldo_actual "viejo" y ambos pasen la validación aunque,
+        # juntos, superen el saldo real disponible (race condition).
+        #
+        # Ordenamos los IDs antes de bloquear para evitar deadlocks: si dos
+        # traslados cruzados (A→B y B→A) bloquearan en orden distinto,
+        # podrían quedar esperándose mutuamente para siempre. Bloqueando
+        # siempre en el mismo orden (el ID menor primero), eso no puede pasar.
+        caja_origen_id = serializer.validated_data.get('caja_origen').id
+        caja_destino_id = serializer.validated_data.get('caja_destino').id
+
+        ids_ordenados = sorted([caja_origen_id, caja_destino_id])
+        cajas_bloqueadas = {
+            c.id: c for c in
+            Caja.objects.select_for_update().filter(id__in=ids_ordenados)
+        }
+        caja_origen = cajas_bloqueadas[caja_origen_id]
+        caja_destino = cajas_bloqueadas[caja_destino_id]
+        valor = serializer.validated_data.get('valor')
 
         if usuario.rol == 'administrador' and caja_origen.bodega != usuario.bodega:
             raise PermissionDenied('Solo puedes trasladar dinero desde tu propia caja.')
