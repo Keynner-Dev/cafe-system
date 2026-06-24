@@ -80,7 +80,6 @@ const labelStyle = {
 
 const hoy = new Date().toISOString().split('T')[0]
 
-// ── CAMBIO: ahora es una función para poder inyectar la bodega del administrador ──
 const crearDetalleVacio = (bodegaDefault = '') => ({
   tipo_cafe: '', bodega: bodegaDefault, kilos: '', precio_kilo: '', es_deposito: false
 })
@@ -396,14 +395,12 @@ function NotificacionLetras({ letras, letraElegida, valorAbono, onElegirLetra, o
 }
 
 export default function CompraModal({ onClose, onSaved }) {
-  // ── NUEVO: usuario actual para detectar si es administrador ──
   const { usuario } = useAuth()
   const esAdministrador = usuario?.rol === 'administrador'
   const bodegaUsuario = usuario?.bodega
   const bodegaUsuarioNombre = usuario?.bodega_nombre
 
   const [form, setForm]         = useState({ caficultor: '', fecha: hoy, nota: '' })
-  // ── CAMBIO: usa crearDetalleVacio() con la bodega del admin si aplica ──
   const [detalles, setDetalles] = useState([crearDetalleVacio(esAdministrador ? bodegaUsuario : '')])
   const [compraCreadada,        setCompraCreadada] = useState(null)
 
@@ -454,6 +451,15 @@ export default function CompraModal({ onClose, onSaved }) {
     return () => clearTimeout(timer)
   }, [busqueda])
 
+  // ── FIX: sincroniza la bodega del administrador en todas las líneas
+  // existentes en caso de que `usuario.bodega` no estuviera disponible
+  // todavía en el primer render (ej. mientras AuthContext aún cargaba). ──
+  useEffect(() => {
+    if (esAdministrador && bodegaUsuario) {
+      setDetalles(prev => prev.map(d => ({ ...d, bodega: bodegaUsuario })))
+    }
+  }, [bodegaUsuario, esAdministrador])
+
   const seleccionarCaficultor = (tercero) => {
     setCaficultorSeleccionado(tercero)
     setForm(prev => ({ ...prev, caficultor: tercero.id }))
@@ -494,7 +500,6 @@ export default function CompraModal({ onClose, onSaved }) {
     setDetalles(nuevos)
   }
 
-  // ── CAMBIO: nuevas líneas también heredan la bodega del administrador ──
   const agregarDetalle = () => setDetalles([
     ...detalles,
     crearDetalleVacio(esAdministrador ? bodegaUsuario : '')
@@ -515,6 +520,12 @@ export default function CompraModal({ onClose, onSaved }) {
     for (const d of detalles) {
       if (!d.es_deposito && !d.precio_kilo) {
         setError('Las compras normales requieren precio por kilo.')
+        return
+      }
+      // ── FIX adicional: valida también que la bodega esté presente
+      // antes de enviar, así nunca llega null al backend ──
+      if (!d.bodega) {
+        setError('Falta seleccionar la bodega en alguna línea de la compra.')
         return
       }
     }
@@ -550,7 +561,6 @@ export default function CompraModal({ onClose, onSaved }) {
   const handleNuevaCompra = () => {
     setCompraCreadada(null)
     setForm({ caficultor: '', fecha: hoy, nota: '' })
-    // ── CAMBIO: reinicia con la bodega del admin si aplica ──
     setDetalles([crearDetalleVacio(esAdministrador ? bodegaUsuario : '')])
     setBusqueda('')
     setCaficultorSeleccionado(null)
@@ -786,7 +796,7 @@ export default function CompraModal({ onClose, onSaved }) {
                             </select>
                           </div>
 
-                          {/* ── CAMBIO: Bodega — autom\u00e1tica y deshabilitada para administrador ── */}
+                          {/* Bodega — automática y deshabilitada para administrador */}
                           <div>
                             <label style={{ ...labelStyle, fontSize: '11px' }}>Bodega *</label>
                             {esAdministrador ? (
