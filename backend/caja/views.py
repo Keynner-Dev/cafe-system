@@ -102,6 +102,8 @@ class MovimientoCajaViewSet(viewsets.ModelViewSet):
         usuario = self.request.user
         caja = serializer.validated_data.get('caja')
 
+        if not caja:
+            raise ValidationError('Debes especificar la caja.')
         if usuario.rol == 'administrador' and caja and caja.bodega != usuario.bodega:
             raise PermissionDenied('No tienes acceso a esta caja.')
         if not caja.abierta:

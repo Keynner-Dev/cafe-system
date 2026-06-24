@@ -11,7 +11,7 @@ class MovimientoCajaSerializer(serializers.ModelSerializer):
     class Meta:
         model = MovimientoCaja
         fields = [
-            'id', 'tipo', 'valor', 'descripcion',
+            'id', 'caja', 'tipo', 'valor', 'descripcion',
             'creado_por', 'creado_por_nombre', 'fecha'
         ]
         read_only_fields = ['creado_por', 'fecha']
