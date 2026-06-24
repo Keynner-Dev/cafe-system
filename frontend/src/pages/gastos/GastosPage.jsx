@@ -21,6 +21,13 @@ const IconTrash = () => (
     <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
   </svg>
 );
+const IconExport = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+    <polyline points="7 10 12 15 17 10"/>
+    <line x1="12" y1="15" x2="12" y2="3"/>
+  </svg>
+);
 
 function formatCOP(valor) {
   return new Intl.NumberFormat('es-CO', {
@@ -32,6 +39,196 @@ function getMesActual() {
   const hoy = new Date();
   return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
 }
+
+function formatMesLabel(mes) {
+  if (!mes) return 'Todos los períodos';
+  const [anio, m] = mes.split('-');
+  const fecha = new Date(Number(anio), Number(m) - 1, 1);
+  return fecha.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
+}
+
+// ── Genera y abre el reporte imprimible ──────────────────────────────────────
+function exportarReporte({ gastos, filtroMes, filtroBodega, bodegas }) {
+  const bodegaNombre = filtroBodega
+    ? bodegas.find(b => String(b.id) === String(filtroBodega))?.nombre || 'Bodega'
+    : 'Todas las bodegas';
+
+  const periodoLabel = formatMesLabel(filtroMes);
+  const total = gastos.reduce((acc, g) => acc + parseFloat(g.valor), 0);
+
+  // Resumen por categoría
+  const porCategoria = {};
+  gastos.forEach(g => {
+    if (!porCategoria[g.categoria]) porCategoria[g.categoria] = 0;
+    porCategoria[g.categoria] += parseFloat(g.valor);
+  });
+  const categorias = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]);
+
+  // Resumen por medio de pago
+  const efectivo = gastos.filter(g => g.medio_pago === 'efectivo').reduce((acc, g) => acc + parseFloat(g.valor), 0);
+  const transferencia = gastos.filter(g => g.medio_pago === 'transferencia').reduce((acc, g) => acc + parseFloat(g.valor), 0);
+
+  const filasDetalle = gastos.map(g => `
+    <tr>
+      <td>${new Date(g.fecha + 'T00:00:00').toLocaleDateString('es-CO')}</td>
+      <td><span class="badge">${g.categoria}</span></td>
+      <td>${g.descripcion}</td>
+      <td>${g.bodega_nombre}</td>
+      <td><span class="medio ${g.medio_pago}">${g.medio_pago === 'efectivo' ? 'Efectivo' : 'Transferencia'}</span></td>
+      <td style="text-align:right;font-weight:600;color:#dc2626">${formatCOP(g.valor)}</td>
+    </tr>
+  `).join('');
+
+  const filasCategorias = categorias.map(([cat, val]) => `
+    <tr>
+      <td>${cat}</td>
+      <td style="text-align:right;font-weight:600">${formatCOP(val)}</td>
+      <td style="text-align:right;color:#64748b;font-size:12px">${((val / total) * 100).toFixed(1)}%</td>
+    </tr>
+  `).join('');
+
+  const ventana = window.open('', '_blank', 'width=900,height=750');
+  ventana.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Reporte de Gastos — Café San Joaquín</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 36px; color: #0f172a; font-size: 13px; }
+
+        /* Cabecera */
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+        .logo h1 { font-size: 20px; font-weight: 700; }
+        .logo p { font-size: 12px; color: #64748b; margin-top: 2px; }
+        .meta { text-align: right; }
+        .meta .titulo { font-size: 18px; font-weight: 700; color: #16a34a; }
+        .meta .sub { font-size: 12px; color: #64748b; margin-top: 3px; }
+
+        /* Tarjetas resumen */
+        .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+        .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; }
+        .card.green { background: #f0fdf4; border-color: #bbf7d0; }
+        .card label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
+        .card .val { font-size: 18px; font-weight: 700; color: #0f172a; }
+        .card.green .val { color: #16a34a; }
+
+        /* Sección */
+        .seccion { margin-bottom: 24px; }
+        .seccion h2 { font-size: 13px; font-weight: 700; color: '#475569'; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #e2e8f0; }
+
+        /* Tablas */
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #0f172a; color: white; padding: 9px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+        td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; }
+        tr:nth-child(even) td { background: #f8fafc; }
+
+        /* Badges */
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #eff6ff; color: #2563eb; }
+        .medio { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .medio.efectivo { background: #fefce8; color: #ca8a04; }
+        .medio.transferencia { background: #f0fdf4; color: #16a34a; }
+
+        /* Total final */
+        .total-final { background: #0f172a; color: white; border-radius: 8px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+        .total-final span { font-size: 13px; color: #94a3b8; }
+        .total-final strong { font-size: 24px; font-weight: 700; }
+
+        /* Footer */
+        .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; }
+
+        @media print {
+          body { padding: 20px; }
+          button { display: none; }
+        }
+      </style>
+    </head>
+    <body>
+
+      <div class="header">
+        <div class="logo">
+          <h1>☕ Café San Joaquín</h1>
+          <p>NIT. 901659573-6</p>
+        </div>
+        <div class="meta">
+          <div class="titulo">Reporte de Gastos</div>
+          <div class="sub">${periodoLabel} · ${bodegaNombre}</div>
+          <div class="sub" style="margin-top:2px">${gastos.length} registro${gastos.length !== 1 ? 's' : ''}</div>
+        </div>
+      </div>
+
+      <!-- Tarjetas resumen -->
+      <div class="cards">
+        <div class="card green">
+          <label>Total gastos</label>
+          <div class="val">${formatCOP(total)}</div>
+        </div>
+        <div class="card">
+          <label>En efectivo</label>
+          <div class="val">${formatCOP(efectivo)}</div>
+        </div>
+        <div class="card">
+          <label>Por transferencia</label>
+          <div class="val">${formatCOP(transferencia)}</div>
+        </div>
+        <div class="card">
+          <label>Categorías</label>
+          <div class="val">${categorias.length}</div>
+        </div>
+      </div>
+
+      <!-- Resumen por categoría -->
+      <div class="seccion">
+        <h2>Resumen por categoría</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Categoría</th>
+              <th style="text-align:right">Total</th>
+              <th style="text-align:right">% del total</th>
+            </tr>
+          </thead>
+          <tbody>${filasCategorias}</tbody>
+        </table>
+      </div>
+
+      <!-- Detalle completo -->
+      <div class="seccion">
+        <h2>Detalle de gastos</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Categoría</th>
+              <th>Descripción</th>
+              <th>Bodega</th>
+              <th>Medio de pago</th>
+              <th style="text-align:right">Valor</th>
+            </tr>
+          </thead>
+          <tbody>${filasDetalle}</tbody>
+        </table>
+      </div>
+
+      <div class="total-final">
+        <span>Total del período</span>
+        <strong>${formatCOP(total)}</strong>
+      </div>
+
+      <div class="footer">
+        <span>Café San Joaquín SAS · Reporte generado el ${new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+        <span>Para uso contable interno</span>
+      </div>
+
+      <script>window.onload = () => window.print()</script>
+    </body>
+    </html>
+  `);
+  ventana.document.close();
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 
 export default function GastosPage() {
   const { usuario } = useAuth();
@@ -81,19 +278,38 @@ export default function GastosPage() {
             Registro de egresos operativos por bodega
           </p>
         </div>
-        <button
-          onClick={() => { setGastoEditando(null); setModalAbierto(true); }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: '#16a34a', color: 'white', border: 'none',
-            borderRadius: 6, padding: '9px 18px', fontSize: 14,
-            fontWeight: 600, cursor: 'pointer'
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = '#15803d'}
-          onMouseLeave={e => e.currentTarget.style.background = '#16a34a'}
-        >
-          <IconPlus /> Registrar gasto
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {/* Exportar reporte — solo jefe */}
+          {esJefe && gastos.length > 0 && (
+            <button
+              onClick={() => exportarReporte({ gastos, filtroMes, filtroBodega, bodegas })}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: 'white', color: '#0f172a',
+                border: '1px solid #e2e8f0',
+                borderRadius: 6, padding: '9px 18px', fontSize: 14,
+                fontWeight: 600, cursor: 'pointer'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+              onMouseLeave={e => e.currentTarget.style.background = 'white'}
+            >
+              <IconExport /> Exportar reporte
+            </button>
+          )}
+          <button
+            onClick={() => { setGastoEditando(null); setModalAbierto(true); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: '#16a34a', color: 'white', border: 'none',
+              borderRadius: 6, padding: '9px 18px', fontSize: 14,
+              fontWeight: 600, cursor: 'pointer'
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#15803d'}
+            onMouseLeave={e => e.currentTarget.style.background = '#16a34a'}
+          >
+            <IconPlus /> Registrar gasto
+          </button>
+        </div>
       </div>
 
       {/* Tarjeta total del mes */}
@@ -103,7 +319,7 @@ export default function GastosPage() {
       }}>
         <div style={{ color: 'white' }}>
           <p style={{ margin: 0, fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>
-            Total gastos — {filtroMes || 'todos los meses'}
+            Total gastos — {formatMesLabel(filtroMes)}
           </p>
           <p style={{ margin: '4px 0 0', fontSize: 32, fontWeight: 700, letterSpacing: '-0.5px' }}>
             {formatCOP(totalMes)}
@@ -144,7 +360,7 @@ export default function GastosPage() {
             ))}
           </select>
         )}
-        {filtroMes && (
+        {(filtroMes || filtroBodega) && (
           <button
             onClick={() => { setFiltroMes(''); setFiltroBodega(''); }}
             style={{
@@ -229,7 +445,6 @@ export default function GastosPage() {
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      {/* Editar */}
                       <button
                         onClick={() => { setGastoEditando(g); setModalAbierto(true); }}
                         style={{
@@ -242,7 +457,6 @@ export default function GastosPage() {
                         <IconEdit /> Editar
                       </button>
 
-                      {/* Eliminar con confirmación inline */}
                       {confirmandoId === g.id ? (
                         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                           <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 500 }}>¿Eliminar?</span>
