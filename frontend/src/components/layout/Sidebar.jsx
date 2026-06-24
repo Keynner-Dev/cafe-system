@@ -205,11 +205,14 @@ export default function Sidebar() {
   return (
     <aside style={{
       width: '220px',
-      minHeight: '100vh',
+      height: '100vh',
+      position: 'sticky',
+      top: 0,
       background: '#0f172a',
       display: 'flex',
       flexDirection: 'column',
       flexShrink: 0,
+      overflow: 'hidden',
     }}>
 
       {/* ── Logo ── */}
@@ -218,6 +221,7 @@ export default function Sidebar() {
         borderBottom: '1px solid #1e293b',
         display: 'flex',
         justifyContent: 'center',
+        flexShrink: 0,
         }}>
         <div style={{
             background: 'white',
@@ -243,8 +247,8 @@ export default function Sidebar() {
         </div>
 
 
-      {/* ── Nav ── */}
-      <nav style={{ padding: '12px 8px', flex: 1 }}>
+      {/* ── Nav (con scroll propio) ── */}
+      <nav style={{ padding: '12px 8px', flex: 1, overflowY: 'auto', minHeight: 0 }}>
         {SECTIONS.map(section => {
           // Filtra los links: si el link es soloJefe y el usuario NO es jefe, lo oculta
           const linksFiltrados = section.links.filter(link =>
@@ -297,10 +301,11 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* ── Footer: usuario + logout ── */}
+      {/* ── Footer: usuario + logout (siempre fijo abajo) ── */}
       <div style={{
         padding: '12px 16px',
         borderTop: '1px solid #1e293b',
+        flexShrink: 0,
       }}>
         {/* Info del usuario */}
         <div style={{

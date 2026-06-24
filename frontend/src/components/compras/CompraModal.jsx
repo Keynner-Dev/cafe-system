@@ -4,6 +4,7 @@ import { getTerceros } from '../../api/terceros'
 import { getTiposCafe, getBodegas } from '../../api/inventario'
 import { getPreciosHoy } from '../../api/precios'
 import { getLetrasPendientesCaficultor } from '../../api/letras'
+import { useAuth } from '../../context/AuthContext'
 
 const IconX = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -78,7 +79,11 @@ const labelStyle = {
 }
 
 const hoy = new Date().toISOString().split('T')[0]
-const detalleVacio = { tipo_cafe: '', bodega: '', kilos: '', precio_kilo: '', es_deposito: false }
+
+// ── CAMBIO: ahora es una función para poder inyectar la bodega del administrador ──
+const crearDetalleVacio = (bodegaDefault = '') => ({
+  tipo_cafe: '', bodega: bodegaDefault, kilos: '', precio_kilo: '', es_deposito: false
+})
 
 function formatCOP(val) {
   return `$${Number(val || 0).toLocaleString('es-CO')}`
@@ -89,25 +94,47 @@ function PantallaExito({ compra, onClose, onNuevaCompra }) {
 
   const armarMensajeWhatsApp = () => {
     const fecha = new Date(compra.fecha + 'T12:00:00').toLocaleDateString('es-CO', {
-      day: '2-digit', month: 'long', year: 'numeric',
+        day: '2-digit', month: 'long', year: 'numeric',
     })
-    let msg = `*☕ Café San Joaquín*\n`
-    msg += `*Compra #${compra.id}*\n`
-    msg += `📅 ${fecha}\n`
-    msg += `👤 ${compra.caficultor_nombre}\n\n`
-    msg += `*Detalle:*\n`
-    compra.detalles.forEach(d => {
-      if (d.es_deposito) {
-        msg += `• ${d.tipo_cafe_nombre} — ${d.kilos} kg *(DEPÓSITO — liquidar después)*\n`
-      } else {
+
+    const lineasDetalle = compra.detalles.map(d => {
+        if (d.es_deposito) {
+        return `  ☕ ${d.tipo_cafe_nombre}\n  📦 ${d.kilos} kg — _Depósito (liquidar después)_`
+        }
         const subtotal = Number(d.kilos) * Number(d.precio_kilo)
-        msg += `• ${d.tipo_cafe_nombre} — ${d.kilos} kg × ${formatCOP(d.precio_kilo)}/kg = *${formatCOP(subtotal)}*\n`
-      }
-    })
-    msg += `\n💰 *Total: ${formatCOP(compra.total)}*`
-    if (compra.nota) msg += `\n📝 ${compra.nota}`
+        return (
+        `  ☕ ${d.tipo_cafe_nombre}\n` +
+        `  📦 ${Number(d.kilos).toLocaleString('es-CO')} kg × ${formatCOP(d.precio_kilo)}/kg\n` +
+        `  💵 Subtotal: *${formatCOP(subtotal)}*`
+        )
+    }).join('\n\n')
+
+    const separador = '━━━━━━━━━━━━━━━━━━━━━━'
+
+    let msg = ''
+    msg += `🌿 *CAFÉ SAN JOAQUÍN*\n`
+    msg += `_Comprobante de compra_\n`
+    msg += `${separador}\n\n`
+    msg += `🧾 *Compra #${compra.id}*\n`
+    msg += `📅 Fecha: ${fecha}\n`
+    msg += `👤 Caficultor: *${compra.caficultor_nombre}*\n\n`
+    msg += `${separador}\n`
+    msg += `*DETALLE*\n`
+    msg += `${separador}\n\n`
+    msg += `${lineasDetalle}\n\n`
+    msg += `${separador}\n`
+    msg += `💰 *TOTAL PAGADO: ${formatCOP(compra.total)}*\n`
+    msg += `${separador}\n\n`
+
+    if (compra.nota) {
+        msg += `📝 _Nota: ${compra.nota}_\n\n`
+    }
+
+    msg += `_¡Gracias por su confianza!_ 🤝\n`
+    msg += `_Café San Joaquín — Calidad desde el campo_`
+
     return encodeURIComponent(msg)
-  }
+    }
 
   const handleWhatsApp = () => {
     const msg = armarMensajeWhatsApp()
@@ -301,7 +328,7 @@ function PantallaExito({ compra, onClose, onNuevaCompra }) {
   )
 }
 
-// ── NUEVO: Notificación flotante de letras pendientes ──
+// ── Notificación flotante de letras pendientes ──
 function NotificacionLetras({ letras, letraElegida, valorAbono, onElegirLetra, onCambiarValor }) {
   if (!letras || letras.length === 0) return null
 
@@ -369,8 +396,15 @@ function NotificacionLetras({ letras, letraElegida, valorAbono, onElegirLetra, o
 }
 
 export default function CompraModal({ onClose, onSaved }) {
+  // ── NUEVO: usuario actual para detectar si es administrador ──
+  const { usuario } = useAuth()
+  const esAdministrador = usuario?.rol === 'administrador'
+  const bodegaUsuario = usuario?.bodega
+  const bodegaUsuarioNombre = usuario?.bodega_nombre
+
   const [form, setForm]         = useState({ caficultor: '', fecha: hoy, nota: '' })
-  const [detalles, setDetalles] = useState([{ ...detalleVacio }])
+  // ── CAMBIO: usa crearDetalleVacio() con la bodega del admin si aplica ──
+  const [detalles, setDetalles] = useState([crearDetalleVacio(esAdministrador ? bodegaUsuario : '')])
   const [compraCreadada,        setCompraCreadada] = useState(null)
 
   const [busqueda, setBusqueda]                             = useState('')
@@ -386,7 +420,6 @@ export default function CompraModal({ onClose, onSaved }) {
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState(null)
 
-  // ── NUEVO: estado de letras pendientes ──
   const [letrasPendientes, setLetrasPendientes] = useState([])
   const [letraElegida, setLetraElegida]         = useState(null)
   const [valorAbono, setValorAbono]             = useState('')
@@ -427,7 +460,6 @@ export default function CompraModal({ onClose, onSaved }) {
     setBusqueda(tercero.nombre)
     setDropdownVisible(false)
 
-    // ── NUEVO: consulta letras pendientes de este caficultor ──
     setLetraElegida(null)
     setValorAbono('')
     getLetrasPendientesCaficultor(tercero.id)
@@ -440,7 +472,6 @@ export default function CompraModal({ onClose, onSaved }) {
     setForm(prev => ({ ...prev, caficultor: '' }))
     setBusqueda('')
     setResultados([])
-    // ── NUEVO: limpia también el estado de letras ──
     setLetrasPendientes([])
     setLetraElegida(null)
     setValorAbono('')
@@ -448,7 +479,7 @@ export default function CompraModal({ onClose, onSaved }) {
 
   const elegirLetra = (letraId, saldo) => {
     setLetraElegida(letraId)
-    setValorAbono(String(saldo)) // sugiere abonar el saldo completo por defecto
+    setValorAbono(String(saldo))
   }
 
   const handleDetalleChange = (index, e) => {
@@ -463,7 +494,11 @@ export default function CompraModal({ onClose, onSaved }) {
     setDetalles(nuevos)
   }
 
-  const agregarDetalle = () => setDetalles([...detalles, { ...detalleVacio }])
+  // ── CAMBIO: nuevas líneas también heredan la bodega del administrador ──
+  const agregarDetalle = () => setDetalles([
+    ...detalles,
+    crearDetalleVacio(esAdministrador ? bodegaUsuario : '')
+  ])
   const eliminarDetalle = (index) => {
     if (detalles.length === 1) return
     setDetalles(detalles.filter((_, i) => i !== index))
@@ -483,7 +518,6 @@ export default function CompraModal({ onClose, onSaved }) {
         return
       }
     }
-    // ── NUEVO: valida el abono a letra si fue elegida ──
     if (letraElegida) {
       const letra = letrasPendientes.find(l => l.id === letraElegida)
       if (!valorAbono || Number(valorAbono) <= 0) {
@@ -500,7 +534,6 @@ export default function CompraModal({ onClose, onSaved }) {
     setError(null)
     try {
       const payload = { ...form, detalles }
-      // ── NUEVO: incluye el abono a letra si aplica ──
       if (letraElegida) {
         payload.abono_letra = { letra_id: letraElegida, valor: Number(valorAbono) }
       }
@@ -517,11 +550,11 @@ export default function CompraModal({ onClose, onSaved }) {
   const handleNuevaCompra = () => {
     setCompraCreadada(null)
     setForm({ caficultor: '', fecha: hoy, nota: '' })
-    setDetalles([{ ...detalleVacio }])
+    // ── CAMBIO: reinicia con la bodega del admin si aplica ──
+    setDetalles([crearDetalleVacio(esAdministrador ? bodegaUsuario : '')])
     setBusqueda('')
     setCaficultorSeleccionado(null)
     setError(null)
-    // ── NUEVO: reinicia estado de letras ──
     setLetrasPendientes([])
     setLetraElegida(null)
     setValorAbono('')
@@ -691,7 +724,6 @@ export default function CompraModal({ onClose, onSaved }) {
                   </div>
                 </div>
 
-                {/* ── NUEVO: notificación flotante de letras pendientes ── */}
                 <NotificacionLetras
                   letras={letrasPendientes}
                   letraElegida={letraElegida}
@@ -753,17 +785,29 @@ export default function CompraModal({ onClose, onSaved }) {
                               {tiposCafe.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
                             </select>
                           </div>
+
+                          {/* ── CAMBIO: Bodega — autom\u00e1tica y deshabilitada para administrador ── */}
                           <div>
                             <label style={{ ...labelStyle, fontSize: '11px' }}>Bodega *</label>
-                            <select name="bodega" value={detalle.bodega}
-                              onChange={e => handleDetalleChange(index, e)} required
-                              style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
-                              onFocus={focusGreen} onBlur={blurGray}
-                            >
-                              <option value="">Selecciona</option>
-                              {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
-                            </select>
+                            {esAdministrador ? (
+                              <div style={{
+                                ...inputDisabledStyle, fontSize: '12px', padding: '6px 10px',
+                                display: 'flex', alignItems: 'center',
+                              }}>
+                                {bodegaUsuarioNombre || 'Sin bodega asignada'}
+                              </div>
+                            ) : (
+                              <select name="bodega" value={detalle.bodega}
+                                onChange={e => handleDetalleChange(index, e)} required
+                                style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
+                                onFocus={focusGreen} onBlur={blurGray}
+                              >
+                                <option value="">Selecciona</option>
+                                {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
+                              </select>
+                            )}
                           </div>
+
                           <div>
                             <label style={{ ...labelStyle, fontSize: '11px' }}>Kilos *</label>
                             <input type="number" name="kilos" value={detalle.kilos}
@@ -852,7 +896,6 @@ export default function CompraModal({ onClose, onSaved }) {
                   </div>
                 </div>
 
-                {/* ── Total + resumen del abono a letra ── */}
                 <div style={{
                   background: '#f0fdf4', border: '1px solid #bbf7d0',
                   borderRadius: '8px', padding: '14px 16px',
