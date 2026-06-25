@@ -38,6 +38,18 @@ const IconEye = () => (
     <circle cx="12" cy="12" r="3"/>
   </svg>
 )
+const IconSortAsc = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+  </svg>
+)
+const IconSortDesc = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+  </svg>
+)
 
 const TIPO_STYLE = {
   empresa:    { bg: '#eff6ff', color: '#2563eb', label: 'Empresa'    },
@@ -80,6 +92,10 @@ export default function TercerosPage() {
   const [perfilId, setPerfilId]           = useState(null)
   const [filtro, setFiltro]               = useState('')
 
+  // ── Ordenamiento ──
+  const [ordenCampo, setOrdenCampo] = useState('id')
+  const [ordenDir, setOrdenDir]     = useState('desc')
+
   const cargarTerceros = () => {
     setLoading(true)
     getTerceros({ todos: true })
@@ -103,15 +119,26 @@ export default function TercerosPage() {
     }
   }
 
-  const tercerosFiltrados = terceros.filter(t => {
-    const texto = filtro.toLowerCase().trim()
-    return (
-      (t.nombre || '').toLowerCase().includes(texto) ||
-      (t.cedula || '').toString().includes(texto) ||
-      (t.telefono || '').toString().includes(texto) ||
-      (t.telefono_whatsapp || '').toString().includes(texto)
-    )
-  })
+  const tercerosFiltrados = terceros
+    .filter(t => {
+      const texto = filtro.toLowerCase().trim()
+      return (
+        (t.nombre || '').toLowerCase().includes(texto) ||
+        (t.cedula || '').toString().includes(texto) ||
+        (t.telefono || '').toString().includes(texto) ||
+        (t.telefono_whatsapp || '').toString().includes(texto)
+      )
+    })
+    .sort((a, b) => {
+      let va = a[ordenCampo] ?? ''
+      let vb = b[ordenCampo] ?? ''
+      if (ordenCampo === 'nombre') {
+        va = va.toLowerCase(); vb = vb.toLowerCase()
+        return ordenDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
+      }
+      // id y cedula — numérico
+      return ordenDir === 'asc' ? Number(va) - Number(vb) : Number(vb) - Number(va)
+    })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -142,29 +169,67 @@ export default function TercerosPage() {
         </button>
       </div>
 
-      {/* Barra de búsqueda */}
-      <div style={{ position: 'relative', maxWidth: '320px' }}>
-        <span style={{
-          position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)',
-          color: '#94a3b8', pointerEvents: 'none', display: 'flex', alignItems: 'center',
-        }}>
-          <IconSearch />
-        </span>
-        <input
-          value={filtro}
-          onChange={e => setFiltro(e.target.value)}
-          placeholder="Buscar por nombre o cédula..."
-          style={{
-            width: '100%', boxSizing: 'border-box',
-            paddingLeft: '34px', paddingRight: '12px',
-            paddingTop: '8px', paddingBottom: '8px',
-            border: '1px solid #e2e8f0', borderRadius: '6px',
-            fontSize: '13px', color: '#0f172a',
-            outline: 'none', background: 'white',
-          }}
-          onFocus={e => e.target.style.borderColor = '#16a34a'}
-          onBlur={e => e.target.style.borderColor = '#e2e8f0'}
-        />
+      {/* Búsqueda y ordenamiento */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+
+        {/* Barra de búsqueda */}
+        <div style={{ position: 'relative', flex: '1', minWidth: '200px', maxWidth: '320px' }}>
+          <span style={{
+            position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)',
+            color: '#94a3b8', pointerEvents: 'none', display: 'flex', alignItems: 'center',
+          }}>
+            <IconSearch />
+          </span>
+          <input
+            value={filtro}
+            onChange={e => setFiltro(e.target.value)}
+            placeholder="Buscar por nombre o cédula..."
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              paddingLeft: '34px', paddingRight: '12px',
+              paddingTop: '8px', paddingBottom: '8px',
+              border: '1px solid #e2e8f0', borderRadius: '6px',
+              fontSize: '13px', color: '#0f172a',
+              outline: 'none', background: 'white',
+            }}
+            onFocus={e => e.target.style.borderColor = '#16a34a'}
+            onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+          />
+        </div>
+
+        {/* Ordenamiento */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>Ordenar por</span>
+          <select
+            value={ordenCampo}
+            onChange={e => setOrdenCampo(e.target.value)}
+            style={{
+              border: '1px solid #e2e8f0', borderRadius: '6px',
+              padding: '6px 10px', fontSize: '12px', color: '#0f172a',
+              background: 'white', outline: 'none', cursor: 'pointer',
+            }}
+            onFocus={e => e.target.style.borderColor = '#16a34a'}
+            onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+          >
+            <option value="id">ID</option>
+            <option value="nombre">Nombre</option>
+            <option value="cedula">Cédula</option>
+          </select>
+          <button
+            onClick={() => setOrdenDir(d => d === 'asc' ? 'desc' : 'asc')}
+            title={ordenDir === 'asc' ? 'Ascendente' : 'Descendente'}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '32px', height: '32px', borderRadius: '6px',
+              border: '1px solid #e2e8f0', background: 'white',
+              color: '#475569', cursor: 'pointer',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+            onMouseLeave={e => e.currentTarget.style.background = 'white'}
+          >
+            {ordenDir === 'asc' ? <IconSortAsc /> : <IconSortDesc />}
+          </button>
+        </div>
       </div>
 
       {/* Tabla */}

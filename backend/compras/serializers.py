@@ -66,7 +66,10 @@ class CompraSerializer(serializers.ModelSerializer):
     creado_por = serializers.StringRelatedField(read_only=True)
     cuenta_por_pagar = serializers.SerializerMethodField()
 
-    # ← NUEVO: opcional, solo se usa en el create(), nunca se devuelve en la respuesta
+    # ← NUEVO: lista de nombres de bodega únicos de los detalles de esta compra
+    bodegas = serializers.SerializerMethodField()
+
+    # opcional, solo se usa en el create(), nunca se devuelve en la respuesta
     abono_letra = serializers.DictField(write_only=True, required=False)
 
     class Meta:
@@ -111,6 +114,11 @@ class CompraSerializer(serializers.ModelSerializer):
             'saldo': float(cuenta.saldo),
         }
 
+    # ← NUEVO: nombres únicos de bodega de todos los detalles de la compra
+    def get_bodegas(self, obj):
+        nombres = obj.detalles.values_list('bodega__nombre', flat=True).distinct()
+        return list(nombres)
+
     def validate(self, data):
         request = self.context.get('request')
         usuario = getattr(request, 'user', None)
@@ -124,7 +132,7 @@ class CompraSerializer(serializers.ModelSerializer):
                         'detalles': f'Línea {i+1}: no tienes acceso a la bodega {bodega.nombre}.'
                     })
 
-        # ← Valida el abono a letra si viene en el payload
+        # Valida el abono a letra si viene en el payload
         abono_letra = data.get('abono_letra')
         if abono_letra:
             from letras_cambio.models import LetraCambio
@@ -148,7 +156,7 @@ class CompraSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         detalles_data = validated_data.pop('detalles')
-        abono_letra_data = validated_data.pop('abono_letra', None)  # ← extrae antes de crear
+        abono_letra_data = validated_data.pop('abono_letra', None)
 
         compra = Compra.objects.create(**validated_data)
 
@@ -165,7 +173,7 @@ class CompraSerializer(serializers.ModelSerializer):
             )
             # La señal post_save de DetalleCompra ya genera el egreso de caja automáticamente
 
-        # ← Si viene un abono a letra, se crea ligado a esta compra.
+        # Si viene un abono a letra, se crea ligado a esta compra.
         # El AbonoLetra dispara su propia señal post_save que registra el ingreso en caja.
         if abono_letra_data:
             from letras_cambio.models import LetraCambio, AbonoLetra
