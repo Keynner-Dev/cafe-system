@@ -140,6 +140,7 @@ function PantallaExito({ compra, onClose, onNuevaCompra }) {
     window.open(`https://wa.me/?text=${msg}`, '_blank')
   }
 
+  // ── Imprimible adaptado a 80mm (impresora térmica) ──
   const handleImprimir = () => {
     const fecha = new Date(compra.fecha + 'T12:00:00').toLocaleDateString('es-CO', {
       day: '2-digit', month: 'long', year: 'numeric',
@@ -147,25 +148,25 @@ function PantallaExito({ compra, onClose, onNuevaCompra }) {
     const detallesHTML = compra.detalles.map(d => {
       if (d.es_deposito) {
         return `
-          <tr>
-            <td>${d.tipo_cafe_nombre}</td>
-            <td>${d.bodega_nombre}</td>
-            <td>${d.kilos} kg</td>
-            <td colspan="2" style="color:#ca8a04;font-weight:600;">DEPÓSITO — liquidar después</td>
-          </tr>`
+          <div class="linea">
+            <div class="linea-tipo">${d.tipo_cafe_nombre}</div>
+            <div class="linea-sub">${d.bodega_nombre} · ${d.kilos} kg</div>
+            <div class="linea-deposito">DEPÓSITO — liquidar después</div>
+          </div>`
       }
       const subtotal = Number(d.kilos) * Number(d.precio_kilo)
       return `
-        <tr>
-          <td>${d.tipo_cafe_nombre}</td>
-          <td>${d.bodega_nombre}</td>
-          <td>${d.kilos} kg</td>
-          <td>${formatCOP(d.precio_kilo)}/kg</td>
-          <td style="font-weight:600;">${formatCOP(subtotal)}</td>
-        </tr>`
+        <div class="linea">
+          <div class="linea-tipo">${d.tipo_cafe_nombre}</div>
+          <div class="linea-sub">${d.bodega_nombre} · ${Number(d.kilos).toLocaleString('es-CO')} kg</div>
+          <div class="linea-precio">
+            <span>${formatCOP(d.precio_kilo)}/kg</span>
+            <span class="linea-subtotal">${formatCOP(subtotal)}</span>
+          </div>
+        </div>`
     }).join('')
 
-    const ventana = window.open('', '_blank', 'width=700,height=600')
+    const ventana = window.open('', '_blank', 'width=400,height=600')
     ventana.document.write(`
       <!DOCTYPE html>
       <html>
@@ -173,72 +174,96 @@ function PantallaExito({ compra, onClose, onNuevaCompra }) {
         <meta charset="UTF-8">
         <title>Compra #${compra.id} — Café San Joaquín</title>
         <style>
+          @page { size: 80mm auto; margin: 3mm; }
           * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 32px; color: #0f172a; }
-          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
-          .logo-area h1 { font-size: 20px; font-weight: 700; color: #0f172a; }
-          .logo-area p { font-size: 12px; color: #64748b; margin-top: 2px; }
-          .compra-info { text-align: right; }
-          .compra-info .num { font-size: 22px; font-weight: 700; color: #16a34a; }
-          .compra-info .fecha { font-size: 12px; color: #64748b; margin-top: 2px; }
-          .caficultor { background: #f8fafc; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; }
-          .caficultor label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-          .caficultor p { font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 3px; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-          th { background: #0f172a; color: white; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
-          td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
-          tr:nth-child(even) td { background: #f8fafc; }
-          .total-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; }
-          .total-box span { font-size: 13px; color: #475569; }
-          .total-box strong { font-size: 20px; font-weight: 700; color: #16a34a; }
-          .nota { margin-top: 16px; font-size: 12px; color: #64748b; }
-          .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
-          @media print { body { padding: 20px; } }
+          html, body {
+            width: 72mm;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            color: #0f172a;
+            font-size: 11px;
+            line-height: 1.4;
+          }
+          .ticket { padding: 2mm 1mm; }
+
+          .header { text-align: center; margin-bottom: 8px; }
+          .header h1 { font-size: 14px; font-weight: 700; }
+          .header p { font-size: 9px; color: #475569; margin-top: 1px; }
+
+          .sep { border-top: 1px dashed #0f172a; margin: 6px 0; }
+          .sep-double { border-top: 2px solid #0f172a; margin: 6px 0; }
+
+          .compra-info { text-align: center; margin-bottom: 6px; }
+          .compra-info .num { font-size: 13px; font-weight: 700; color: #16a34a; }
+          .compra-info .fecha { font-size: 9.5px; color: #475569; margin-top: 1px; }
+
+          .caficultor { text-align: center; margin-bottom: 6px; }
+          .caficultor label { font-size: 8.5px; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; }
+          .caficultor p { font-size: 12px; font-weight: 700; margin-top: 1px; word-wrap: break-word; }
+
+          .detalle-titulo { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+
+          .linea { margin-bottom: 7px; }
+          .linea-tipo { font-size: 11.5px; font-weight: 700; }
+          .linea-sub { font-size: 10px; color: #475569; }
+          .linea-precio { display: flex; justify-content: space-between; font-size: 10.5px; margin-top: 1px; }
+          .linea-subtotal { font-weight: 700; }
+          .linea-deposito { font-size: 9.5px; font-weight: 700; color: #92400e; margin-top: 1px; }
+
+          .total-box { text-align: center; margin: 8px 0; }
+          .total-box span { font-size: 10px; display: block; color: #475569; }
+          .total-box strong { font-size: 17px; font-weight: 700; color: #16a34a; display: block; margin-top: 2px; }
+
+          .nota { font-size: 9.5px; color: #475569; margin-bottom: 6px; word-wrap: break-word; }
+
+          .footer { text-align: center; font-size: 8.5px; color: #94a3b8; margin-top: 10px; }
+
+          @media print {
+            html, body { width: 80mm; }
+          }
         </style>
       </head>
       <body>
-        <div class="header">
-          <div class="logo-area">
+        <div class="ticket">
+
+          <div class="header">
             <h1>☕ Café San Joaquín</h1>
             <p>NIT. 901659573-6</p>
           </div>
+
+          <div class="sep"></div>
+
           <div class="compra-info">
             <div class="num">Compra #${compra.id}</div>
             <div class="fecha">${fecha}</div>
           </div>
+
+          <div class="caficultor">
+            <label>Caficultor</label>
+            <p>${compra.caficultor_nombre}</p>
+          </div>
+
+          <div class="sep"></div>
+
+          <div class="detalle-titulo">Detalle</div>
+          ${detallesHTML}
+
+          <div class="sep-double"></div>
+
+          <div class="total-box">
+            <span>Total a pagar</span>
+            <strong>${formatCOP(compra.total)}</strong>
+          </div>
+
+          ${compra.nota ? `<div class="sep"></div><p class="nota">📝 Nota: ${compra.nota}</p>` : ''}
+
+          <div class="sep"></div>
+
+          <div class="footer">
+            Café San Joaquín SAS<br>
+            Generado el ${new Date().toLocaleDateString('es-CO')}
+          </div>
+
         </div>
-
-        <div class="caficultor">
-          <label>Caficultor</label>
-          <p>${compra.caficultor_nombre}</p>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th>Tipo de café</th>
-              <th>Bodega</th>
-              <th>Kilos</th>
-              <th>Precio/kg</th>
-              <th>Subtotal</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${detallesHTML}
-          </tbody>
-        </table>
-
-        <div class="total-box">
-          <span>Total a pagar:</span>
-          <strong>${formatCOP(compra.total)}</strong>
-        </div>
-
-        ${compra.nota ? `<p class="nota">📝 <strong>Nota:</strong> ${compra.nota}</p>` : ''}
-
-        <div class="footer">
-          Café San Joaquín SAS · Generado el ${new Date().toLocaleDateString('es-CO')}
-        </div>
-
         <script>window.onload = () => window.print()</script>
       </body>
       </html>
