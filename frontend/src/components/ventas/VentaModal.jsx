@@ -73,30 +73,34 @@ function Seccion({ label }) {
   )
 }
 
-// ── Pantalla de éxito con botón Imprimir ──────────────────────────────────────
+// ── Pantalla de éxito con impresión 80mm ──────────────────────────────────────
 function PantallaExito({ venta, onClose, onNuevaRemision }) {
   const handleImprimir = () => {
     const fecha = new Date(venta.fecha + 'T12:00:00').toLocaleDateString('es-CO', {
       day: '2-digit', month: 'long', year: 'numeric',
     })
 
-    const filasDetalle = venta.detalles.map(d => `
-      <tr>
-        <td>${d.tipo_cafe_nombre}</td>
-        <td>${d.bodega_nombre}</td>
-        <td style="text-align:center">${d.bultos}</td>
-        <td style="text-align:right">${Number(d.kilos).toLocaleString('es-CO')} kg</td>
-        ${d.muestra || d.factor || d.humedad || d.pasilla ? `
-        <td style="font-size:11px;color:#64748b">
-          ${d.muestra ? `M: ${d.muestra} ` : ''}
-          ${d.factor  ? `F: ${d.factor} `  : ''}
-          ${d.humedad ? `H: ${d.humedad}% ` : ''}
-          ${d.pasilla ? `P: ${d.pasilla}%`  : ''}
-        </td>` : '<td style="color:#cbd5e1">—</td>'}
-      </tr>
-    `).join('')
+    const bloquesMercancia = venta.detalles.map(d => {
+      const calidad = [
+        d.muestra ? `Muestra: ${d.muestra}` : '',
+        d.factor  ? `Factor: ${d.factor}`   : '',
+        d.humedad ? `Humedad: ${d.humedad}%` : '',
+        d.pasilla ? `Pasilla: ${d.pasilla}%` : '',
+      ].filter(Boolean).join(' · ')
 
-    const ventana = window.open('', '_blank', 'width=800,height=700')
+      return `
+        <div class="linea">
+          <div class="linea-tipo">${d.tipo_cafe_nombre}</div>
+          <div class="linea-sub">${d.bodega_nombre}</div>
+          <div class="linea-row">
+            <span>${d.bultos} bulto${d.bultos !== 1 ? 's' : ''}</span>
+            <span class="linea-kilos">${Number(d.kilos).toLocaleString('es-CO')} kg</span>
+          </div>
+          ${calidad ? `<div class="linea-calidad">${calidad}</div>` : ''}
+        </div>`
+    }).join('')
+
+    const ventana = window.open('', '_blank', 'width=400,height=700')
     ventana.document.write(`
       <!DOCTYPE html>
       <html>
@@ -104,102 +108,163 @@ function PantallaExito({ venta, onClose, onNuevaRemision }) {
         <meta charset="UTF-8">
         <title>${venta.numero_remision} — Café San Joaquín</title>
         <style>
+          @page { size: 80mm auto; margin: 3mm; }
           * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 32px; color: #0f172a; }
-          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
-          .logo-area h1 { font-size: 20px; font-weight: 700; color: #0f172a; }
-          .logo-area p { font-size: 12px; color: #64748b; margin-top: 2px; }
-          .rem-info { text-align: right; }
-          .rem-info .num { font-size: 22px; font-weight: 700; color: #16a34a; }
-          .rem-info .fecha { font-size: 12px; color: #64748b; margin-top: 2px; }
-          .empresa-box { background: #f8fafc; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; }
-          .empresa-box label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-          .empresa-box p { font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 3px; }
-          .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-          .info-box { background: #f8fafc; border-radius: 8px; padding: 12px 14px; }
-          .info-box label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
-          .info-box p { font-size: 13px; color: #0f172a; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-          th { background: #0f172a; color: white; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
-          td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
-          tr:nth-child(even) td { background: #f8fafc; }
-          .totales { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 16px; display: flex; gap: 32px; align-items: center; margin-bottom: 16px; }
-          .totales span { font-size: 13px; color: #475569; }
-          .totales strong { font-size: 16px; font-weight: 700; color: #16a34a; display: block; margin-top: 2px; }
-          .flete-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px; }
-          .nota { margin-bottom: 16px; font-size: 12px; color: #64748b; }
-          .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
-          @media print { body { padding: 20px; } }
+          html, body {
+            width: 72mm;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            color: #0f172a;
+            font-size: 11px;
+            line-height: 1.4;
+          }
+          .ticket { padding: 2mm 1mm; }
+
+          /* Cabecera */
+          .header { text-align: center; margin-bottom: 6px; }
+          .header h1 { font-size: 14px; font-weight: 700; }
+          .header p  { font-size: 9px; color: #475569; margin-top: 1px; }
+
+          /* Separadores */
+          .sep        { border-top: 1px dashed #0f172a; margin: 5px 0; }
+          .sep-solid  { border-top: 1px solid #0f172a;  margin: 5px 0; }
+          .sep-double { border-top: 2px solid #0f172a;  margin: 6px 0; }
+
+          /* Remisión info */
+          .rem-info { text-align: center; margin-bottom: 5px; }
+          .rem-info .num   { font-size: 13px; font-weight: 700; color: #16a34a; }
+          .rem-info .fecha { font-size: 9.5px; color: #475569; margin-top: 1px; }
+
+          /* Empresa */
+          .empresa { text-align: center; margin-bottom: 5px; }
+          .empresa label { font-size: 8.5px; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; }
+          .empresa p { font-size: 12px; font-weight: 700; margin-top: 1px; word-wrap: break-word; }
+          .empresa .cuenta { font-size: 10px; color: #475569; margin-top: 2px; }
+
+          /* Secciones de datos */
+          .seccion-titulo {
+            font-size: 8.5px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            color: #475569; margin-bottom: 3px;
+          }
+          .dato-row {
+            display: flex; justify-content: space-between;
+            font-size: 10px; margin-bottom: 2px;
+          }
+          .dato-row .etiq { color: #475569; }
+          .dato-row .val  { font-weight: 600; text-align: right; max-width: 55%; word-break: break-word; }
+          .dato-full { font-size: 10px; margin-bottom: 2px; word-wrap: break-word; }
+
+          /* Mercancía */
+          .detalle-titulo {
+            font-size: 9px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.04em;
+            margin-bottom: 4px;
+          }
+          .linea { margin-bottom: 7px; }
+          .linea-tipo { font-size: 11.5px; font-weight: 700; }
+          .linea-sub  { font-size: 10px; color: #475569; }
+          .linea-row  {
+            display: flex; justify-content: space-between;
+            font-size: 10.5px; margin-top: 1px;
+          }
+          .linea-kilos  { font-weight: 700; }
+          .linea-calidad { font-size: 9.5px; color: #64748b; margin-top: 1px; }
+
+          /* Totales */
+          .totales { margin: 4px 0; }
+          .total-row {
+            display: flex; justify-content: space-between;
+            font-size: 11px; font-weight: 700; margin-bottom: 2px;
+          }
+
+          /* Flete */
+          .flete { font-size: 10px; margin-bottom: 4px; word-wrap: break-word; }
+          .flete strong { font-weight: 700; }
+
+          /* Nota */
+          .nota { font-size: 9.5px; color: #475569; margin-bottom: 5px; word-wrap: break-word; }
+
+          /* Footer */
+          .footer { text-align: center; font-size: 8.5px; color: #94a3b8; margin-top: 10px; }
+
+          @media print { html, body { width: 80mm; } }
         </style>
       </head>
       <body>
-        <div class="header">
-          <div class="logo-area">
+        <div class="ticket">
+
+          <div class="header">
             <h1>☕ Café San Joaquín</h1>
             <p>NIT. 901659573-6</p>
           </div>
+
+          <div class="sep"></div>
+
           <div class="rem-info">
             <div class="num">${venta.numero_remision}</div>
             <div class="fecha">${fecha}</div>
           </div>
-        </div>
 
-        <div class="empresa-box">
-          <label>Empresa compradora</label>
-          <p>${venta.empresa_nombre}</p>
-          ${venta.cuenta ? `<p style="font-size:12px;color:#64748b;margin-top:4px">Cuenta: ${venta.cuenta}</p>` : ''}
-        </div>
-
-        <div class="grid2">
-          <div class="info-box">
-            <label>Conductor</label>
-            <p>${venta.conductor_nombre} — CC ${venta.conductor_cedula}</p>
-            ${venta.conductor_telefono ? `<p style="font-size:12px;color:#64748b">${venta.conductor_telefono}</p>` : ''}
-            ${venta.conductor_direccion ? `<p style="font-size:12px;color:#64748b">${venta.conductor_direccion}</p>` : ''}
+          <div class="empresa">
+            <label>Empresa compradora</label>
+            <p>${venta.empresa_nombre}</p>
+            ${venta.cuenta ? `<div class="cuenta">Cuenta: ${venta.cuenta}</div>` : ''}
           </div>
-          <div class="info-box">
-            <label>Vehículo</label>
-            <p>Placas: <strong>${venta.vehiculo_placas}</strong></p>
-            ${venta.vehiculo_clase || venta.vehiculo_marca ? `<p style="font-size:12px;color:#64748b">${[venta.vehiculo_clase, venta.vehiculo_marca, venta.vehiculo_color, venta.vehiculo_modelo].filter(Boolean).join(' · ')}</p>` : ''}
+
+          <div class="sep"></div>
+
+          <div class="seccion-titulo">Conductor</div>
+          <div class="dato-full"><strong>${venta.conductor_nombre}</strong> — CC ${venta.conductor_cedula}</div>
+          ${venta.conductor_telefono ? `<div class="dato-full" style="color:#475569">${venta.conductor_telefono}</div>` : ''}
+          ${venta.conductor_direccion ? `<div class="dato-full" style="color:#475569">${venta.conductor_direccion}</div>` : ''}
+
+          <div class="sep-solid" style="margin-top:5px"></div>
+
+          <div class="seccion-titulo">Vehículo</div>
+          <div class="dato-row">
+            <span class="etiq">Placas</span>
+            <span class="val">${venta.vehiculo_placas}</span>
           </div>
-        </div>
+          ${venta.vehiculo_clase ? `<div class="dato-row"><span class="etiq">Clase</span><span class="val">${venta.vehiculo_clase}</span></div>` : ''}
+          ${venta.vehiculo_marca ? `<div class="dato-row"><span class="etiq">Marca</span><span class="val">${venta.vehiculo_marca}</span></div>` : ''}
+          ${venta.vehiculo_color ? `<div class="dato-row"><span class="etiq">Color</span><span class="val">${venta.vehiculo_color}</span></div>` : ''}
+          ${venta.vehiculo_modelo ? `<div class="dato-row"><span class="etiq">Modelo</span><span class="val">${venta.vehiculo_modelo}</span></div>` : ''}
 
-        <table>
-          <thead>
-            <tr>
-              <th>Tipo de café</th>
-              <th>Bodega</th>
-              <th style="text-align:center">Bultos</th>
-              <th style="text-align:right">Kilos</th>
-              <th>Calidad</th>
-            </tr>
-          </thead>
-          <tbody>${filasDetalle}</tbody>
-        </table>
+          <div class="sep"></div>
 
-        <div class="totales">
-          <div>
-            <span>Total bultos</span>
-            <strong>${venta.total_bultos}</strong>
+          <div class="detalle-titulo">Mercancía</div>
+          ${bloquesMercancia}
+
+          <div class="sep-double"></div>
+
+          <div class="totales">
+            <div class="total-row">
+              <span>Total bultos</span>
+              <span>${venta.total_bultos}</span>
+            </div>
+            <div class="total-row">
+              <span>Total kilos</span>
+              <span>${Number(venta.total_kilos).toLocaleString('es-CO')} kg</span>
+            </div>
           </div>
-          <div>
-            <span>Total kilos</span>
-            <strong>${Number(venta.total_kilos).toLocaleString('es-CO')} kg</strong>
+
+          ${venta.flete_valor && Number(venta.flete_valor) > 0 ? `
+          <div class="sep"></div>
+          <div class="flete">
+            <strong>Flete:</strong> ${formatCOP(venta.flete_valor)}
+            ${venta.flete_pagadero_por ? `<br>Pagadero por: ${venta.flete_pagadero_por}` : ''}
+          </div>` : ''}
+
+          ${venta.nota ? `<div class="sep"></div><p class="nota">📝 Nota: ${venta.nota}</p>` : ''}
+
+          <div class="sep"></div>
+
+          <div class="footer">
+            Café San Joaquín SAS<br>
+            Generado el ${new Date().toLocaleDateString('es-CO')}
           </div>
+
         </div>
-
-        ${venta.flete_valor && Number(venta.flete_valor) > 0 ? `
-        <div class="flete-box">
-          <strong>Flete:</strong> ${formatCOP(venta.flete_valor)}
-          ${venta.flete_pagadero_por ? ` — pagadero por: ${venta.flete_pagadero_por}` : ''}
-        </div>` : ''}
-
-        ${venta.nota ? `<p class="nota">📝 <strong>Nota:</strong> ${venta.nota}</p>` : ''}
-
-        <div class="footer">
-          Café San Joaquín SAS · Generado el ${new Date().toLocaleDateString('es-CO')}
-        </div>
-
         <script>window.onload = () => window.print()</script>
       </body>
       </html>
@@ -209,7 +274,6 @@ function PantallaExito({ venta, onClose, onNuevaRemision }) {
 
   return (
     <div style={{ padding: '40px 24px', textAlign: 'center' }}>
-      {/* Ícono de éxito */}
       <div style={{
         width: 64, height: 64, borderRadius: '50%',
         background: '#16a34a', display: 'flex',
@@ -230,7 +294,6 @@ function PantallaExito({ venta, onClose, onNuevaRemision }) {
         {venta.total_bultos} bultos · {Number(venta.total_kilos).toLocaleString('es-CO')} kg
       </p>
 
-      {/* Botón imprimir */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
         <button
           onClick={handleImprimir}
@@ -247,7 +310,6 @@ function PantallaExito({ venta, onClose, onNuevaRemision }) {
         </button>
       </div>
 
-      {/* Acciones secundarias */}
       <div style={{ display: 'flex', gap: 10 }}>
         <button
           onClick={onNuevaRemision}
@@ -297,9 +359,8 @@ const initialForm = {
 export default function VentaModal({ onClose, onSaved }) {
   const [form, setForm]         = useState(initialForm)
   const [detalles, setDetalles] = useState([{ ...detalleVacio }])
-  const [ventaGuardada, setVentaGuardada] = useState(null) // ← nuevo: guarda la venta al crear
+  const [ventaGuardada, setVentaGuardada] = useState(null)
 
-  // ── estados del buscador de empresa ──
   const [busqueda, setBusqueda]                       = useState('')
   const [resultados, setResultados]                   = useState([])
   const [dropdownVisible, setDropdownVisible]         = useState(false)
@@ -320,9 +381,8 @@ export default function VentaModal({ onClose, onSaved }) {
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target))
         setDropdownVisible(false)
-      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -337,10 +397,7 @@ export default function VentaModal({ onClose, onSaved }) {
     setBuscando(true)
     const timer = setTimeout(() => {
       getTerceros({ buscar: busqueda, tipo: 'empresa' })
-        .then(res => {
-          setResultados(res.data)
-          setDropdownVisible(true)
-        })
+        .then(res => { setResultados(res.data); setDropdownVisible(true) })
         .finally(() => setBuscando(false))
     }, 300)
     return () => clearTimeout(timer)
@@ -384,10 +441,7 @@ export default function VentaModal({ onClose, onSaved }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     e.stopPropagation()
-    if (!form.empresa) {
-      setError('Debes seleccionar una empresa.')
-      return
-    }
+    if (!form.empresa) { setError('Debes seleccionar una empresa.'); return }
     if (loading || submitted) return
     setSubmitted(true)
     setLoading(true)
@@ -402,7 +456,7 @@ export default function VentaModal({ onClose, onSaved }) {
       }))
       const res = await createVenta({ ...form, detalles: detallesLimpios })
       onSaved()
-      setVentaGuardada(res.data) // ← muestra pantalla de éxito con los datos reales
+      setVentaGuardada(res.data)
     } catch (err) {
       setSubmitted(false)
       const data = err.response?.data
@@ -417,7 +471,6 @@ export default function VentaModal({ onClose, onSaved }) {
     if (e.target === e.currentTarget) onClose()
   }
 
-  // ── Si ya se guardó, mostrar pantalla de éxito ──
   if (ventaGuardada) {
     return (
       <div
@@ -469,7 +522,6 @@ export default function VentaModal({ onClose, onSaved }) {
         boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
       }}>
 
-        {/* ── Cabecera ── */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           padding: '18px 20px', borderBottom: '1px solid #f1f5f9',
@@ -496,7 +548,6 @@ export default function VentaModal({ onClose, onSaved }) {
           </button>
         </div>
 
-        {/* ── Cuerpo ── */}
         <form onSubmit={handleSubmit}>
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
@@ -521,7 +572,6 @@ export default function VentaModal({ onClose, onSaved }) {
                 />
               </div>
 
-              {/* ── Buscador de empresa ── */}
               <div ref={dropdownRef} style={{ position: 'relative' }}>
                 <label style={labelStyle}>Empresa *</label>
                 <div style={{ position: 'relative' }}>
@@ -534,27 +584,19 @@ export default function VentaModal({ onClose, onSaved }) {
                     <IconSearch />
                   </span>
                   <input
-                    type="text"
-                    value={busqueda}
-                    onChange={e => {
-                      setBusqueda(e.target.value)
-                      if (empresaSeleccionada) limpiarEmpresa()
-                    }}
+                    type="text" value={busqueda}
+                    onChange={e => { setBusqueda(e.target.value); if (empresaSeleccionada) limpiarEmpresa() }}
                     placeholder="Buscar por nombre o NIT..."
                     style={{ ...inputStyle, paddingLeft: '32px', paddingRight: empresaSeleccionada ? '32px' : '12px' }}
-                    onFocus={focusGreen} onBlur={blurGray}
-                    autoComplete="off"
+                    onFocus={focusGreen} onBlur={blurGray} autoComplete="off"
                   />
                   {empresaSeleccionada && (
-                    <button
-                      type="button"
-                      onClick={limpiarEmpresa}
+                    <button type="button" onClick={limpiarEmpresa}
                       style={{
                         position: 'absolute', right: '8px', top: '50%',
                         transform: 'translateY(-50%)',
-                        background: 'none', border: 'none',
-                        cursor: 'pointer', color: '#94a3b8',
-                        display: 'flex', alignItems: 'center', padding: '2px',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#94a3b8', display: 'flex', alignItems: 'center', padding: '2px',
                       }}
                       onMouseEnter={e => e.currentTarget.style.color = '#dc2626'}
                       onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
@@ -572,33 +614,22 @@ export default function VentaModal({ onClose, onSaved }) {
                     zIndex: 10, marginTop: '2px', maxHeight: '200px', overflowY: 'auto',
                   }}>
                     {buscando ? (
-                      <div style={{ padding: '10px 12px', color: '#94a3b8', fontSize: '12px' }}>
-                        Buscando...
-                      </div>
+                      <div style={{ padding: '10px 12px', color: '#94a3b8', fontSize: '12px' }}>Buscando...</div>
                     ) : resultados.length === 0 ? (
-                      <div style={{ padding: '10px 12px', color: '#94a3b8', fontSize: '12px' }}>
-                        No se encontraron empresas.
+                      <div style={{ padding: '10px 12px', color: '#94a3b8', fontSize: '12px' }}>No se encontraron empresas.</div>
+                    ) : resultados.map(r => (
+                      <div key={r.id} onClick={() => seleccionarEmpresa(r)}
+                        style={{
+                          padding: '9px 12px', cursor: 'pointer',
+                          fontSize: '13px', color: '#0f172a', borderBottom: '1px solid #f1f5f9',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                      >
+                        <span style={{ fontWeight: 500 }}>{r.nombre}</span>
+                        {r.cedula && <span style={{ color: '#94a3b8', fontSize: '12px', marginLeft: '8px' }}>{r.cedula}</span>}
                       </div>
-                    ) : (
-                      resultados.map(r => (
-                        <div key={r.id} onClick={() => seleccionarEmpresa(r)}
-                          style={{
-                            padding: '9px 12px', cursor: 'pointer',
-                            fontSize: '13px', color: '#0f172a',
-                            borderBottom: '1px solid #f1f5f9',
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'white'}
-                        >
-                          <span style={{ fontWeight: 500 }}>{r.nombre}</span>
-                          {r.cedula && (
-                            <span style={{ color: '#94a3b8', fontSize: '12px', marginLeft: '8px' }}>
-                              {r.cedula}
-                            </span>
-                          )}
-                        </div>
-                      ))
-                    )}
+                    ))}
                   </div>
                 )}
 
@@ -617,7 +648,6 @@ export default function VentaModal({ onClose, onSaved }) {
               </div>
             </div>
 
-            {/* ── Mercancía ── */}
             <Seccion label="Mercancía" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {detalles.map((d, i) => (
@@ -651,8 +681,7 @@ export default function VentaModal({ onClose, onSaved }) {
                     <div>
                       <label style={{ ...labelStyle, fontSize: '11px' }}>Bultos *</label>
                       <input type="number" name="bultos" value={d.bultos}
-                        onChange={e => handleDetalleChange(i, e)} required min="1"
-                        placeholder="0"
+                        onChange={e => handleDetalleChange(i, e)} required min="1" placeholder="0"
                         style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
                         onFocus={focusGreen} onBlur={blurGray}
                       />
@@ -660,23 +689,21 @@ export default function VentaModal({ onClose, onSaved }) {
                     <div>
                       <label style={{ ...labelStyle, fontSize: '11px' }}>Kilos *</label>
                       <input type="number" name="kilos" value={d.kilos}
-                        onChange={e => handleDetalleChange(i, e)} required min="0.01" step="0.01"
-                        placeholder="0.00"
+                        onChange={e => handleDetalleChange(i, e)} required min="0.01" step="0.01" placeholder="0.00"
                         style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px' }}
                         onFocus={focusGreen} onBlur={blurGray}
                       />
                     </div>
                   </div>
 
-                  {/* ── Campos opcionales de calidad ── */}
                   <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #e2e8f0' }}>
                     <p style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                       Calidad (opcional)
                     </p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px' }}>
                       {[
-                        { name: 'muestra', label: 'Muestra', type: 'text',   placeholder: 'Ref.' },
-                        { name: 'factor',  label: 'Factor',  type: 'number', placeholder: '0.00' },
+                        { name: 'muestra', label: 'Muestra',   type: 'text',   placeholder: 'Ref.' },
+                        { name: 'factor',  label: 'Factor',    type: 'number', placeholder: '0.00' },
                         { name: 'humedad', label: 'Humedad %', type: 'number', placeholder: '0.00' },
                         { name: 'pasilla', label: 'Pasilla %', type: 'number', placeholder: '0.00' },
                       ].map(f => (
@@ -730,8 +757,7 @@ export default function VentaModal({ onClose, onSaved }) {
             {(totalKilos > 0 || totalBultos > 0) && (
               <div style={{
                 background: '#f8fafc', border: '1px solid #e2e8f0',
-                borderRadius: '6px', padding: '10px 14px',
-                display: 'flex', gap: '24px',
+                borderRadius: '6px', padding: '10px 14px', display: 'flex', gap: '24px',
               }}>
                 <span style={{ fontSize: '12px', color: '#64748b' }}>
                   Total bultos: <strong style={{ color: '#0f172a' }}>{totalBultos}</strong>
@@ -742,14 +768,13 @@ export default function VentaModal({ onClose, onSaved }) {
               </div>
             )}
 
-            {/* ── Conductor ── */}
             <Seccion label="Datos del conductor" />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
               {[
-                { name: 'conductor_nombre',    label: 'Nombre *',   placeholder: 'Nombre completo',  required: true },
-                { name: 'conductor_cedula',    label: 'Cédula *',   placeholder: 'Número de cédula', required: true },
-                { name: 'conductor_direccion', label: 'Dirección',  placeholder: 'Dirección' },
-                { name: 'conductor_telefono',  label: 'Teléfono',   placeholder: 'Teléfono' },
+                { name: 'conductor_nombre',    label: 'Nombre *',  placeholder: 'Nombre completo',  required: true },
+                { name: 'conductor_cedula',    label: 'Cédula *',  placeholder: 'Número de cédula', required: true },
+                { name: 'conductor_direccion', label: 'Dirección', placeholder: 'Dirección' },
+                { name: 'conductor_telefono',  label: 'Teléfono',  placeholder: 'Teléfono' },
               ].map(field => (
                 <div key={field.name}>
                   <label style={labelStyle}>{field.label}</label>
@@ -762,7 +787,6 @@ export default function VentaModal({ onClose, onSaved }) {
               ))}
             </div>
 
-            {/* ── Vehículo ── */}
             <Seccion label="Datos del vehículo" />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
               {[
@@ -783,7 +807,6 @@ export default function VentaModal({ onClose, onSaved }) {
               ))}
             </div>
 
-            {/* ── Flete ── */}
             <Seccion label="Flete" />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
               <div>
@@ -821,7 +844,6 @@ export default function VentaModal({ onClose, onSaved }) {
 
           </div>
 
-          {/* ── Pie ── */}
           <div style={{
             display: 'flex', gap: '10px',
             padding: '16px 20px', borderTop: '1px solid #f1f5f9',
@@ -829,10 +851,8 @@ export default function VentaModal({ onClose, onSaved }) {
           }}>
             <button type="button" onClick={onClose}
               style={{
-                flex: 1, padding: '9px',
-                border: '1px solid #e2e8f0', borderRadius: '6px',
-                background: 'white', color: '#475569',
-                fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+                flex: 1, padding: '9px', border: '1px solid #e2e8f0', borderRadius: '6px',
+                background: 'white', color: '#475569', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
               }}
               onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
               onMouseLeave={e => e.currentTarget.style.background = 'white'}
