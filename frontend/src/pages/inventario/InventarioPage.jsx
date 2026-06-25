@@ -5,6 +5,7 @@ import {
   getStock
 } from '../../api/inventario'
 import ItemModal from '../../components/inventario/ItemModal'
+import { useAuth } from '../../context/AuthContext'  // ← nuevo
 
 // ─── Iconos SVG inline ────────────────────────────────────────────────────────
 const IconPlus = () => (
@@ -56,8 +57,6 @@ function BadgeEstado({ activo }) {
   )
 }
 
-const TABS = ['Tipos de Café', 'Bodegas', 'Stock']
-
 const camposTipoCafe = [
   { name: 'nombre', label: 'Nombre', required: true, placeholder: 'Ej: Café seco' },
   { name: 'descripcion', label: 'Descripción', type: 'textarea', placeholder: 'Descripción opcional' },
@@ -70,7 +69,15 @@ const camposBodega = [
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function InventarioPage() {
-  const [tabActiva, setTabActiva] = useState('Tipos de Café')
+  const { usuario } = useAuth()                        // ← nuevo
+  const esJefe = usuario?.rol === 'jefe'               // ← nuevo
+
+  // Las tabs disponibles dependen del rol
+  const TABS = esJefe                                  // ← nuevo
+    ? ['Tipos de Café', 'Bodegas', 'Stock']
+    : ['Stock']
+
+  const [tabActiva, setTabActiva] = useState(TABS[0]) // arranca en 'Tipos de Café' para jefe, 'Stock' para admin
 
   // Tipos de café
   const [tiposCafe, setTiposCafe] = useState([])
@@ -80,9 +87,11 @@ export default function InventarioPage() {
   const [bodegas, setBodegas] = useState([])
   const [loadingBodegas, setLoadingBodegas] = useState(true)
 
-  // Stock
+  // Stock — si es administrador, su bodega queda preseleccionada y bloqueada
   const [stock, setStock] = useState(null)
-  const [filtroBodega, setFiltroBodega] = useState('')
+  const [filtroBodega, setFiltroBodega] = useState(
+    esJefe ? '' : String(usuario?.bodega ?? '')        // ← nuevo
+  )
   const [filtroTipo, setFiltroTipo] = useState('')
   const [loadingStock, setLoadingStock] = useState(false)
 
@@ -157,8 +166,6 @@ export default function InventarioPage() {
   const handleEditar = (item) => { setItemEditando(item); setModalOpen(true) }
   const handleNuevo  = ()     => { setItemEditando(null);  setModalOpen(true) }
 
-  const loading = tabActiva === 'Tipos de Café' ? loadingTipos : loadingBodegas
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
@@ -169,10 +176,13 @@ export default function InventarioPage() {
             Inventario
           </h1>
           <p style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
-            Gestión de tipos de café, bodegas y consulta de stock
+            {esJefe
+              ? 'Gestión de tipos de café, bodegas y consulta de stock'
+              : 'Consulta de stock de tu bodega'}
           </p>
         </div>
-        {tabActiva !== 'Stock' && (
+        {/* Botón nuevo: solo visible para jefe y solo en tabs que no son Stock */}
+        {esJefe && tabActiva !== 'Stock' && (
           <button
             onClick={handleNuevo}
             style={{
@@ -191,34 +201,36 @@ export default function InventarioPage() {
         )}
       </div>
 
-      {/* ── Tabs ── */}
-      <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #e2e8f0' }}>
-        {TABS.map(tab => {
-          const activa = tabActiva === tab
-          return (
-            <button
-              key={tab}
-              onClick={() => setTabActiva(tab)}
-              style={{
-                padding: '9px 18px',
-                fontSize: '13px',
-                fontWeight: activa ? 600 : 400,
-                color: activa ? '#16a34a' : '#64748b',
-                background: 'none',
-                border: 'none',
-                borderBottom: activa ? '2px solid #16a34a' : '2px solid transparent',
-                marginBottom: '-1px',
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => { if (!activa) e.currentTarget.style.color = '#0f172a' }}
-              onMouseLeave={e => { if (!activa) e.currentTarget.style.color = '#64748b' }}
-            >
-              {tab}
-            </button>
-          )
-        })}
-      </div>
+      {/* ── Tabs — solo se renderizan si hay más de una ── */}
+      {TABS.length > 1 && (
+        <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #e2e8f0' }}>
+          {TABS.map(tab => {
+            const activa = tabActiva === tab
+            return (
+              <button
+                key={tab}
+                onClick={() => setTabActiva(tab)}
+                style={{
+                  padding: '9px 18px',
+                  fontSize: '13px',
+                  fontWeight: activa ? 600 : 400,
+                  color: activa ? '#16a34a' : '#64748b',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: activa ? '2px solid #16a34a' : '2px solid transparent',
+                  marginBottom: '-1px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { if (!activa) e.currentTarget.style.color = '#0f172a' }}
+                onMouseLeave={e => { if (!activa) e.currentTarget.style.color = '#64748b' }}
+              >
+                {tab}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* ── Tab: Tipos de Café ── */}
       {tabActiva === 'Tipos de Café' && (
@@ -428,7 +440,8 @@ export default function InventarioPage() {
             </div>
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              {/* Select Bodega */}
+
+              {/* Select Bodega — jefe elige, administrador ve solo la suya */}
               <div style={{ flex: '1', minWidth: '160px' }}>
                 <label style={{
                   display: 'block', fontSize: '12px', fontWeight: 500,
@@ -436,26 +449,38 @@ export default function InventarioPage() {
                 }}>
                   Bodega
                 </label>
-                <select
-                  value={filtroBodega}
-                  onChange={e => setFiltroBodega(e.target.value)}
-                  style={{
+                {esJefe ? (
+                  <select
+                    value={filtroBodega}
+                    onChange={e => setFiltroBodega(e.target.value)}
+                    style={{
+                      width: '100%', boxSizing: 'border-box',
+                      border: '1px solid #e2e8f0', borderRadius: '6px',
+                      padding: '8px 12px', fontSize: '13px', color: '#0f172a',
+                      background: 'white', outline: 'none',
+                    }}
+                    onFocus={e => e.target.style.borderColor = '#16a34a'}
+                    onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                  >
+                    <option value="">Todas las bodegas</option>
+                    {bodegas.map(b => (
+                      <option key={b.id} value={b.id}>{b.nombre}</option>
+                    ))}
+                  </select>
+                ) : (
+                  /* Administrador: campo de solo lectura mostrando su bodega */
+                  <div style={{
                     width: '100%', boxSizing: 'border-box',
                     border: '1px solid #e2e8f0', borderRadius: '6px',
-                    padding: '8px 12px', fontSize: '13px', color: '#0f172a',
-                    background: 'white', outline: 'none',
-                  }}
-                  onFocus={e => e.target.style.borderColor = '#16a34a'}
-                  onBlur={e => e.target.style.borderColor = '#e2e8f0'}
-                >
-                  <option value="">Todas las bodegas</option>
-                  {bodegas.map(b => (
-                    <option key={b.id} value={b.id}>{b.nombre}</option>
-                  ))}
-                </select>
+                    padding: '8px 12px', fontSize: '13px', color: '#475569',
+                    background: '#f8fafc',
+                  }}>
+                    {bodegas.find(b => b.id === Number(usuario?.bodega))?.nombre ?? 'Tu bodega'}
+                  </div>
+                )}
               </div>
 
-              {/* Select Tipo */}
+              {/* Select Tipo — igual para ambos roles */}
               <div style={{ flex: '1', minWidth: '160px' }}>
                 <label style={{
                   display: 'block', fontSize: '12px', fontWeight: 500,
@@ -508,8 +533,8 @@ export default function InventarioPage() {
           {stock ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
               {[
-                { label: 'Total Entradas', value: stock.entradas, color: '#2563eb', bg: '#eff6ff' },
-                { label: 'Total Salidas',  value: stock.salidas,  color: '#dc2626', bg: '#fef2f2' },
+                { label: 'Total Entradas', value: stock.entradas,     color: '#2563eb', bg: '#eff6ff' },
+                { label: 'Total Salidas',  value: stock.salidas,      color: '#dc2626', bg: '#fef2f2' },
                 { label: 'Stock Actual',   value: stock.stock_actual, color: '#16a34a', bg: '#f0fdf4' },
               ].map(card => (
                 <div key={card.label} style={{
@@ -539,8 +564,8 @@ export default function InventarioPage() {
         </div>
       )}
 
-      {/* ── Modal ── */}
-      {modalOpen && (
+      {/* ── Modal — solo jefe lo usa ── */}
+      {modalOpen && esJefe && (
         <ItemModal
           titulo={tabActiva === 'Tipos de Café' ? 'Tipo de Café' : 'Bodega'}
           item={itemEditando}
