@@ -88,8 +88,15 @@ function formatCOP(val) {
   return `$${Number(val || 0).toLocaleString('es-CO')}`
 }
 
+// ── Limpia el número de WhatsApp dejando solo dígitos (la API de wa.me
+// no acepta '+' ni espacios; ej: '+573001234567' → '573001234567') ──
+function limpiarNumeroWhatsApp(numero) {
+  if (!numero) return ''
+  return String(numero).replace(/\D/g, '')
+}
+
 // ── Pantalla de éxito con botones WhatsApp e Imprimir ──
-function PantallaExito({ compra, onClose, onNuevaCompra }) {
+function PantallaExito({ compra, telefonoWhatsapp, onClose, onNuevaCompra }) {
 
   const armarMensajeWhatsApp = () => {
     const fecha = new Date(compra.fecha + 'T12:00:00').toLocaleDateString('es-CO', {
@@ -137,7 +144,14 @@ function PantallaExito({ compra, onClose, onNuevaCompra }) {
 
   const handleWhatsApp = () => {
     const msg = armarMensajeWhatsApp()
-    window.open(`https://wa.me/?text=${msg}`, '_blank')
+    const numero = limpiarNumeroWhatsApp(telefonoWhatsapp)
+    // ── Si el caficultor tiene telefono_whatsapp registrado, abre el chat
+    // directo con wa.me/{numero}. Si no, cae al comportamiento anterior
+    // (abre WhatsApp sin número, para no romper el flujo). ──
+    const url = numero
+      ? `https://wa.me/${numero}?text=${msg}`
+      : `https://wa.me/?text=${msg}`
+    window.open(url, '_blank')
   }
 
   // ── Imprimible adaptado a 80mm (impresora térmica) ──
@@ -623,6 +637,7 @@ export default function CompraModal({ onClose, onSaved }) {
         {compraCreadada ? (
           <PantallaExito
             compra={compraCreadada}
+            telefonoWhatsapp={caficultorSeleccionado?.telefono_whatsapp}
             onClose={onClose}
             onNuevaCompra={handleNuevaCompra}
           />
