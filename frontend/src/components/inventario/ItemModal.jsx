@@ -96,7 +96,6 @@ export default function ItemModal({ titulo, item, campos, onClose, onSubmit }) {
         zIndex: 50,
         padding: '16px',
       }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       {/* Tarjeta del modal */}
       <div style={{

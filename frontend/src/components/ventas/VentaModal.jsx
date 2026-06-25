@@ -467,14 +467,9 @@ export default function VentaModal({ onClose, onSaved }) {
     }
   }
 
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) onClose()
-  }
-
   if (ventaGuardada) {
     return (
       <div
-        onClick={handleBackdropClick}
         style={{
           position: 'fixed', inset: 0,
           background: 'rgba(15, 23, 42, 0.5)',
@@ -507,7 +502,6 @@ export default function VentaModal({ onClose, onSaved }) {
 
   return (
     <div
-      onClick={handleBackdropClick}
       style={{
         position: 'fixed', inset: 0,
         background: 'rgba(15, 23, 42, 0.5)',

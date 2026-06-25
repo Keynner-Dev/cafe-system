@@ -73,7 +73,7 @@ function CierreModal({ caja, onCerrar, onConfirmar }) {
   };
 
   return (
-    <div onClick={e => { if (e.target === e.currentTarget) onCerrar(); }}
+    <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 16 }}>
       <div style={{ background: 'white', borderRadius: 12, width: '100%', maxWidth: 420,
@@ -195,7 +195,7 @@ function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
   };
 
   return (
-    <div onClick={e => { if (e.target === e.currentTarget) onCerrar(); }}
+    <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 16 }}>
       <div style={{ background: 'white', borderRadius: 12, width: '100%', maxWidth: 440,

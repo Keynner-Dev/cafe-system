@@ -57,17 +57,12 @@ export default function LiquidacionModal({ detalle, onClose, onSaved }) {
     }
   }
 
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) onClose()
-  }
-
   const subtotal  = Number(form.kilos) * Number(form.precio_kilo) || 0
   const focusGold = (e) => e.target.style.borderColor = '#ca8a04'
   const blurGray  = (e) => e.target.style.borderColor = '#e2e8f0'
 
   return (
     <div
-      onClick={handleBackdropClick}
       style={{
         position: 'fixed', inset: 0,
         background: 'rgba(15, 23, 42, 0.5)',
