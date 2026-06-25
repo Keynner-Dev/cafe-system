@@ -26,6 +26,24 @@ const IconTrash = () => (
     <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
   </svg>
 )
+const IconSearch = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+)
+const IconSortAsc = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+  </svg>
+)
+const IconSortDesc = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+  </svg>
+)
 
 const fmt = (n) =>
   Number(n).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
@@ -39,6 +57,11 @@ export default function VentasPage() {
   const [modalOpen, setModalOpen]                 = useState(false)
   const [detalleOpen, setDetalleOpen]             = useState(false)
   const [ventaSeleccionada, setVentaSeleccionada] = useState(null)
+
+  // ── Búsqueda y ordenamiento ──
+  const [busqueda, setBusqueda]     = useState('')
+  const [ordenCampo, setOrdenCampo] = useState('id')
+  const [ordenDir, setOrdenDir]     = useState('desc')
 
   const cargarVentas = () => {
     setLoading(true)
@@ -63,6 +86,32 @@ export default function VentasPage() {
       alert('No se pudo eliminar.')
     }
   }
+
+  // ── Filtrado y ordenamiento ──
+  const ventasFiltradas = ventas
+    .filter(v =>
+      (v.empresa_nombre || '').toLowerCase().includes(busqueda.toLowerCase().trim()) ||
+      (v.numero_remision || '').toLowerCase().includes(busqueda.toLowerCase().trim())
+    )
+    .sort((a, b) => {
+      let va, vb
+      if (ordenCampo === 'empresa') {
+        va = (a.empresa_nombre || '').toLowerCase()
+        vb = (b.empresa_nombre || '').toLowerCase()
+        return ordenDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
+      }
+      if (ordenCampo === 'fecha') {
+        va = a.fecha ?? ''; vb = b.fecha ?? ''
+        return ordenDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
+      }
+      if (ordenCampo === 'kilos') {
+        va = Number(a.total_kilos || 0); vb = Number(b.total_kilos || 0)
+        return ordenDir === 'asc' ? va - vb : vb - va
+      }
+      // id — numérico
+      va = Number(a.id); vb = Number(b.id)
+      return ordenDir === 'asc' ? va - vb : vb - va
+    })
 
   const columnas = [
     'Remisión', 'Fecha', 'Empresa', 'Kilos', 'Bultos', 'Flete',
@@ -99,6 +148,68 @@ export default function VentasPage() {
         </button>
       </div>
 
+      {/* ── Búsqueda y ordenamiento ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+
+        <div style={{ position: 'relative', flex: '1', minWidth: '200px', maxWidth: '320px' }}>
+          <span style={{
+            position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)',
+            color: '#94a3b8', pointerEvents: 'none', display: 'flex', alignItems: 'center',
+          }}>
+            <IconSearch />
+          </span>
+          <input
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            placeholder="Buscar por empresa o remisión..."
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              paddingLeft: '34px', paddingRight: '12px',
+              paddingTop: '8px', paddingBottom: '8px',
+              border: '1px solid #e2e8f0', borderRadius: '6px',
+              fontSize: '13px', color: '#0f172a',
+              outline: 'none', background: 'white',
+            }}
+            onFocus={e => e.target.style.borderColor = '#16a34a'}
+            onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+          />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>Ordenar por</span>
+          <select
+            value={ordenCampo}
+            onChange={e => setOrdenCampo(e.target.value)}
+            style={{
+              border: '1px solid #e2e8f0', borderRadius: '6px',
+              padding: '6px 10px', fontSize: '12px', color: '#0f172a',
+              background: 'white', outline: 'none', cursor: 'pointer',
+            }}
+            onFocus={e => e.target.style.borderColor = '#16a34a'}
+            onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+          >
+            <option value="id">ID</option>
+            <option value="fecha">Fecha</option>
+            <option value="empresa">Empresa</option>
+            <option value="kilos">Kilos</option>
+          </select>
+          <button
+            onClick={() => setOrdenDir(d => d === 'asc' ? 'desc' : 'asc')}
+            title={ordenDir === 'asc' ? 'Ascendente' : 'Descendente'}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '32px', height: '32px', borderRadius: '6px',
+              border: '1px solid #e2e8f0', background: 'white',
+              color: '#475569', cursor: 'pointer',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+            onMouseLeave={e => e.currentTarget.style.background = 'white'}
+          >
+            {ordenDir === 'asc' ? <IconSortAsc /> : <IconSortDesc />}
+          </button>
+        </div>
+      </div>
+
       {/* Tabla */}
       {loading ? (
         <div style={{ color: '#94a3b8', fontSize: '13px', padding: '20px 0' }}>
@@ -124,17 +235,17 @@ export default function VentasPage() {
               </tr>
             </thead>
             <tbody>
-              {ventas.length === 0 ? (
+              {ventasFiltradas.length === 0 ? (
                 <tr>
                   <td colSpan={columnas.length} style={{
                     padding: '40px', textAlign: 'center',
                     color: '#94a3b8', fontSize: '13px',
                   }}>
-                    No hay ventas registradas aún.
+                    {busqueda ? 'No se encontraron resultados.' : 'No hay ventas registradas aún.'}
                   </td>
                 </tr>
               ) : (
-                ventas.map(v => (
+                ventasFiltradas.map(v => (
                   <tr
                     key={v.id}
                     style={{ borderTop: '1px solid #f1f5f9', transition: 'background 0.1s' }}
@@ -165,7 +276,6 @@ export default function VentasPage() {
                       {fmt(v.flete_valor || 0)}
                     </td>
 
-                    {/* Columna utilidad — solo jefe */}
                     {esJefe && (
                       <td style={{ padding: '11px 16px' }}>
                         {v.utilidad_total !== null && v.utilidad_total !== undefined ? (
@@ -223,12 +333,15 @@ export default function VentasPage() {
             </tbody>
           </table>
 
-          {ventas.length > 0 && (
+          {ventasFiltradas.length > 0 && (
             <div style={{
               padding: '10px 16px', borderTop: '1px solid #f1f5f9',
               color: '#94a3b8', fontSize: '12px',
             }}>
-              {ventas.length} remisión(es) registrada(s)
+              {busqueda
+                ? `${ventasFiltradas.length} resultado(s) para "${busqueda}"`
+                : `${ventas.length} remisión(es) registrada(s)`
+              }
             </div>
           )}
         </div>
