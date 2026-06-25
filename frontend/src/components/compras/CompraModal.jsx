@@ -95,8 +95,19 @@ function limpiarNumeroWhatsApp(numero) {
   return String(numero).replace(/\D/g, '')
 }
 
-// ── Pantalla de éxito con botones WhatsApp e Imprimir ──
-function PantallaExito({ compra, telefonoWhatsapp, onClose, onNuevaCompra }) {
+
+function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, letraInfo, onClose, onNuevaCompra }) {
+
+  const hayAbono = Number(valorAbono) > 0
+  const totalFinal = hayAbono ? Math.max(subtotalCafe - Number(valorAbono), 0) : subtotalCafe
+
+  // ── NUEVO: contexto de la letra abonada — saldo restante después
+  // de este abono, y su fecha/id para que quede claro a qué deuda
+  // corresponde el descuento (no solo "se descontó algo"). ──
+  const saldoRestanteLetra = letraInfo ? Math.max(Number(letraInfo.saldo) - Number(valorAbono), 0) : 0
+  const fechaLetraFmt = letraInfo
+    ? new Date(letraInfo.fecha_creacion).toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })
+    : ''
 
   const armarMensajeWhatsApp = () => {
     const fecha = new Date(compra.fecha + 'T12:00:00').toLocaleDateString('es-CO', {
@@ -129,7 +140,18 @@ function PantallaExito({ compra, telefonoWhatsapp, onClose, onNuevaCompra }) {
     msg += `${separador}\n\n`
     msg += `${lineasDetalle}\n\n`
     msg += `${separador}\n`
-    msg += `💰 *TOTAL PAGADO: ${formatCOP(compra.total)}*\n`
+
+    // ── Desglose si hubo abono a letra ──
+    if (hayAbono) {
+      msg += `💵 Subtotal café: *${formatCOP(subtotalCafe)}*\n`
+      msg += `📋 Abono a letra${letraInfo ? ` #${letraInfo.id}` : ''}${fechaLetraFmt ? ` (creada ${fechaLetraFmt})` : ''}: *-${formatCOP(valorAbono)}*\n`
+      if (letraInfo) {
+        msg += `   _Saldo restante de la letra: ${formatCOP(saldoRestanteLetra)}_\n`
+      }
+      msg += `💰 *TOTAL PAGADO: ${formatCOP(totalFinal)}*\n`
+    } else {
+      msg += `💰 *TOTAL PAGADO: ${formatCOP(totalFinal)}*\n`
+    }
     msg += `${separador}\n\n`
 
     if (compra.nota) {
@@ -145,9 +167,6 @@ function PantallaExito({ compra, telefonoWhatsapp, onClose, onNuevaCompra }) {
   const handleWhatsApp = () => {
     const msg = armarMensajeWhatsApp()
     const numero = limpiarNumeroWhatsApp(telefonoWhatsapp)
-    // ── Si el caficultor tiene telefono_whatsapp registrado, abre el chat
-    // directo con wa.me/{numero}. Si no, cae al comportamiento anterior
-    // (abre WhatsApp sin número, para no romper el flujo). ──
     const url = numero
       ? `https://wa.me/${numero}?text=${msg}`
       : `https://wa.me/?text=${msg}`
@@ -179,6 +198,23 @@ function PantallaExito({ compra, telefonoWhatsapp, onClose, onNuevaCompra }) {
           </div>
         </div>`
     }).join('')
+
+    const totalesHTML = hayAbono ? `
+      <div class="totales-desglose">
+        <div class="fila-total"><span>Subtotal café</span><span>${formatCOP(subtotalCafe)}</span></div>
+        <div class="fila-total fila-abono"><span>Abono a letra${letraInfo ? ` #${letraInfo.id}` : ''}</span><span>-${formatCOP(valorAbono)}</span></div>
+        ${letraInfo ? `<div class="letra-detalle">Letra creada: ${fechaLetraFmt}<br>Saldo restante: ${formatCOP(saldoRestanteLetra)}</div>` : ''}
+      </div>
+      <div class="total-box">
+        <span>Total a pagar</span>
+        <strong>${formatCOP(totalFinal)}</strong>
+      </div>
+    ` : `
+      <div class="total-box">
+        <span>Total a pagar</span>
+        <strong>${formatCOP(totalFinal)}</strong>
+      </div>
+    `
 
     const ventana = window.open('', '_blank', 'width=400,height=600')
     ventana.document.write(`
@@ -223,6 +259,11 @@ function PantallaExito({ compra, telefonoWhatsapp, onClose, onNuevaCompra }) {
           .linea-subtotal { font-weight: 700; }
           .linea-deposito { font-size: 9.5px; font-weight: 700; color: #92400e; margin-top: 1px; }
 
+          .totales-desglose { margin: 6px 0 2px; }
+          .fila-total { display: flex; justify-content: space-between; font-size: 10.5px; margin-bottom: 2px; }
+          .fila-abono { color: #92400e; font-weight: 600; }
+          .letra-detalle { font-size: 9px; color: #92400e; margin-bottom: 4px; line-height: 1.5; }
+
           .total-box { text-align: center; margin: 8px 0; }
           .total-box span { font-size: 10px; display: block; color: #475569; }
           .total-box strong { font-size: 17px; font-weight: 700; color: #16a34a; display: block; margin-top: 2px; }
@@ -263,10 +304,7 @@ function PantallaExito({ compra, telefonoWhatsapp, onClose, onNuevaCompra }) {
 
           <div class="sep-double"></div>
 
-          <div class="total-box">
-            <span>Total a pagar</span>
-            <strong>${formatCOP(compra.total)}</strong>
-          </div>
+          ${totalesHTML}
 
           ${compra.nota ? `<div class="sep"></div><p class="nota">📝 Nota: ${compra.nota}</p>` : ''}
 
@@ -303,8 +341,24 @@ function PantallaExito({ compra, telefonoWhatsapp, onClose, onNuevaCompra }) {
       <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 4px' }}>
         Compra <strong>#{compra.id}</strong> — {compra.caficultor_nombre}
       </p>
+
+      {/* ── Monto final: si hubo abono, se ve el desglose chiquito arriba
+           del total grande, incluyendo a qué letra se abonó y cuánto
+           saldo le queda ── */}
+      {hayAbono && (
+        <>
+          <p style={{ fontSize: 12, color: '#92400e', margin: '0 0 2px' }}>
+            {formatCOP(subtotalCafe)} − {formatCOP(valorAbono)} abono a letra{letraInfo ? ` #${letraInfo.id}` : ''}
+          </p>
+          {letraInfo && (
+            <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 8px' }}>
+              Letra del {fechaLetraFmt} — saldo restante: {formatCOP(saldoRestanteLetra)}
+            </p>
+          )}
+        </>
+      )}
       <p style={{ fontSize: 18, fontWeight: 700, color: '#16a34a', margin: '0 0 28px' }}>
-        {formatCOP(compra.total)}
+        {formatCOP(totalFinal)}
       </p>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
@@ -384,7 +438,7 @@ function NotificacionLetras({ letras, letraElegida, valorAbono, onElegirLetra, o
             Este caficultor tiene {letras.length} letra{letras.length > 1 ? 's' : ''} pendiente{letras.length > 1 ? 's' : ''}
           </p>
           <p style={{ margin: '2px 0 10px', fontSize: '12px', color: '#a16207' }}>
-            Puedes abonar a una de ellas con esta compra. El abono entrará a la caja.
+            Puedes abonar a una de ellas con esta compra. El abono se descuenta del total a pagar.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -442,6 +496,8 @@ export default function CompraModal({ onClose, onSaved }) {
   const [form, setForm]         = useState({ caficultor: '', fecha: hoy, nota: '' })
   const [detalles, setDetalles] = useState([crearDetalleVacio(esAdministrador ? bodegaUsuario : '')])
   const [compraCreadada,        setCompraCreadada] = useState(null)
+
+  const [desgloseGuardado, setDesgloseGuardado] = useState({ subtotalCafe: 0, valorAbono: 0, letraInfo: null })
 
   const [busqueda, setBusqueda]                             = useState('')
   const [resultados, setResultados]                         = useState([])
@@ -548,10 +604,14 @@ export default function CompraModal({ onClose, onSaved }) {
     setDetalles(detalles.filter((_, i) => i !== index))
   }
 
-  const totalCompra = detalles.reduce((acc, d) => {
+
+  const subtotalCafe = detalles.reduce((acc, d) => {
     if (d.es_deposito) return acc
     return acc + (Number(d.kilos) * Number(d.precio_kilo) || 0)
   }, 0)
+
+  const valorAbonoNum = letraElegida ? (Number(valorAbono) || 0) : 0
+  const totalAPagar = Math.max(subtotalCafe - valorAbonoNum, 0)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -578,6 +638,11 @@ export default function CompraModal({ onClose, onSaved }) {
         setError(`El abono no puede superar el saldo de la letra (${formatCOP(letra.saldo)}).`)
         return
       }
+  
+      if (Number(valorAbono) > subtotalCafe) {
+        setError(`El abono no puede superar el valor de la compra (${formatCOP(subtotalCafe)}).`)
+        return
+      }
     }
 
     setLoading(true)
@@ -589,6 +654,15 @@ export default function CompraModal({ onClose, onSaved }) {
       }
       const res = await createCompra(payload)
       onSaved()
+      // ── NUEVO: congela el desglose vigente en este momento exacto,
+      // para que PantallaExito siempre muestre el desglose correcto
+      // de ESTA compra, sin importar qué pase con el formulario después.
+      // Incluye la letra completa (no solo su id) para poder mostrar su
+      // fecha de creación y calcular el saldo restante en los comprobantes. ──
+      const letraInfoGuardada = letraElegida
+        ? letrasPendientes.find(l => l.id === letraElegida) || null
+        : null
+      setDesgloseGuardado({ subtotalCafe, valorAbono: valorAbonoNum, letraInfo: letraInfoGuardada })
       setCompraCreadada(res.data)
     } catch (err) {
       setError(err?.response?.data?.abono_letra?.[0] || 'Error al guardar la compra. Verifica los datos.')
@@ -633,6 +707,9 @@ export default function CompraModal({ onClose, onSaved }) {
           <PantallaExito
             compra={compraCreadada}
             telefonoWhatsapp={caficultorSeleccionado?.telefono_whatsapp}
+            subtotalCafe={desgloseGuardado.subtotalCafe}
+            valorAbono={desgloseGuardado.valorAbono}
+            letraInfo={desgloseGuardado.letraInfo}
             onClose={onClose}
             onNuevaCompra={handleNuevaCompra}
           />
@@ -941,6 +1018,7 @@ export default function CompraModal({ onClose, onSaved }) {
                   </div>
                 </div>
 
+          
                 <div style={{
                   background: '#f0fdf4', border: '1px solid #bbf7d0',
                   borderRadius: '8px', padding: '14px 16px',
@@ -948,25 +1026,35 @@ export default function CompraModal({ onClose, onSaved }) {
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '13px', fontWeight: 500, color: '#475569' }}>
-                      Total a pagar hoy:
+                      Subtotal café:
                     </span>
-                    <span style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a' }}>
-                      ${totalCompra.toLocaleString('es-CO')}
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>
+                      {formatCOP(subtotalCafe)}
                     </span>
                   </div>
-                  {letraElegida && Number(valorAbono) > 0 && (
-                    <div style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      paddingTop: '8px', borderTop: '1px solid #bbf7d0',
-                    }}>
+
+                  {letraElegida && valorAbonoNum > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '12px', color: '#92400e' }}>
-                        + Abono a letra (entra a caja):
+                        − Abono a letra:
                       </span>
                       <span style={{ fontSize: '13px', fontWeight: 600, color: '#ca8a04' }}>
-                        {formatCOP(valorAbono)}
+                        {formatCOP(valorAbonoNum)}
                       </span>
                     </div>
                   )}
+
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    paddingTop: '8px', borderTop: '1px solid #bbf7d0',
+                  }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>
+                      Total a pagar hoy:
+                    </span>
+                    <span style={{ fontSize: '20px', fontWeight: 700, color: '#16a34a' }}>
+                      {formatCOP(totalAPagar)}
+                    </span>
+                  </div>
                 </div>
 
               </div>
