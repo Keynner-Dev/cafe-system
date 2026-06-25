@@ -93,6 +93,108 @@ class MovimientoInventarioViewSet(viewsets.ModelViewSet):
             'stock_actual': float(entradas - salidas)
         })
 
+    @action(detail=False, methods=['get'], url_path='stock-detallado')
+    def stock_detallado(self, request):
+        """Devuelve el stock desglosado por bodega y tipo de café en
+        una sola consulta, en vez de un único total agregado.
+
+        Jefe: puede ver todas las bodegas o filtrar por una con ?bodega=.
+        Administrador: siempre forzado a su propia bodega, sin importar
+        qué llegue en ?bodega= (misma regla de seguridad que en `stock`).
+
+        ?tipo_cafe= sigue funcionando igual para ambos roles.
+        """
+        usuario = request.user
+        bodega_id = request.query_params.get('bodega')
+        tipo_cafe_id = request.query_params.get('tipo_cafe')
+
+        if usuario.rol == 'administrador':
+            if bodega_id and str(bodega_id) != str(usuario.bodega_id):
+                raise PermissionDenied('No tienes acceso a esta bodega.')
+            bodega_id = usuario.bodega_id
+
+        bodegas = Bodega.objects.filter(activo=True)
+        if bodega_id:
+            bodegas = bodegas.filter(id=bodega_id)
+
+        tipos = TipoCafe.objects.filter(activo=True)
+        if tipo_cafe_id:
+            tipos = tipos.filter(id=tipo_cafe_id)
+
+        movimientos_base = MovimientoInventario.objects.filter(
+            bodega__in=bodegas, tipo_cafe__in=tipos
+        )
+
+        # Una sola consulta agregada por (bodega, tipo_cafe, tipo de
+        # movimiento), en vez de N consultas (una por combinación) como
+        # haría iterar con get_stock(). Se procesa el resultado en
+        # memoria para armar el desglose.
+        agregados = movimientos_base.values(
+            'bodega_id', 'bodega__nombre', 'tipo_cafe_id', 'tipo_cafe__nombre', 'tipo'
+        ).annotate(total_kilos=Sum('kilos'))
+
+        # claves: (bodega_id, tipo_cafe_id) -> {entradas, salidas, nombres}
+        filas = {}
+        for fila in agregados:
+            clave = (fila['bodega_id'], fila['tipo_cafe_id'])
+            if clave not in filas:
+                filas[clave] = {
+                    'bodega_id': fila['bodega_id'],
+                    'bodega_nombre': fila['bodega__nombre'],
+                    'tipo_cafe_id': fila['tipo_cafe_id'],
+                    'tipo_cafe_nombre': fila['tipo_cafe__nombre'],
+                    'entradas': Decimal('0'),
+                    'salidas': Decimal('0'),
+                }
+            if fila['tipo'] in ('entrada', 'traslado_entrada'):
+                filas[clave]['entradas'] += fila['total_kilos'] or Decimal('0')
+            else:
+                filas[clave]['salidas'] += fila['total_kilos'] or Decimal('0')
+
+        # Asegura que también aparezcan combinaciones bodega × tipo sin
+        # ningún movimiento todavía (stock 0), para que el jefe vea de
+        # un vistazo qué bodegas no tienen cierto tipo de café.
+        for bodega in bodegas:
+            for tipo in tipos:
+                clave = (bodega.id, tipo.id)
+                if clave not in filas:
+                    filas[clave] = {
+                        'bodega_id': bodega.id,
+                        'bodega_nombre': bodega.nombre,
+                        'tipo_cafe_id': tipo.id,
+                        'tipo_cafe_nombre': tipo.nombre,
+                        'entradas': Decimal('0'),
+                        'salidas': Decimal('0'),
+                    }
+
+        resultado = []
+        total_entradas = Decimal('0')
+        total_salidas = Decimal('0')
+        for fila in filas.values():
+            stock_actual = fila['entradas'] - fila['salidas']
+            total_entradas += fila['entradas']
+            total_salidas += fila['salidas']
+            resultado.append({
+                'bodega_id': fila['bodega_id'],
+                'bodega_nombre': fila['bodega_nombre'],
+                'tipo_cafe_id': fila['tipo_cafe_id'],
+                'tipo_cafe_nombre': fila['tipo_cafe_nombre'],
+                'entradas': float(fila['entradas']),
+                'salidas': float(fila['salidas']),
+                'stock_actual': float(stock_actual),
+            })
+
+        resultado.sort(key=lambda r: (r['bodega_nombre'], r['tipo_cafe_nombre']))
+
+        return Response({
+            'filas': resultado,
+            'totales': {
+                'entradas': float(total_entradas),
+                'salidas': float(total_salidas),
+                'stock_actual': float(total_entradas - total_salidas),
+            }
+        })
+
 
 @api_view(['POST'])
 def trasladar(request):

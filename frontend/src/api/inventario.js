@@ -14,6 +14,8 @@ export const deleteBodega = (id) => api.delete(`/inventario/bodegas/${id}/`)
 
 // Stock
 export const getStock = (params) => api.get('/inventario/movimientos/stock/', { params })
+// Stock desglosado por bodega y tipo de café (ítem 12 — mejora consulta de stock)
+export const getStockDetallado = (params) => api.get('/inventario/movimientos/stock-detallado/', { params })
 
 // Movimientos
 export const getMovimientos = () => api.get('/inventario/movimientos/')

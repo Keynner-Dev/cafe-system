@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   getTiposCafe, createTipoCafe, updateTipoCafe, deleteTipoCafe,
   getBodegas, createBodega, updateBodega, deleteBodega,
-  getStock
+  getStockDetallado
 } from '../../api/inventario'
 import ItemModal from '../../components/inventario/ItemModal'
 import { useAuth } from '../../context/AuthContext'  // ← nuevo
@@ -34,12 +34,6 @@ const IconFilter = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-  </svg>
-)
-const IconSearch = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
   </svg>
 )
 
@@ -87,13 +81,16 @@ export default function InventarioPage() {
   const [bodegas, setBodegas] = useState([])
   const [loadingBodegas, setLoadingBodegas] = useState(true)
 
-  // Stock — si es administrador, su bodega queda preseleccionada y bloqueada
-  const [stock, setStock] = useState(null)
+  // Stock — si es administrador, su bodega queda preseleccionada y bloqueada.
+  // `stockFilas`: desglose por bodega + tipo de café. `stockTotales`: resumen.
+  const [stockFilas, setStockFilas] = useState([])
+  const [stockTotales, setStockTotales] = useState(null)
   const [filtroBodega, setFiltroBodega] = useState(
     esJefe ? '' : String(usuario?.bodega ?? '')        // ← nuevo
   )
   const [filtroTipo, setFiltroTipo] = useState('')
   const [loadingStock, setLoadingStock] = useState(false)
+  const [errorStock, setErrorStock] = useState(null)
 
   // Modal
   const [modalOpen, setModalOpen] = useState(false)
@@ -116,11 +113,16 @@ export default function InventarioPage() {
 
   const consultarStock = () => {
     setLoadingStock(true)
+    setErrorStock(null)
     const params = {}
     if (filtroBodega) params.bodega = filtroBodega
     if (filtroTipo) params.tipo_cafe = filtroTipo
-    getStock(params)
-      .then(res => setStock(res.data))
+    getStockDetallado(params)
+      .then(res => {
+        setStockFilas(res.data.filas)
+        setStockTotales(res.data.totales)
+      })
+      .catch(() => setErrorStock('No se pudo cargar el stock. Intenta de nuevo.'))
       .finally(() => setLoadingStock(false))
   }
 
@@ -128,6 +130,13 @@ export default function InventarioPage() {
     cargarTipos()
     cargarBodegas()
   }, [])
+
+  // Carga automática al entrar a la pestaña Stock y cada vez que cambian
+  // los filtros — ya no requiere que el usuario presione un botón para
+  // ver algo.
+  useEffect(() => {
+    if (tabActiva === 'Stock') consultarStock()
+  }, [tabActiva, filtroBodega, filtroTipo])
 
   // ── Acciones Tipos de Café ──
   const handleSubmitTipo = async (form) => {
@@ -165,6 +174,11 @@ export default function InventarioPage() {
 
   const handleEditar = (item) => { setItemEditando(item); setModalOpen(true) }
   const handleNuevo  = ()     => { setItemEditando(null);  setModalOpen(true) }
+
+  // Solo mostramos la columna Bodega si el jefe está viendo más de una
+  // bodega a la vez (consolidado o varias filas) — si filtró a una sola,
+  // o si es administrador, sobra repetir el mismo nombre en cada fila.
+  const mostrarColumnaBodega = esJefe && !filtroBodega
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -506,36 +520,26 @@ export default function InventarioPage() {
                   ))}
                 </select>
               </div>
-
-              {/* Botón */}
-              <button
-                onClick={consultarStock}
-                disabled={loadingStock}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '8px 16px',
-                  background: loadingStock ? '#86efac' : '#16a34a',
-                  color: 'white', border: 'none', borderRadius: '6px',
-                  fontSize: '13px', fontWeight: 500,
-                  cursor: loadingStock ? 'not-allowed' : 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-                onMouseEnter={e => { if (!loadingStock) e.currentTarget.style.background = '#15803d' }}
-                onMouseLeave={e => { if (!loadingStock) e.currentTarget.style.background = '#16a34a' }}
-              >
-                <IconSearch />
-                {loadingStock ? 'Consultando...' : 'Consultar stock'}
-              </button>
             </div>
           </div>
 
-          {/* Resultados */}
-          {stock ? (
+          {/* Error */}
+          {errorStock && (
+            <div style={{
+              background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px',
+              padding: '12px 16px', color: '#dc2626', fontSize: '13px',
+            }}>
+              {errorStock}
+            </div>
+          )}
+
+          {/* Totales — resumen, ya no es el único resultado */}
+          {stockTotales && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
               {[
-                { label: 'Total Entradas', value: stock.entradas,     color: '#2563eb', bg: '#eff6ff' },
-                { label: 'Total Salidas',  value: stock.salidas,      color: '#dc2626', bg: '#fef2f2' },
-                { label: 'Stock Actual',   value: stock.stock_actual, color: '#16a34a', bg: '#f0fdf4' },
+                { label: 'Total Entradas', value: stockTotales.entradas,     color: '#2563eb', bg: '#eff6ff' },
+                { label: 'Total Salidas',  value: stockTotales.salidas,      color: '#dc2626', bg: '#fef2f2' },
+                { label: 'Stock Actual',   value: stockTotales.stock_actual, color: '#16a34a', bg: '#f0fdf4' },
               ].map(card => (
                 <div key={card.label} style={{
                   background: 'white', border: '1px solid #e2e8f0',
@@ -552,15 +556,74 @@ export default function InventarioPage() {
                 </div>
               ))}
             </div>
-          ) : !loadingStock && (
-            <div style={{
-              background: 'white', border: '1px solid #e2e8f0',
-              borderRadius: '10px', padding: '48px',
-              textAlign: 'center', color: '#94a3b8', fontSize: '13px',
-            }}>
-              Selecciona los filtros y presiona <strong style={{ color: '#64748b' }}>Consultar stock</strong> para ver los resultados.
-            </div>
           )}
+
+          {/* Desglose por bodega y tipo de café */}
+          <div style={{
+            background: 'white', border: '1px solid #e2e8f0',
+            borderRadius: '10px', overflow: 'hidden',
+          }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid #f1f5f9' }}>
+              <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
+                Desglose por {mostrarColumnaBodega ? 'bodega y ' : ''}tipo de café
+              </p>
+            </div>
+
+            {loadingStock ? (
+              <div style={{ color: '#94a3b8', fontSize: '13px', padding: '32px', textAlign: 'center' }}>
+                Cargando stock...
+              </div>
+            ) : stockFilas.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+                No hay datos de stock para los filtros seleccionados.
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ background: '#0f172a' }}>
+                    {[
+                      ...(mostrarColumnaBodega ? ['Bodega'] : []),
+                      'Tipo de Café', 'Entradas (kg)', 'Salidas (kg)', 'Stock actual (kg)',
+                    ].map(col => (
+                      <th key={col} style={{
+                        padding: '11px 16px', textAlign: col === 'Tipo de Café' || col === 'Bodega' ? 'left' : 'right',
+                        color: '#e2e8f0', fontWeight: 500, fontSize: '12px',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {stockFilas.map(fila => (
+                    <tr
+                      key={`${fila.bodega_id}-${fila.tipo_cafe_id}`}
+                      style={{ borderTop: '1px solid #f1f5f9', transition: 'background 0.1s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                    >
+                      {mostrarColumnaBodega && (
+                        <td style={{ padding: '11px 16px', color: '#475569' }}>{fila.bodega_nombre}</td>
+                      )}
+                      <td style={{ padding: '11px 16px', fontWeight: 500, color: '#0f172a' }}>
+                        {fila.tipo_cafe_nombre}
+                      </td>
+                      <td style={{ padding: '11px 16px', textAlign: 'right', color: '#2563eb' }}>
+                        {fila.entradas}
+                      </td>
+                      <td style={{ padding: '11px 16px', textAlign: 'right', color: '#dc2626' }}>
+                        {fila.salidas}
+                      </td>
+                      <td style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 600, color: '#16a34a' }}>
+                        {fila.stock_actual}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       )}
 
