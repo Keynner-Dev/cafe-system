@@ -6,7 +6,11 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.throttling import ScopedRateThrottle
 from .models import Tercero
 from .serializers import TerceroSerializer
+from rest_framework.pagination import PageNumberPagination
 
+class TerceroPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
 
 def armar_perfil_tercero(tercero):
     """Construye el diccionario completo de perfil (compras, vales, letras,
@@ -90,18 +94,13 @@ class TerceroViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Para acciones de detalle, siempre devolver todos
         if self.action in ['retrieve', 'update', 'partial_update', 'destroy', 'perfil']:
             return Tercero.objects.all()
 
         queryset = Tercero.objects.all()
-
-        tipo = self.request.query_params.get('tipo')
-        buscar = (
-            self.request.query_params.get('search')
-            or self.request.query_params.get('buscar')
-        )
-        todos = self.request.query_params.get('todos')
+        tipo   = self.request.query_params.get('tipo')
+        buscar = self.request.query_params.get('search') or self.request.query_params.get('buscar')
+        todos  = self.request.query_params.get('todos')
 
         if tipo:
             queryset = queryset.filter(tipo__in=[tipo, 'ambos'])
@@ -117,6 +116,26 @@ class TerceroViewSet(viewsets.ModelViewSet):
             return Tercero.objects.none()
 
         return queryset
+
+    def get_paginator(self):
+        todos  = self.request.query_params.get('todos')
+        buscar = self.request.query_params.get('search') or self.request.query_params.get('buscar')
+        if todos or buscar:
+            return None
+        return TerceroPagination()
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        paginator = self.get_paginator()
+
+        if paginator is not None:
+            page = paginator.paginate_queryset(queryset, request)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return paginator.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['get'], url_path='perfil')
     def perfil(self, request, pk=None):
