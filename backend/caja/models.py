@@ -5,6 +5,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import F
 
 
 class Caja(models.Model):
@@ -78,17 +79,62 @@ class MovimientoCaja(models.Model):
 
     def save(self, *args, **kwargs):
         es_nuevo = self.pk is None
-        if es_nuevo and not self.caja.abierta:
-            raise ValidationError(
-                'La caja está cerrada. Debes abrirla antes de registrar movimientos.'
-            )
-        super().save(*args, **kwargs)
+
         if es_nuevo:
-            if self.tipo == 'ingreso':
-                self.caja.saldo_actual += self.valor
-            else:
-                self.caja.saldo_actual -= self.valor
-            self.caja.save()
+            # ── NUEVO (ítem 21) ──
+            # Antes de actualizar el saldo, se vuelve a leer `caja.abierta`
+            # con select_for_update() para bloquear esa fila hasta que
+            # termine esta transacción completa. Si dos movimientos para
+            # la MISMA caja llegan casi al mismo tiempo, el segundo tiene
+            # que ESPERAR a que el primero termine (no puede leer
+            # `abierta` ni `saldo_actual` viejos mientras el primero está
+            # a mitad de camino). Mismo patrón ya usado en
+            # TrasladoDineroViewSet.perform_create().
+            #
+            # select_for_update() exige estar dentro de una transacción
+            # atómica -- se envuelve todo el método en transaction.atomic()
+            # para garantizarlo sin depender de que la vista que llama a
+            # .save() ya esté en una.
+            with transaction.atomic():
+                caja_bloqueada = Caja.objects.select_for_update().get(pk=self.caja_id)
+
+                if not caja_bloqueada.abierta:
+                    raise ValidationError(
+                        'La caja está cerrada. Debes abrirla antes de registrar movimientos.'
+                    )
+
+                super().save(*args, **kwargs)
+
+                # ── NUEVO (ítem 21): actualización atómica con F() ──
+                # Antes: self.caja.saldo_actual += self.valor; self.caja.save()
+                # Eso carga el saldo en un objeto Python y lo vuelve a
+                # escribir -- si dos movimientos llegaran casi al mismo
+                # tiempo (incluso sin el bloqueo de arriba, por ejemplo
+                # si alguna otra ruta de código futura llama a este save()
+                # fuera de una request HTTP), el segundo `save()` podía
+                # sobrescribir el incremento del primero ("lost update"),
+                # dejando saldo_actual desincronizado del historial real
+                # de movimientos.
+                #
+                # F('saldo_actual') le dice a la base de datos que haga
+                # la suma/resta directamente en la fila (UPDATE caja SET
+                # saldo_actual = saldo_actual + X), una operación atómica
+                # a nivel de base de datos sin importar cuántas peticiones
+                # concurrentes existan. Se combina con select_for_update()
+                # de arriba como doble capa de protección: el bloqueo
+                # serializa el orden de las operaciones, y F() garantiza
+                # que el cálculo en sí nunca se basa en un valor leído
+                # en memoria que pudo quedar desactualizado.
+                if self.tipo == 'ingreso':
+                    Caja.objects.filter(pk=self.caja_id).update(
+                        saldo_actual=F('saldo_actual') + self.valor
+                    )
+                else:
+                    Caja.objects.filter(pk=self.caja_id).update(
+                        saldo_actual=F('saldo_actual') - self.valor
+                    )
+        else:
+            super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.tipo} ${self.valor} — {self.caja.bodega.nombre}"

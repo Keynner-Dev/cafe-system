@@ -1,6 +1,7 @@
 import api from './axios'
 
-export const getCompras = () => api.get('/compras/compras/')
+export const getCompras = (params = {}) => api.get('/compras/compras/', { params })
+
 export const getCompra = (id) => api.get(`/compras/compras/${id}/`)
 export const createCompra = (data) => api.post('/compras/compras/', data)
 export const updateCompra = (id, data) => api.put(`/compras/compras/${id}/`, data)

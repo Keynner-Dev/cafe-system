@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getCajas, getCajasDestino, getMovimientos, cerrarCaja, abrirCaja, createTraslado } from '../../api/caja';
+import { getCajas, getCajasDestino, getMovimientos, cerrarCaja, abrirCaja, createTraslado, getHistorialCierres } from '../../api/caja';
 import { useAuth } from '../../context/AuthContext';
 import MovimientoModal from '../../components/caja/MovimientoModal';
 
@@ -36,6 +36,13 @@ const IconTransfer = () => (
 const IconX = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+);
+const IconHistory = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+    <path d="M3 3v5h5"/>
+    <path d="M12 7v5l4 2"/>
   </svg>
 );
 
@@ -146,8 +153,6 @@ function CierreModal({ caja, onCerrar, onConfirmar }) {
 }
 
 // ── Modal traslado de dinero ──────────────────────────────────────────────────
-// `cajas`: lista para poblar destino (jefe → todas con saldo; admin → cajasDestino sin saldo)
-// `cajaOrigen`: objeto COMPLETO de la caja propia del admin (con saldo real), o null si es jefe
 function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
   const cajasDestino = cajas.filter(c => c.id !== cajaOrigen?.id);
 
@@ -160,8 +165,6 @@ function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
 
-  // Si hay cajaOrigen fijo (admin), el saldo real viene de ahí (dato propio, sí permitido).
-  // Si es jefe, busca el saldo en la lista `cajas` (que sí trae saldo_actual completo).
   const cajaOrigenActual = cajaOrigen || cajas.find(c => c.id === Number(form.caja_origen));
   const saldoDisponible  = Number(cajaOrigenActual?.saldo_actual || 0);
 
@@ -201,7 +204,6 @@ function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
       <div style={{ background: 'white', borderRadius: 12, width: '100%', maxWidth: 440,
         boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
 
-        {/* Cabecera */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           padding: '18px 20px', borderBottom: '1px solid #f1f5f9' }}>
           <div>
@@ -219,7 +221,6 @@ function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
           {error && <div style={{ background: '#fef2f2', border: '1px solid #fecaca',
             borderRadius: 6, padding: '10px 12px', color: '#dc2626', fontSize: 12 }}>{error}</div>}
 
-          {/* Origen */}
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#475569', marginBottom: 5 }}>
               Caja origen</label>
@@ -230,12 +231,10 @@ function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
               onFocus={e => e.target.style.borderColor = '#16a34a'}
               onBlur={e => e.target.style.borderColor = '#e2e8f0'}>
               {cajaOrigen ? (
-                // Admin: caja fija, con su saldo real (dato propio permitido)
                 <option value={cajaOrigen.id}>
                   {cajaOrigen.bodega_nombre} — {formatCOP(cajaOrigen.saldo_actual)}
                 </option>
               ) : (
-                // Jefe: puede elegir cualquier caja como origen, todas con saldo
                 cajas.map(c => (
                   <option key={c.id} value={c.id}>{c.bodega_nombre} — {formatCOP(c.saldo_actual)}</option>
                 ))
@@ -248,12 +247,10 @@ function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
             )}
           </div>
 
-          {/* Flecha */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
             <IconTransfer />
           </div>
 
-          {/* Destino — nunca muestra saldo, ya sea lista de jefe o de admin */}
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#475569', marginBottom: 5 }}>
               Caja destino</label>
@@ -269,7 +266,6 @@ function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
             </select>
           </div>
 
-          {/* Valor */}
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#475569', marginBottom: 5 }}>
               Valor a trasladar *</label>
@@ -281,7 +277,6 @@ function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
               onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
           </div>
 
-          {/* Nota */}
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#475569', marginBottom: 5 }}>
               Nota (opcional)</label>
@@ -313,18 +308,22 @@ export default function CajaPage() {
   const { usuario } = useAuth();
   const esJefe = usuario?.rol === 'jefe';
 
-  const [cajas,            setCajas]            = useState([]);
-  const [cajasDestino,     setCajasDestino]     = useState([]); // solo se usa para admin
-  const [cajaSeleccionada, setCajaSeleccionada] = useState(null);
-  const [movimientos,      setMovimientos]      = useState([]);
-  const [cargandoCajas,    setCargandoCajas]    = useState(true);
-  const [cargandoMov,      setCargandoMov]      = useState(false);
-  const [modalAbierto,     setModalAbierto]     = useState(false);
-  const [modalCierre,      setModalCierre]      = useState(false);
-  const [modalTraslado,    setModalTraslado]    = useState(false);
-  const [filtroTipo,       setFiltroTipo]       = useState('todos');
-  const [loadingAbrir,     setLoadingAbrir]     = useState(false);
+  const [cajas,             setCajas]             = useState([]);
+  const [cajasDestino,      setCajasDestino]      = useState([]);
+  const [cajaSeleccionada,  setCajaSeleccionada]  = useState(null);
+  const [movimientos,       setMovimientos]       = useState([]);
+  const [historialCierres,  setHistorialCierres]  = useState([]);
+  const [cargandoCajas,     setCargandoCajas]     = useState(true);
+  const [cargandoMov,       setCargandoMov]       = useState(false);
+  const [cargandoHistorial, setCargandoHistorial] = useState(false);
+  const [modalAbierto,      setModalAbierto]      = useState(false);
+  const [modalCierre,       setModalCierre]       = useState(false);
+  const [modalTraslado,     setModalTraslado]     = useState(false);
+  const [filtroTipo,        setFiltroTipo]        = useState('todos');
+  const [loadingAbrir,      setLoadingAbrir]      = useState(false);
+  const [tabActiva,         setTabActiva]         = useState('movimientos');
 
+  // Carga inicial de cajas
   useEffect(() => {
     getCajas()
       .then(res => {
@@ -334,20 +333,30 @@ export default function CajaPage() {
       })
       .finally(() => setCargandoCajas(false));
 
-    // El admin solo recibe su propia caja en getCajas(), así que necesita
-    // esta lista aparte (sin saldo) para saber a qué otras cajas puede trasladar.
     if (!esJefe) {
       getCajasDestino().then(res => setCajasDestino(res.data));
     }
   }, []);
 
+  // Carga movimientos al cambiar de caja — resetea pestaña e historial
   useEffect(() => {
     if (!cajaSeleccionada) return;
+    setHistorialCierres([]);
+    setTabActiva('movimientos');
     setCargandoMov(true);
     getMovimientos(cajaSeleccionada.id)
       .then(res => setMovimientos(res.data))
       .finally(() => setCargandoMov(false));
   }, [cajaSeleccionada]);
+
+  // Carga historial de cierres al activar esa pestaña
+  useEffect(() => {
+    if (!cajaSeleccionada || tabActiva !== 'historial') return;
+    setCargandoHistorial(true);
+    getHistorialCierres(cajaSeleccionada.id)
+      .then(res => setHistorialCierres(res.data))
+      .finally(() => setCargandoHistorial(false));
+  }, [cajaSeleccionada, tabActiva]);
 
   const refrescar = () => {
     getCajas().then(res => {
@@ -376,9 +385,6 @@ export default function CajaPage() {
     ? cajas.find(c => c.id === cajaSeleccionada.id) || cajaSeleccionada
     : null;
   const cajaEstaAbierta = cajaActual?.abierta !== false;
-
-  // Jefe: usa `cajas` (todas, con saldo) para decidir si mostrar el botón.
-  // Admin: usa `cajasDestino` (todas, sin saldo) porque `cajas` solo trae la suya.
   const puedeTrasladar = esJefe ? cajas.length > 1 : cajasDestino.length > 1;
 
   if (cargandoCajas) {
@@ -404,7 +410,6 @@ export default function CajaPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Cerrar / abrir */}
           {cajaActual && (
             cajaEstaAbierta ? (
               <button onClick={() => setModalCierre(true)}
@@ -426,7 +431,6 @@ export default function CajaPage() {
             )
           )}
 
-          {/* Trasladar dinero */}
           {puedeTrasladar && (
             <button onClick={() => setModalTraslado(true)}
               style={{ display: 'flex', alignItems: 'center', gap: 8,
@@ -439,7 +443,6 @@ export default function CajaPage() {
             </button>
           )}
 
-          {/* Registrar movimiento */}
           {(!esJefe || cajaActual) && cajaEstaAbierta && (
             <button onClick={() => setModalAbierto(true)}
               style={{ display: 'flex', alignItems: 'center', gap: 8,
@@ -561,95 +564,186 @@ export default function CajaPage() {
         </div>
       )}
 
-      {/* Tabla movimientos */}
+      {/* Tabla con pestañas */}
       {(!esJefe || cajaActual) && (
         <div style={{ background: 'white', borderRadius: 10, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9',
+
+          {/* Pestañas */}
+          <div style={{ padding: '0 20px', borderBottom: '1px solid #f1f5f9',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#0f172a' }}>
-              Historial de movimientos
-              {esJefe && cajaActual && (
-                <span style={{ fontSize: 13, color: '#64748b', fontWeight: 400, marginLeft: 8 }}>
-                  — {cajaActual.bodega_nombre}</span>
-              )}
-            </h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {[
-                  { value: 'todos',   label: 'Todos' },
-                  { value: 'ingreso', label: 'Ingresos' },
-                  { value: 'egreso',  label: 'Egresos' },
-                ].map(op => (
-                  <button key={op.value} onClick={() => setFiltroTipo(op.value)}
-                    style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12,
-                      fontWeight: 600, cursor: 'pointer', border: 'none',
-                      background: filtroTipo === op.value
-                        ? op.value === 'ingreso' ? '#f0fdf4' : op.value === 'egreso' ? '#fef2f2' : '#0f172a'
-                        : '#f1f5f9',
-                      color: filtroTipo === op.value
-                        ? op.value === 'ingreso' ? '#16a34a' : op.value === 'egreso' ? '#dc2626' : 'white'
-                        : '#64748b' }}>
-                    {op.label}
-                  </button>
-                ))}
-              </div>
-              {esJefe && cajaActual && (
-                <button onClick={() => setCajaSeleccionada(null)}
-                  style={{ fontSize: 12, color: '#64748b', background: 'none',
-                    border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-                  Volver al consolidado</button>
-              )}
+            <div style={{ display: 'flex', gap: 0 }}>
+              {[
+                { key: 'movimientos', label: 'Movimientos',       icon: <IconPlus /> },
+                { key: 'historial',   label: 'Historial cierres', icon: <IconHistory /> },
+              ].map(tab => (
+                <button key={tab.key} onClick={() => setTabActiva(tab.key)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7,
+                    padding: '14px 18px', border: 'none', background: 'transparent',
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    color: tabActiva === tab.key ? '#16a34a' : '#64748b',
+                    borderBottom: tabActiva === tab.key ? '2px solid #16a34a' : '2px solid transparent',
+                    marginBottom: -1, transition: 'all 0.15s' }}>
+                  {tab.icon} {tab.label}
+                </button>
+              ))}
             </div>
+
+            {/* Filtros tipo — solo en pestaña movimientos */}
+            {tabActiva === 'movimientos' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[
+                    { value: 'todos',   label: 'Todos' },
+                    { value: 'ingreso', label: 'Ingresos' },
+                    { value: 'egreso',  label: 'Egresos' },
+                  ].map(op => (
+                    <button key={op.value} onClick={() => setFiltroTipo(op.value)}
+                      style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12,
+                        fontWeight: 600, cursor: 'pointer', border: 'none',
+                        background: filtroTipo === op.value
+                          ? op.value === 'ingreso' ? '#f0fdf4' : op.value === 'egreso' ? '#fef2f2' : '#0f172a'
+                          : '#f1f5f9',
+                        color: filtroTipo === op.value
+                          ? op.value === 'ingreso' ? '#16a34a' : op.value === 'egreso' ? '#dc2626' : 'white'
+                          : '#64748b' }}>
+                      {op.label}
+                    </button>
+                  ))}
+                </div>
+                {esJefe && cajaActual && (
+                  <button onClick={() => setCajaSeleccionada(null)}
+                    style={{ fontSize: 12, color: '#64748b', background: 'none',
+                      border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                    Volver al consolidado</button>
+                )}
+              </div>
+            )}
+
+            {/* Botón volver — solo en historial para el jefe */}
+            {tabActiva === 'historial' && esJefe && cajaActual && (
+              <button onClick={() => setCajaSeleccionada(null)}
+                style={{ fontSize: 12, color: '#64748b', background: 'none',
+                  border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                Volver al consolidado</button>
+            )}
           </div>
 
-          {cargandoMov ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%',
-                border: '3px solid #e2e8f0', borderTopColor: '#16a34a',
-                animation: 'spin 0.8s linear infinite' }} />
-            </div>
-          ) : movimientosFiltrados.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 14 }}>
-              No hay movimientos {filtroTipo !== 'todos' ? `de tipo "${filtroTipo}"` : 'registrados aún'}
-            </div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: '#0f172a' }}>
-                  {['Fecha', 'Descripción', 'Tipo', 'Valor', 'Registrado por'].map(col => (
-                    <th key={col} style={{ padding: '11px 16px', textAlign: 'left',
-                      fontSize: 12, fontWeight: 600, color: '#e2e8f0',
-                      textTransform: 'uppercase', letterSpacing: '0.05em' }}>{col}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {movimientosFiltrados.map((mov, i) => (
-                  <tr key={mov.id}
-                    style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #f1f5f9' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
-                    onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'white' : '#f8fafc'}>
-                    <td style={{ padding: '12px 16px', fontSize: 13, color: '#64748b' }}>{formatFecha(mov.fecha)}</td>
-                    <td style={{ padding: '12px 16px', fontSize: 14, color: '#0f172a' }}>{mov.descripcion}</td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 20,
-                        fontSize: 12, fontWeight: 600,
-                        background: mov.tipo === 'ingreso' ? '#f0fdf4' : '#fef2f2',
-                        color: mov.tipo === 'ingreso' ? '#16a34a' : '#dc2626' }}>
-                        {mov.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600,
-                      color: mov.tipo === 'ingreso' ? '#16a34a' : '#dc2626' }}>
-                      {mov.tipo === 'egreso' ? '− ' : '+ '}{formatCOP(mov.valor)}
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: 13, color: '#64748b' }}>
-                      {mov.creado_por_nombre || '—'}
-                    </td>
+          {/* Contenido: Movimientos */}
+          {tabActiva === 'movimientos' && (
+            cargandoMov ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%',
+                  border: '3px solid #e2e8f0', borderTopColor: '#16a34a',
+                  animation: 'spin 0.8s linear infinite' }} />
+              </div>
+            ) : movimientosFiltrados.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 14 }}>
+                No hay movimientos {filtroTipo !== 'todos' ? `de tipo "${filtroTipo}"` : 'registrados aún'}
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#0f172a' }}>
+                    {['Fecha', 'Descripción', 'Tipo', 'Valor', 'Registrado por'].map(col => (
+                      <th key={col} style={{ padding: '11px 16px', textAlign: 'left',
+                        fontSize: 12, fontWeight: 600, color: '#e2e8f0',
+                        textTransform: 'uppercase', letterSpacing: '0.05em' }}>{col}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {movimientosFiltrados.map((mov, i) => (
+                    <tr key={mov.id}
+                      style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #f1f5f9' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
+                      onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'white' : '#f8fafc'}>
+                      <td style={{ padding: '12px 16px', fontSize: 13, color: '#64748b' }}>{formatFecha(mov.fecha)}</td>
+                      <td style={{ padding: '12px 16px', fontSize: 14, color: '#0f172a' }}>{mov.descripcion}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 20,
+                          fontSize: 12, fontWeight: 600,
+                          background: mov.tipo === 'ingreso' ? '#f0fdf4' : '#fef2f2',
+                          color: mov.tipo === 'ingreso' ? '#16a34a' : '#dc2626' }}>
+                          {mov.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600,
+                        color: mov.tipo === 'ingreso' ? '#16a34a' : '#dc2626' }}>
+                        {mov.tipo === 'egreso' ? '− ' : '+ '}{formatCOP(mov.valor)}
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: 13, color: '#64748b' }}>
+                        {mov.creado_por_nombre || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          )}
+
+          {/* Contenido: Historial de cierres */}
+          {tabActiva === 'historial' && (
+            cargandoHistorial ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%',
+                  border: '3px solid #e2e8f0', borderTopColor: '#16a34a',
+                  animation: 'spin 0.8s linear infinite' }} />
+              </div>
+            ) : historialCierres.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 14 }}>
+                Esta caja aún no tiene cierres registrados
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#0f172a' }}>
+                    {['Fecha', 'Saldo sistema', 'Efectivo contado', 'Diferencia', 'Nota', 'Cerrado por'].map(col => (
+                      <th key={col} style={{ padding: '11px 16px', textAlign: 'left',
+                        fontSize: 12, fontWeight: 600, color: '#e2e8f0',
+                        textTransform: 'uppercase', letterSpacing: '0.05em' }}>{col}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {historialCierres.map((cierre, i) => (
+                    <tr key={cierre.id}
+                      style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #f1f5f9' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
+                      onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'white' : '#f8fafc'}>
+                      <td style={{ padding: '12px 16px', fontSize: 13, color: '#64748b' }}>
+                        {new Date(cierre.fecha).toLocaleDateString('es-CO', {
+                          day: '2-digit', month: '2-digit', year: 'numeric'
+                        })}
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#0f172a' }}>
+                        {formatCOP(cierre.saldo_teorico)}
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#0f172a' }}>
+                        {formatCOP(cierre.saldo_fisico)}
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{
+                          display: 'inline-block', padding: '3px 10px', borderRadius: 20,
+                          fontSize: 12, fontWeight: 700,
+                          background: cierre.diferencia === 0 ? '#f0fdf4'
+                            : cierre.diferencia > 0 ? '#eff6ff' : '#fef2f2',
+                          color: cierre.diferencia === 0 ? '#16a34a'
+                            : cierre.diferencia > 0 ? '#2563eb' : '#dc2626',
+                        }}>
+                          {cierre.diferencia > 0 ? '+' : ''}{formatCOP(cierre.diferencia)}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: 13, color: '#64748b' }}>
+                        {cierre.nota || <span style={{ color: '#cbd5e1' }}>—</span>}
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: 13, color: '#64748b' }}>
+                        {cierre.creado_por_nombre || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
           )}
         </div>
       )}

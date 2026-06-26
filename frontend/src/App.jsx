@@ -45,13 +45,10 @@ function RutaProtegida({ children }) {
 }
 
 export default function App() {
-  const { usuario } = useAuth()
+  const { usuario, redirigirAPrecios } = useAuth()
 
   return (
     <Routes>
-      {/* Portal caficultor — página pública, SIN autenticación de usuario
-          interno y SIN el Layout/sidebar del panel admin. Por eso vive
-          fuera de RutaProtegida y antes que cualquier otra cosa. */}
       <Route path="/portal" element={<PortalCaficultorPage />} />
 
       <Route
@@ -64,18 +61,22 @@ export default function App() {
           <Layout />
         </RutaProtegida>
       }>
-        <Route index element={<Dashboard />} />
-        <Route path="terceros"   element={<TercerosPage />} />
-        <Route path="inventario" element={<InventarioPage />} />
-        <Route path="compras"    element={<ComprasPage />} />
-        <Route path="ventas"     element={<VentasPage />} />
-        <Route path="precios"    element={<PreciosPage />} />
-        <Route path="traslados"  element={<TrasladosPage />} />
-        <Route path="usuarios"   element={<UsuariosPage />} />
-        <Route path="caja"       element={<CajaPage />} />
-        <Route path="gastos"     element={<GastosPage />} />
+        <Route index element={
+          redirigirAPrecios
+            ? <Navigate to="/precios" replace />
+            : <Dashboard />
+        } />
+        <Route path="terceros"      element={<TercerosPage />} />
+        <Route path="inventario"    element={<InventarioPage />} />
+        <Route path="compras"       element={<ComprasPage />} />
+        <Route path="ventas"        element={<VentasPage />} />
+        <Route path="precios"       element={<PreciosPage />} />
+        <Route path="traslados"     element={<TrasladosPage />} />
+        <Route path="usuarios"      element={<UsuariosPage />} />
+        <Route path="caja"          element={<CajaPage />} />
+        <Route path="gastos"        element={<GastosPage />} />
         <Route path="cuentas-pagar" element={<CuentasPagarPage />} />
-        <Route path="letras"     element={<LetrasPage />} />
+        <Route path="letras"        element={<LetrasPage />} />
       </Route>
     </Routes>
   )

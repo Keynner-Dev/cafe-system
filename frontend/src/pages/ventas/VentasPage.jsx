@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getVentas, deleteVenta } from '../../api/ventas'
+import { getVentas, getVenta, deleteVenta } from '../../api/ventas'
 import { useAuth } from '../../context/AuthContext'
 import VentaModal from '../../components/ventas/VentaModal'
 import VentaDetalle from '../../components/ventas/VentaDetalle'
@@ -44,33 +44,90 @@ const IconSortDesc = () => (
     <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
   </svg>
 )
+const IconChevronLeft = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6"/>
+  </svg>
+)
+const IconChevronRight = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+)
 
 const fmt = (n) =>
   Number(n).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
+const CAMPO_ORDEN_BACKEND = {
+  id: 'id',
+  fecha: 'fecha',
+}
+const CAMPOS_ORDEN_BACKEND_SOPORTADOS = ['id', 'fecha']
 
 export default function VentasPage() {
   const { usuario } = useAuth()
   const esJefe = usuario?.rol === 'jefe'
 
   const [ventas, setVentas]                       = useState([])
+  const [totalVentas, setTotalVentas]             = useState(0) 
   const [loading, setLoading]                     = useState(true)
   const [modalOpen, setModalOpen]                 = useState(false)
   const [detalleOpen, setDetalleOpen]             = useState(false)
   const [ventaSeleccionada, setVentaSeleccionada] = useState(null)
 
   // ── Búsqueda y ordenamiento ──
-  const [busqueda, setBusqueda]     = useState('')
-  const [ordenCampo, setOrdenCampo] = useState('id')
-  const [ordenDir, setOrdenDir]     = useState('desc')
+  const [busqueda, setBusqueda]                       = useState('')
+  const [busquedaDebounced, setBusquedaDebounced]     = useState('')  
+  const [ordenCampo, setOrdenCampo]                   = useState('id')
+  const [ordenDir, setOrdenDir]                       = useState('desc')
+
+  const [filtroFechaDesde, setFiltroFechaDesde] = useState('')
+  const [filtroFechaHasta, setFiltroFechaHasta] = useState('')
+
+
+  const [pagina, setPagina] = useState(1)
+  const PAGE_SIZE = 10  // debe coincidir con settings.REST_FRAMEWORK['PAGE_SIZE']
+  const totalPaginas = Math.max(1, Math.ceil(totalVentas / PAGE_SIZE))
+
+  // ── Debounce de la búsqueda (mismo patrón de 300ms que ya usa
+  // ComprasPage.jsx / CompraModal.jsx) ──
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setBusquedaDebounced(busqueda)
+      setPagina(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [busqueda])
 
   const cargarVentas = () => {
     setLoading(true)
-    getVentas()
-      .then(res => setVentas(res.data))
+    const params = { page: pagina }
+
+    // Solo manda 'ordering' al backend si el campo elegido es uno de
+    // los que el backend sabe resolver (id o fecha). Si el usuario
+    // eligió "Empresa" o "Kilos", no se manda ordering -- esos casos
+    // se ordenan en memoria más abajo, sobre la página ya cargada.
+    if (CAMPOS_ORDEN_BACKEND_SOPORTADOS.includes(ordenCampo)) {
+      params.ordering = ordenDir === 'desc'
+        ? `-${CAMPO_ORDEN_BACKEND[ordenCampo]}`
+        : CAMPO_ORDEN_BACKEND[ordenCampo]
+    }
+    if (busquedaDebounced.trim()) params.buscar = busquedaDebounced.trim()
+    if (filtroFechaDesde) params.fecha_desde = filtroFechaDesde
+    if (filtroFechaHasta) params.fecha_hasta = filtroFechaHasta
+
+    getVentas(params)
+      .then(res => {
+        setVentas(res.data.results)
+        setTotalVentas(res.data.count)
+      })
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { cargarVentas() }, [])
+  useEffect(() => {
+    cargarVentas()
+  }, [pagina, busquedaDebounced, ordenCampo, ordenDir, filtroFechaDesde, filtroFechaHasta])
 
   const handleVerDetalle = (venta) => {
     setVentaSeleccionada(venta)
@@ -81,37 +138,37 @@ export default function VentasPage() {
     if (!confirm('¿Eliminar esta venta? También se eliminarán sus movimientos de inventario.')) return
     try {
       await deleteVenta(id)
-      cargarVentas()
+      // ── Si eliminamos el último registro de la página actual y no
+      // somos la página 1, retrocedemos una página (mismo patrón de
+      // ComprasPage.jsx) ──
+      if (ventas.length === 1 && pagina > 1) {
+        setPagina(p => p - 1)
+      } else {
+        cargarVentas()
+      }
     } catch {
       alert('No se pudo eliminar.')
     }
   }
 
-  // ── Filtrado y ordenamiento ──
-  const ventasFiltradas = ventas
-    .filter(v =>
-      (v.empresa_nombre || '').toLowerCase().includes(busqueda.toLowerCase().trim()) ||
-      (v.numero_remision || '').toLowerCase().includes(busqueda.toLowerCase().trim())
-    )
-    .sort((a, b) => {
-      let va, vb
-      if (ordenCampo === 'empresa') {
-        va = (a.empresa_nombre || '').toLowerCase()
-        vb = (b.empresa_nombre || '').toLowerCase()
-        return ordenDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
-      }
-      if (ordenCampo === 'fecha') {
-        va = a.fecha ?? ''; vb = b.fecha ?? ''
-        return ordenDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
-      }
-      if (ordenCampo === 'kilos') {
-        va = Number(a.total_kilos || 0); vb = Number(b.total_kilos || 0)
-        return ordenDir === 'asc' ? va - vb : vb - va
-      }
-      // id — numérico
-      va = Number(a.id); vb = Number(b.id)
+  // ── Ordenamiento en memoria SOLO para 'empresa' y 'kilos' (no
+  // soportados en el backend por alcance acotado del ítem 17) -- actúa
+  // únicamente sobre los 10 registros de la página actual, ya
+  // descargados. Para 'id' y 'fecha', 'ventas' ya viene ordenado por
+  // el backend, así que esto los deja tal cual (no-op). ──
+  const ventasOrdenadas = [...ventas].sort((a, b) => {
+    if (ordenCampo === 'empresa') {
+      const va = (a.empresa_nombre || '').toLowerCase()
+      const vb = (b.empresa_nombre || '').toLowerCase()
+      return ordenDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
+    }
+    if (ordenCampo === 'kilos') {
+      const va = Number(a.total_kilos || 0)
+      const vb = Number(b.total_kilos || 0)
       return ordenDir === 'asc' ? va - vb : vb - va
-    })
+    }
+    return 0  // id/fecha: ya vienen ordenados del backend
+  })
 
   const columnas = [
     'Remisión', 'Fecha', 'Empresa', 'Kilos', 'Bultos', 'Flete',
@@ -148,7 +205,7 @@ export default function VentasPage() {
         </button>
       </div>
 
-      {/* ── Búsqueda y ordenamiento ── */}
+      {/* ── Búsqueda, fechas y ordenamiento ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
 
         <div style={{ position: 'relative', flex: '1', minWidth: '200px', maxWidth: '320px' }}>
@@ -175,11 +232,43 @@ export default function VentasPage() {
           />
         </div>
 
+    
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <input
+            type="date"
+            value={filtroFechaDesde}
+            onChange={e => { setFiltroFechaDesde(e.target.value); setPagina(1) }}
+            title="Fecha desde"
+            style={{
+              border: '1px solid #e2e8f0', borderRadius: '6px',
+              padding: '6px 8px', fontSize: '12px', color: '#0f172a',
+              background: 'white', outline: 'none',
+            }}
+            onFocus={e => e.target.style.borderColor = '#16a34a'}
+            onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+          />
+          <span style={{ fontSize: '12px', color: '#94a3b8' }}>—</span>
+          <input
+            type="date"
+            value={filtroFechaHasta}
+            onChange={e => { setFiltroFechaHasta(e.target.value); setPagina(1) }}
+            title="Fecha hasta"
+            min={filtroFechaDesde || undefined}
+            style={{
+              border: '1px solid #e2e8f0', borderRadius: '6px',
+              padding: '6px 8px', fontSize: '12px', color: '#0f172a',
+              background: 'white', outline: 'none',
+            }}
+            onFocus={e => e.target.style.borderColor = '#16a34a'}
+            onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+          />
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>Ordenar por</span>
           <select
             value={ordenCampo}
-            onChange={e => setOrdenCampo(e.target.value)}
+            onChange={e => { setOrdenCampo(e.target.value); setPagina(1) }}
             style={{
               border: '1px solid #e2e8f0', borderRadius: '6px',
               padding: '6px 10px', fontSize: '12px', color: '#0f172a',
@@ -194,7 +283,7 @@ export default function VentasPage() {
             <option value="kilos">Kilos</option>
           </select>
           <button
-            onClick={() => setOrdenDir(d => d === 'asc' ? 'desc' : 'asc')}
+            onClick={() => { setOrdenDir(d => d === 'asc' ? 'desc' : 'asc'); setPagina(1) }}
             title={ordenDir === 'asc' ? 'Ascendente' : 'Descendente'}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -208,7 +297,35 @@ export default function VentasPage() {
             {ordenDir === 'asc' ? <IconSortAsc /> : <IconSortDesc />}
           </button>
         </div>
+
+     
+        {(busqueda || filtroFechaDesde || filtroFechaHasta) && (
+          <button
+            onClick={() => {
+              setBusqueda('')
+              setFiltroFechaDesde('')
+              setFiltroFechaHasta('')
+              setPagina(1)
+            }}
+            style={{
+              padding: '6px 12px', fontSize: '12px', borderRadius: '6px',
+              border: '1px solid #e2e8f0', background: 'white',
+              color: '#64748b', cursor: 'pointer',
+            }}
+          >
+            Limpiar filtros
+          </button>
+        )}
       </div>
+
+      {/* ── Aviso sutil: si el usuario ordena por Empresa o Kilos,
+           el orden solo aplica a la página actual (10 registros), no
+           a todas las ventas -- por alcance acotado del ítem 17 ── */}
+      {(ordenCampo === 'empresa' || ordenCampo === 'kilos') && (
+        <p style={{ fontSize: '11px', color: '#94a3b8', margin: '-8px 0 0' }}>
+          El orden por {ordenCampo === 'empresa' ? 'empresa' : 'kilos'} aplica solo a esta página. Para resultados completos, ordena por ID o Fecha.
+        </p>
+      )}
 
       {/* Tabla */}
       {loading ? (
@@ -235,7 +352,7 @@ export default function VentasPage() {
               </tr>
             </thead>
             <tbody>
-              {ventasFiltradas.length === 0 ? (
+              {ventasOrdenadas.length === 0 ? (
                 <tr>
                   <td colSpan={columnas.length} style={{
                     padding: '40px', textAlign: 'center',
@@ -245,7 +362,7 @@ export default function VentasPage() {
                   </td>
                 </tr>
               ) : (
-                ventasFiltradas.map(v => (
+                ventasOrdenadas.map(v => (
                   <tr
                     key={v.id}
                     style={{ borderTop: '1px solid #f1f5f9', transition: 'background 0.1s' }}
@@ -333,17 +450,53 @@ export default function VentasPage() {
             </tbody>
           </table>
 
-          {ventasFiltradas.length > 0 && (
-            <div style={{
-              padding: '10px 16px', borderTop: '1px solid #f1f5f9',
-              color: '#94a3b8', fontSize: '12px',
-            }}>
+          {/* ── ÍTEM 17: pie de tabla con conteo real + paginación ── */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '10px 16px', borderTop: '1px solid #f1f5f9',
+            flexWrap: 'wrap', gap: '10px',
+          }}>
+            <span style={{ color: '#94a3b8', fontSize: '12px' }}>
               {busqueda
-                ? `${ventasFiltradas.length} resultado(s) para "${busqueda}"`
-                : `${ventas.length} remisión(es) registrada(s)`
+                ? `${totalVentas} resultado(s) para "${busqueda}"`
+                : `${totalVentas} remisión(es) registrada(s)`
               }
-            </div>
-          )}
+            </span>
+
+            {totalPaginas > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  onClick={() => setPagina(p => Math.max(1, p - 1))}
+                  disabled={pagina === 1}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '28px', height: '28px', borderRadius: '6px',
+                    border: '1px solid #e2e8f0', background: 'white',
+                    color: pagina === 1 ? '#cbd5e1' : '#475569',
+                    cursor: pagina === 1 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <IconChevronLeft />
+                </button>
+                <span style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                  Página {pagina} de {totalPaginas}
+                </span>
+                <button
+                  onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
+                  disabled={pagina === totalPaginas}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '28px', height: '28px', borderRadius: '6px',
+                    border: '1px solid #e2e8f0', background: 'white',
+                    color: pagina === totalPaginas ? '#cbd5e1' : '#475569',
+                    cursor: pagina === totalPaginas ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <IconChevronRight />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -357,9 +510,8 @@ export default function VentasPage() {
           onClose={() => setDetalleOpen(false)}
           onUpdated={() => {
             cargarVentas()
-            getVentas().then(res => {
-              const actualizada = res.data.find(v => v.id === ventaSeleccionada.id)
-              if (actualizada) setVentaSeleccionada(actualizada)
+            getVenta(ventaSeleccionada.id).then(res => {
+              setVentaSeleccionada(res.data)
             })
           }}
         />

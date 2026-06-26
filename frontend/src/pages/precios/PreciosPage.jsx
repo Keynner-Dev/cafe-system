@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getPrecios, deletePrecio, createPrecio, updatePrecio } from '../../api/precios'
 import { getTiposCafe } from '../../api/inventario'
+import { useAuth } from '../../context/AuthContext'
 import PrecioModal from '../../components/precios/PrecioModal'
 
 // ─── Iconos SVG inline ────────────────────────────────────────────────────────
@@ -54,6 +55,8 @@ function BadgeTipoCafe({ nombre }) {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function PreciosPage() {
+  const { marcarPreciosRegistrados } = useAuth()
+
   const [precios, setPrecios]           = useState([])
   const [tiposCafe, setTiposCafe]       = useState([])
   const [loading, setLoading]           = useState(true)
@@ -89,8 +92,12 @@ export default function PreciosPage() {
   }
 
   const handleSubmit = async (form) => {
-    if (precioEditando) await updatePrecio(precioEditando.id, form)
-    else await createPrecio(form)
+    if (precioEditando) {
+      await updatePrecio(precioEditando.id, form)
+    } else {
+      await createPrecio(form)
+      marcarPreciosRegistrados()
+    }
     cargarPrecios()
   }
 
@@ -133,7 +140,6 @@ export default function PreciosPage() {
         borderRadius: '10px', padding: '14px 16px',
         display: 'flex', alignItems: 'flex-end', gap: '12px', flexWrap: 'wrap',
       }}>
-        {/* Filtro fecha */}
         <div>
           <label style={{
             display: 'block', fontSize: '12px', fontWeight: 500,
@@ -166,7 +172,6 @@ export default function PreciosPage() {
           </div>
         </div>
 
-        {/* Botón "Hoy" */}
         <button
           onClick={() => setFiltroFecha(hoy)}
           style={{
@@ -182,7 +187,6 @@ export default function PreciosPage() {
           Ver hoy
         </button>
 
-        {/* Limpiar filtro */}
         {filtroFecha && (
           <button
             onClick={() => setFiltroFecha('')}
@@ -199,7 +203,6 @@ export default function PreciosPage() {
           </button>
         )}
 
-        {/* Indicador de resultados filtrados */}
         {filtroFecha && (
           <span style={{ fontSize: '12px', color: '#94a3b8', marginLeft: 'auto' }}>
             {preciosFiltrados.length} precio(s) para{' '}

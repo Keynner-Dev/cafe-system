@@ -15,3 +15,6 @@ export const abrirCaja  = (cajaId)        => api.post(`/caja/cajas/${cajaId}/abr
 // Traslados de dinero
 export const getTraslados      = ()      => api.get('/caja/traslados/');
 export const createTraslado    = (datos) => api.post('/caja/traslados/', datos);
+
+// Historial de cierres
+export const getHistorialCierres = (cajaId) => api.get(`/caja/cajas/${cajaId}/historial/`);
