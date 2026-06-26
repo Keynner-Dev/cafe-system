@@ -303,10 +303,96 @@ function TrasladoModal({ cajas, cajaOrigen, onCerrar, onConfirmar }) {
   );
 }
 
+// ── Detección de pestaña duplicada (ítem 20) ──────────────────────────────────
+// Cada pestaña que monta CajaPage genera un id propio y anuncia su
+// presencia por BroadcastChannel. Si ya hay otra pestaña activa con Caja
+// abierta, esta nueva pestaña queda bloqueada para ACCIONES (registrar
+// movimiento, cerrar/abrir caja, trasladar) pero sigue mostrando los
+// datos con normalidad — sigue siendo útil para solo consultar.
+//
+// Esto NO sustituye la protección real de datos (ítem 21, select_for_
+// update() en backend): es solo para que el mismo usuario no se confunda
+// teniendo dos pestañas de Caja abiertas en su propio navegador. Si dos
+// usuarios distintos entran desde dispositivos distintos, este mecanismo
+// no los detecta entre sí — eso ya está cubierto por el backend.
+//
+// Degrada sin romper nada si el navegador no soporta BroadcastChannel
+// (poco probable hoy, pero por seguridad).
+const CANAL_CAJA = 'caja-pestanas';
+const soportaBroadcastChannel = typeof BroadcastChannel !== 'undefined';
+
+function usarDeteccionPestanaDuplicada() {
+  const [pestanaBloqueada, setPestanaBloqueada] = useState(false);
+
+  useEffect(() => {
+    if (!soportaBroadcastChannel) return;
+
+    const miId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const canal = new BroadcastChannel(CANAL_CAJA);
+
+    const handleMensaje = (e) => {
+      const msg = e.data;
+      if (!msg || msg.id === miId) return;
+
+      if (msg.tipo === 'ping') {
+        canal.postMessage({ tipo: 'pong', id: miId });
+      } else if (msg.tipo === 'pong') {
+        setPestanaBloqueada(true);
+      } else if (msg.tipo === 'cerrando') {
+        setPestanaBloqueada(false);
+      }
+    };
+
+    canal.addEventListener('message', handleMensaje);
+    canal.postMessage({ tipo: 'ping', id: miId });
+
+    const avisarSalida = () => {
+      canal.postMessage({ tipo: 'cerrando', id: miId });
+    };
+    window.addEventListener('beforeunload', avisarSalida);
+
+    return () => {
+      avisarSalida();
+      window.removeEventListener('beforeunload', avisarSalida);
+      canal.removeEventListener('message', handleMensaje);
+      canal.close();
+    };
+  }, []);
+
+  return pestanaBloqueada;
+}
+
+// ── Banner de pestaña duplicada ───────────────────────────────────────────────
+function BannerPestanaDuplicada() {
+  return (
+    <div style={{
+      background: '#fffbeb', border: '1px solid #fde68a',
+      borderRadius: 10, padding: '14px 18px', marginBottom: 20,
+      display: 'flex', alignItems: 'center', gap: 12,
+    }}>
+      <div style={{ background: '#fef3c7', borderRadius: 8, padding: 8,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ca8a04', flexShrink: 0 }}>
+        <IconLock />
+      </div>
+      <div>
+        <p style={{ fontSize: 13, fontWeight: 600, color: '#92400e', margin: 0 }}>
+          Caja ya está abierta en otra pestaña
+        </p>
+        <p style={{ fontSize: 12, color: '#a16207', margin: '2px 0 0' }}>
+          Puedes seguir consultando aquí, pero registrar movimientos, cerrar caja o
+          trasladar dinero está bloqueado en esta pestaña para evitar confusiones.
+          Cierra la otra pestaña para volver a habilitar las acciones aquí.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function CajaPage() {
   const { usuario } = useAuth();
   const esJefe = usuario?.rol === 'jefe';
+  const pestanaBloqueada = usarDeteccionPestanaDuplicada();
 
   const [cajas,             setCajas]             = useState([]);
   const [cajasDestino,      setCajasDestino]      = useState([]);
@@ -412,49 +498,55 @@ export default function CajaPage() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {cajaActual && (
             cajaEstaAbierta ? (
-              <button onClick={() => setModalCierre(true)}
+              <button onClick={() => setModalCierre(true)} disabled={pestanaBloqueada}
                 style={{ display: 'flex', alignItems: 'center', gap: 8,
-                  background: '#0f172a', color: 'white', border: 'none',
-                  borderRadius: 6, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#1e293b'}
-                onMouseLeave={e => e.currentTarget.style.background = '#0f172a'}>
+                  background: pestanaBloqueada ? '#94a3b8' : '#0f172a', color: 'white', border: 'none',
+                  borderRadius: 6, padding: '9px 16px', fontSize: 13, fontWeight: 600,
+                  cursor: pestanaBloqueada ? 'not-allowed' : 'pointer' }}
+                onMouseEnter={e => { if (!pestanaBloqueada) e.currentTarget.style.background = '#1e293b' }}
+                onMouseLeave={e => { if (!pestanaBloqueada) e.currentTarget.style.background = '#0f172a' }}>
                 <IconLock /> Cerrar caja
               </button>
             ) : (
-              <button onClick={() => handleAbrirCaja(cajaActual)} disabled={loadingAbrir}
+              <button onClick={() => handleAbrirCaja(cajaActual)} disabled={loadingAbrir || pestanaBloqueada}
                 style={{ display: 'flex', alignItems: 'center', gap: 8,
-                  background: '#16a34a', color: 'white', border: 'none',
+                  background: (loadingAbrir || pestanaBloqueada) ? '#94a3b8' : '#16a34a', color: 'white', border: 'none',
                   borderRadius: 6, padding: '9px 16px', fontSize: 13, fontWeight: 600,
-                  cursor: loadingAbrir ? 'not-allowed' : 'pointer' }}>
+                  cursor: (loadingAbrir || pestanaBloqueada) ? 'not-allowed' : 'pointer' }}>
                 <IconUnlock /> {loadingAbrir ? 'Abriendo...' : 'Abrir caja'}
               </button>
             )
           )}
 
           {puedeTrasladar && (
-            <button onClick={() => setModalTraslado(true)}
+            <button onClick={() => setModalTraslado(true)} disabled={pestanaBloqueada}
               style={{ display: 'flex', alignItems: 'center', gap: 8,
-                background: 'white', color: '#0f172a',
+                background: 'white', color: pestanaBloqueada ? '#94a3b8' : '#0f172a',
                 border: '1px solid #e2e8f0', borderRadius: 6,
-                padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-              onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                padding: '9px 16px', fontSize: 13, fontWeight: 600,
+                cursor: pestanaBloqueada ? 'not-allowed' : 'pointer' }}
+              onMouseEnter={e => { if (!pestanaBloqueada) e.currentTarget.style.background = '#f8fafc' }}
+              onMouseLeave={e => { if (!pestanaBloqueada) e.currentTarget.style.background = 'white' }}>
               <IconTransfer /> Trasladar dinero
             </button>
           )}
 
           {(!esJefe || cajaActual) && cajaEstaAbierta && (
-            <button onClick={() => setModalAbierto(true)}
+            <button onClick={() => setModalAbierto(true)} disabled={pestanaBloqueada}
               style={{ display: 'flex', alignItems: 'center', gap: 8,
-                background: '#16a34a', color: 'white', border: 'none',
-                borderRadius: 6, padding: '9px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#15803d'}
-              onMouseLeave={e => e.currentTarget.style.background = '#16a34a'}>
+                background: pestanaBloqueada ? '#94a3b8' : '#16a34a', color: 'white', border: 'none',
+                borderRadius: 6, padding: '9px 18px', fontSize: 14, fontWeight: 600,
+                cursor: pestanaBloqueada ? 'not-allowed' : 'pointer' }}
+              onMouseEnter={e => { if (!pestanaBloqueada) e.currentTarget.style.background = '#15803d' }}
+              onMouseLeave={e => { if (!pestanaBloqueada) e.currentTarget.style.background = '#16a34a' }}>
               <IconPlus /> Registrar movimiento
             </button>
           )}
         </div>
       </div>
+
+      {/* Banner pestaña duplicada (ítem 20) */}
+      {pestanaBloqueada && <BannerPestanaDuplicada />}
 
       {/* Banner caja cerrada */}
       {cajaActual && !cajaEstaAbierta && (
@@ -483,11 +575,11 @@ export default function CajaPage() {
               )}
             </div>
           </div>
-          <button onClick={() => handleAbrirCaja(cajaActual)} disabled={loadingAbrir}
+          <button onClick={() => handleAbrirCaja(cajaActual)} disabled={loadingAbrir || pestanaBloqueada}
             style={{ display: 'flex', alignItems: 'center', gap: 8,
-              background: '#16a34a', color: 'white', border: 'none',
+              background: (loadingAbrir || pestanaBloqueada) ? '#94a3b8' : '#16a34a', color: 'white', border: 'none',
               borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 600,
-              cursor: loadingAbrir ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
+              cursor: (loadingAbrir || pestanaBloqueada) ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
             <IconUnlock /> {loadingAbrir ? 'Abriendo...' : 'Abrir caja'}
           </button>
         </div>
@@ -754,17 +846,17 @@ export default function CajaPage() {
       )}
 
       {/* Modales */}
-      {modalAbierto && (
+      {modalAbierto && !pestanaBloqueada && (
         <MovimientoModal caja={cajaActual} cajas={cajas}
           onCerrar={() => setModalAbierto(false)}
           onGuardado={() => { setModalAbierto(false); refrescar(); }} />
       )}
-      {modalCierre && cajaActual && (
+      {modalCierre && cajaActual && !pestanaBloqueada && (
         <CierreModal caja={cajaActual}
           onCerrar={() => setModalCierre(false)}
           onConfirmar={() => { setModalCierre(false); refrescar(); }} />
       )}
-      {modalTraslado && (
+      {modalTraslado && !pestanaBloqueada && (
         <TrasladoModal
           cajas={esJefe ? cajas : cajasDestino}
           cajaOrigen={!esJefe ? cajaActual : null}
