@@ -154,17 +154,48 @@ class PortalCaficultorView(APIView):
     cédulas pero NO evita que alguien con la cédula correcta de un tercero
     vea su información financiera. Si el cliente lo pide más adelante, se
     puede sumar un segundo dato (ej. últimos 4 dígitos del teléfono
-    registrado) sin tener que rediseñar este endpoint."""
+    registrado) sin tener que rediseñar este endpoint.
+
+    ── NUEVO (ítem 19) ──
+    Antes de esta validación, `cedula` se tomaba del query param y se
+    pasaba directo al ORM sin chequear longitud ni caracteres. El ORM ya
+    protege contra inyección SQL clásica (usa parámetros, nunca concatena
+    strings), pero un input público sin ningún límite de tamaño o forma
+    es una superficie de abuso innecesaria: alguien podía mandar strings
+    arbitrariamente largos o con caracteres que nunca podrían matchear
+    una cédula real, gastando ciclos de DB en cada intento.
+
+    Las cédulas en este sistema se guardan siempre como solo dígitos
+    (confirmado con el cliente), así que se puede validar con regla
+    estricta sin riesgo de rechazar cédulas reales:
+      - Solo caracteres 0-9 (cualquier otra cosa se rechaza de una)
+      - Longitud entre 1 y 15 dígitos (cédulas colombianas reales no
+        superan los 10-11 dígitos; el margen hasta 15 es solo un tope
+        defensivo, no una validación de formato exacto)
+    """
 
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'portal_caficultor'
+
+    LONGITUD_MAXIMA_CEDULA = 15
 
     def get(self, request):
         cedula = request.query_params.get('cedula', '').strip()
 
         if not cedula:
             return Response({'detail': 'Debes ingresar tu número de cédula.'}, status=400)
+
+        # ── NUEVO (ítem 19): sanitización de longitud y caracteres ──
+        # Se valida ANTES de tocar la base de datos. El mensaje de
+        # rechazo es el mismo genérico que ya usaba el endpoint para
+        # cédula no encontrada, a propósito: así un input malformado
+        # no revela ninguna pista distinta sobre por qué falló.
+        if len(cedula) > self.LONGITUD_MAXIMA_CEDULA or not cedula.isdigit():
+            return Response(
+                {'detail': 'No encontramos información con esa cédula. Verifica que esté bien escrita.'},
+                status=404,
+            )
 
         tercero = Tercero.objects.filter(
             cedula=cedula,
