@@ -23,9 +23,20 @@ class CajaViewSet(viewsets.ReadOnlyModelViewSet):
         return Caja.objects.select_related('bodega').filter(bodega=usuario.bodega)
 
     @action(detail=True, methods=['post'], url_path='cerrar')
+    @transaction.atomic
     def cerrar(self, request, pk=None):
-        caja = self.get_object()
+        # ── NUEVO (ítem 21) ──
+        # self.get_object() ya filtra por permisos (administrador solo
+        # ve su bodega), pero NO bloquea la fila. Se vuelve a leer la
+        # caja con select_for_update() para que, si dos cierres llegan
+        # casi al mismo tiempo para la MISMA caja, el segundo espere a
+        # que el primero termine -- sin esto, ambos podían leer
+        # `abierta=True`, ambos crear un CierreCaja, y ambos guardar
+        # `abierta=False`, duplicando el registro de cierre con el
+        # mismo saldo_teorico desactualizado en el segundo.
         usuario = request.user
+        caja_pk = self.get_object().pk
+        caja = Caja.objects.select_for_update().get(pk=caja_pk)
 
         if usuario.rol == 'administrador' and caja.bodega != usuario.bodega:
             raise PermissionDenied('No tienes acceso a esta caja.')
@@ -58,9 +69,12 @@ class CajaViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(CierreCajaSerializer(cierre).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'], url_path='abrir')
+    @transaction.atomic
     def abrir(self, request, pk=None):
-        caja = self.get_object()
+        # ── NUEVO (ítem 21): mismo razonamiento que en cerrar() ──
         usuario = request.user
+        caja_pk = self.get_object().pk
+        caja = Caja.objects.select_for_update().get(pk=caja_pk)
 
         if usuario.rol == 'administrador' and caja.bodega != usuario.bodega:
             raise PermissionDenied('No tienes acceso a esta caja.')
@@ -70,17 +84,6 @@ class CajaViewSet(viewsets.ReadOnlyModelViewSet):
         caja.abierta = True
         caja.save()
         return Response(CajaSerializer(caja).data, status=status.HTTP_200_OK)
-    
-    @action(detail=True, methods=['get'], url_path='historial')
-    def historial(self, request, pk=None):
-        caja = self.get_object()
-        usuario = request.user
-
-        if usuario.rol == 'administrador' and caja.bodega != usuario.bodega:
-            raise PermissionDenied('No tienes acceso a esta caja.')
-
-        cierres = caja.cierres.select_related('creado_por').all()
-        return Response(CierreCajaSerializer(cierres, many=True).data)
 
     @action(detail=False, methods=['get'], url_path='destinos')
     def destinos(self, request):
@@ -121,6 +124,30 @@ class MovimientoCajaViewSet(viewsets.ModelViewSet):
             raise ValidationError('La caja está cerrada. Debes abrirla antes de registrar movimientos.')
 
         serializer.save(creado_por=usuario)
+
+
+class CierreCajaViewSet(viewsets.ReadOnlyModelViewSet):
+    """Historial de aperturas/cierres de caja.
+
+    Jefe: ve los cierres de todas las bodegas (consolidado), con
+    filtro opcional por bodega vía ?caja=<id>.
+    Administrador: solo ve los cierres de la caja de su propia
+    bodega, sin importar qué valor llegue en ?caja=.
+    """
+    serializer_class = CierreCajaSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        usuario = self.request.user
+        caja_id = self.request.query_params.get('caja')
+        qs = CierreCaja.objects.select_related('caja__bodega', 'creado_por')
+
+        if usuario.rol == 'administrador':
+            qs = qs.filter(caja__bodega=usuario.bodega)
+        elif caja_id:
+            qs = qs.filter(caja_id=caja_id)
+
+        return qs.order_by('-fecha')
 
 
 class TrasladoDineroViewSet(viewsets.ModelViewSet):
