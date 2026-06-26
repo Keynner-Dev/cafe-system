@@ -59,6 +59,15 @@ class CuentaPorPagarResumenSerializer(serializers.Serializer):
 class CompraSerializer(serializers.ModelSerializer):
     detalles = DetalleCompraSerializer(many=True)
     caficultor_nombre = serializers.CharField(source='caficultor.nombre', read_only=True)
+
+    # ── NUEVO (ítem 16): teléfono de WhatsApp del caficultor, para que
+    # CompraDetalle.jsx pueda reenviar el comprobante por WhatsApp sin
+    # tener que hacer una llamada aparte a /terceros/{id}. Solo lectura,
+    # no se usa nunca en create() ni se puede mandar en el payload. ──
+    caficultor_telefono_whatsapp = serializers.CharField(
+        source='caficultor.telefono_whatsapp', read_only=True, allow_null=True
+    )
+
     total = serializers.SerializerMethodField()
     total_deposito_pendiente = serializers.SerializerMethodField()
     kilos_deposito_pendiente = serializers.SerializerMethodField()
@@ -68,6 +77,13 @@ class CompraSerializer(serializers.ModelSerializer):
 
     # ← NUEVO: lista de nombres de bodega únicos de los detalles de esta compra
     bodegas = serializers.SerializerMethodField()
+
+    # ── NUEVO (ítem 16): abonos a letra que se hicieron desde esta compra
+    # (AbonoLetra.compra es FK hacia Compra, related_name='abonos_letra').
+    # Permite que CompraDetalle.jsx muestre el mismo desglose que ya se ve
+    # en la pantalla de éxito de CompraModal.jsx, incluso después de cerrar
+    # el modal y volver a abrir la compra desde la tabla. ──
+    abonos_letra = serializers.SerializerMethodField()
 
     # opcional, solo se usa en el create(), nunca se devuelve en la respuesta
     abono_letra = serializers.DictField(write_only=True, required=False)
@@ -118,6 +134,32 @@ class CompraSerializer(serializers.ModelSerializer):
     def get_bodegas(self, obj):
         nombres = obj.detalles.values_list('bodega__nombre', flat=True).distinct()
         return list(nombres)
+
+    # ── NUEVO (ítem 16) ──
+    # Devuelve los abonos a letra registrados DESDE esta compra específica.
+    # compra.total (arriba) nunca resta estos valores -- sigue siendo solo
+    # el subtotal del café -- así que el frontend (CompraDetalle.jsx) debe
+    # restar manualmente la suma de "valor" de esta lista para mostrar el
+    # total real que se pagó en efectivo.
+    #
+    # 'saldo_letra_restante' es el saldo ACTUAL de la letra (propiedad
+    # calculada en vivo: valor_total - valor_abonado). Si la letra recibió
+    # abonos posteriores de otras compras, este número refleja el saldo de
+    # HOY, no el saldo histórico exacto en el momento de este abono --
+    # decisión tomada a propósito por simplicidad, confirmada con el cliente.
+    def get_abonos_letra(self, obj):
+        abonos = obj.abonos_letra.select_related('letra').all()
+        resultado = []
+        for abono in abonos:
+            resultado.append({
+                'id': abono.id,
+                'letra_id': abono.letra_id,
+                'valor': float(abono.valor),
+                'fecha': abono.fecha.isoformat(),
+                'letra_fecha_creacion': abono.letra.fecha_creacion.isoformat(),
+                'saldo_letra_restante': float(abono.letra.saldo),
+            })
+        return resultado
 
     def validate(self, data):
         request = self.context.get('request')
