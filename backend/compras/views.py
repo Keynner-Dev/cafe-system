@@ -32,6 +32,14 @@ class CompraViewSet(viewsets.ModelViewSet):
     ordering_fields = ['id', 'fecha', 'caficultor__nombre', 'total_anotado']
     ordering = ['-fecha']  # orden por defecto, igual al que ya tenía la tabla
 
+    # ── NUEVO (ítem 18): tope de compras devueltas cuando la consulta
+    # viene filtrada por caficultor (ej. CuentaPagarModal.jsx al
+    # seleccionar un caficultor para vincular una compra). Antes no
+    # tenía límite propio: dependía del PAGE_SIZE global, que puede ser
+    # mayor a 10 y devolver el historial completo del caficultor solo
+    # para mostrar un selector rápido. ──
+    LIMITE_POR_CAFICULTOR = 10
+
     def get_queryset(self):
         usuario = self.request.user
         qs = Compra.objects.prefetch_related('cuentas_por_pagar', 'detalles').all()
@@ -87,25 +95,23 @@ class CompraViewSet(viewsets.ModelViewSet):
 
         return qs
 
-    def get_serializer_context(self):
-        # Necesario para que CompraSerializer.validate() sepa el rol del usuario
-        context = super().get_serializer_context()
-        context['request'] = self.request
-        return context
-
-    def perform_create(self, serializer):
-        user = self.request.user if self.request.user.is_authenticated else None
-        serializer.save(creado_por=user)
-
-    @transaction.atomic
-    def destroy(self, request, *args, **kwargs):
-        # get_object() ya usa get_queryset() filtrado por bodega
-        compra = self.get_object()
-        MovimientoInventario.objects.filter(
-            referencia=f'compra-{compra.id}'
-        ).delete()
-        compra.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    def filter_queryset(self, queryset):
+        # ── NUEVO (ítem 18) ──
+        # Se aplica DESPUÉS de que DjangoFilterBackend y OrderingFilter
+        # ya corrieron (filter_queryset() de DRF los encadena en orden,
+        # uno por backend, antes de llegar aquí) -- en este punto el
+        # queryset ya tiene su .distinct() resuelto si correspondía
+        # (filtro de bodega/tipo_cafe o el de administrador), así que
+        # cortar con slicing aquí es seguro: no interfiere con el JOIN
+        # de relación uno-a-muchos que pudiera duplicar filas.
+        #
+        # Solo se limita cuando la consulta llega filtrada por un
+        # caficultor específico -- las tablas normales de Compras (sin
+        # ese filtro) siguen usando la paginación global sin cambios.
+        queryset = super().filter_queryset(queryset)
+        if self.request.query_params.get('caficultor'):
+            queryset = queryset[:self.LIMITE_POR_CAFICULTOR]
+        return queryset
 
     def get_serializer_context(self):
         # Necesario para que CompraSerializer.validate() sepa el rol del usuario
