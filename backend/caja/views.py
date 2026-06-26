@@ -70,6 +70,17 @@ class CajaViewSet(viewsets.ReadOnlyModelViewSet):
         caja.abierta = True
         caja.save()
         return Response(CajaSerializer(caja).data, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['get'], url_path='historial')
+    def historial(self, request, pk=None):
+        caja = self.get_object()
+        usuario = request.user
+
+        if usuario.rol == 'administrador' and caja.bodega != usuario.bodega:
+            raise PermissionDenied('No tienes acceso a esta caja.')
+
+        cierres = caja.cierres.select_related('creado_por').all()
+        return Response(CierreCajaSerializer(cierres, many=True).data)
 
     @action(detail=False, methods=['get'], url_path='destinos')
     def destinos(self, request):
