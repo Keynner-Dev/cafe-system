@@ -144,9 +144,6 @@ export default function UsuarioModal({ usuario, onClose, onSaved }) {
     }
   }
 
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) onClose()
-  }
 
   const focusGreen = (e) => e.target.style.borderColor = '#16a34a'
   const blurGray   = (e) => e.target.style.borderColor = '#e2e8f0'
@@ -156,7 +153,6 @@ export default function UsuarioModal({ usuario, onClose, onSaved }) {
 
   return (
     <div
-      onClick={handleBackdropClick}
       style={{
         position: 'fixed', inset: 0,
         background: 'rgba(15, 23, 42, 0.5)',

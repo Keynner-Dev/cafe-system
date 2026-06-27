@@ -156,7 +156,6 @@ class PortalCaficultorView(APIView):
     puede sumar un segundo dato (ej. últimos 4 dígitos del teléfono
     registrado) sin tener que rediseñar este endpoint.
 
-    ── NUEVO (ítem 19) ──
     Antes de esta validación, `cedula` se tomaba del query param y se
     pasaba directo al ORM sin chequear longitud ni caracteres. El ORM ya
     protege contra inyección SQL clásica (usa parámetros, nunca concatena

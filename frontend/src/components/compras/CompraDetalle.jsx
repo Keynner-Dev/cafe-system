@@ -33,10 +33,6 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
 
   const formatCOP = (val) => `$${Number(val || 0).toLocaleString('es-CO')}`
 
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) onClose()
-  }
-
   // ── ÍTEM 16: desglose real de la compra. compra.total (del backend)
   // sigue siendo SOLO el subtotal del café — nunca resta abonos a letra,
   // porque es una @property que no los conoce. Los abonos llegan ahora
@@ -273,7 +269,6 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
 
   return (
     <div
-      onClick={handleBackdropClick}
       style={{
         position: 'fixed', inset: 0,
         background: 'rgba(15, 23, 42, 0.5)',

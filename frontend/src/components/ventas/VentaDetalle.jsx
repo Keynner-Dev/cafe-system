@@ -64,17 +64,12 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
     }
   }
 
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) onClose()
-  }
-
   const tieneCalidad = venta.detalles.some(
     d => d.muestra || d.factor || d.humedad || d.pasilla
   )
 
   return (
     <div
-      onClick={handleBackdropClick}
       style={{
         position: 'fixed', inset: 0,
         background: 'rgba(15, 23, 42, 0.5)',

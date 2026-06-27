@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getGastos, deleteGasto } from '../../api/gastos';
+import { getGastos, getGastosResumen, deleteGasto } from '../../api/gastos';
 import { getBodegas } from '../../api/inventario';
 import { useAuth } from '../../context/AuthContext';
 import GastoModal from '../../components/gastos/GastosModal';
@@ -28,6 +28,18 @@ const IconExport = () => (
     <line x1="12" y1="15" x2="12" y2="3"/>
   </svg>
 );
+const IconChevronLeft = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6"/>
+  </svg>
+)
+const IconChevronRight = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+)
 
 function formatCOP(valor) {
   return new Intl.NumberFormat('es-CO', {
@@ -48,6 +60,11 @@ function formatMesLabel(mes) {
 }
 
 // ── Genera y abre el reporte imprimible ──────────────────────────────────────
+// SIN CAMBIOS de fondo respecto a la versión anterior -- sigue recibiendo
+// la lista de gastos que se le pase. Nota (ítem 17): como la tabla ahora
+// pagina, "Exportar reporte" exporta solo lo que está cargado en la
+// página actual, no TODOS los gastos del filtro. Queda anotado como
+// limitación conocida, junto con el ítem aparte de exportar a Excel/PDF.
 function exportarReporte({ gastos, filtroMes, filtroBodega, bodegas }) {
   const bodegaNombre = filtroBodega
     ? bodegas.find(b => String(b.id) === String(filtroBodega))?.nombre || 'Bodega'
@@ -56,7 +73,6 @@ function exportarReporte({ gastos, filtroMes, filtroBodega, bodegas }) {
   const periodoLabel = formatMesLabel(filtroMes);
   const total = gastos.reduce((acc, g) => acc + parseFloat(g.valor), 0);
 
-  // Resumen por categoría
   const porCategoria = {};
   gastos.forEach(g => {
     if (!porCategoria[g.categoria]) porCategoria[g.categoria] = 0;
@@ -64,7 +80,6 @@ function exportarReporte({ gastos, filtroMes, filtroBodega, bodegas }) {
   });
   const categorias = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]);
 
-  // Resumen por medio de pago
   const efectivo = gastos.filter(g => g.medio_pago === 'efectivo').reduce((acc, g) => acc + parseFloat(g.valor), 0);
   const transferencia = gastos.filter(g => g.medio_pago === 'transferencia').reduce((acc, g) => acc + parseFloat(g.valor), 0);
 
@@ -97,55 +112,36 @@ function exportarReporte({ gastos, filtroMes, filtroBodega, bodegas }) {
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 36px; color: #0f172a; font-size: 13px; }
-
-        /* Cabecera */
         .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
         .logo h1 { font-size: 20px; font-weight: 700; }
         .logo p { font-size: 12px; color: #64748b; margin-top: 2px; }
         .meta { text-align: right; }
         .meta .titulo { font-size: 18px; font-weight: 700; color: #16a34a; }
         .meta .sub { font-size: 12px; color: #64748b; margin-top: 3px; }
-
-        /* Tarjetas resumen */
         .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
         .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; }
         .card.green { background: #f0fdf4; border-color: #bbf7d0; }
         .card label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
         .card .val { font-size: 18px; font-weight: 700; color: #0f172a; }
         .card.green .val { color: #16a34a; }
-
-        /* Sección */
         .seccion { margin-bottom: 24px; }
         .seccion h2 { font-size: 13px; font-weight: 700; color: '#475569'; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #e2e8f0; }
-
-        /* Tablas */
         table { width: 100%; border-collapse: collapse; }
         th { background: #0f172a; color: white; padding: 9px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
         td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; }
         tr:nth-child(even) td { background: #f8fafc; }
-
-        /* Badges */
         .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #eff6ff; color: #2563eb; }
         .medio { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
         .medio.efectivo { background: #fefce8; color: #ca8a04; }
         .medio.transferencia { background: #f0fdf4; color: #16a34a; }
-
-        /* Total final */
         .total-final { background: #0f172a; color: white; border-radius: 8px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
         .total-final span { font-size: 13px; color: #94a3b8; }
         .total-final strong { font-size: 24px; font-weight: 700; }
-
-        /* Footer */
         .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; }
-
-        @media print {
-          body { padding: 20px; }
-          button { display: none; }
-        }
+        @media print { body { padding: 20px; } button { display: none; } }
       </style>
     </head>
     <body>
-
       <div class="header">
         <div class="logo">
           <h1>☕ Café San Joaquín</h1>
@@ -157,70 +153,31 @@ function exportarReporte({ gastos, filtroMes, filtroBodega, bodegas }) {
           <div class="sub" style="margin-top:2px">${gastos.length} registro${gastos.length !== 1 ? 's' : ''}</div>
         </div>
       </div>
-
-      <!-- Tarjetas resumen -->
       <div class="cards">
-        <div class="card green">
-          <label>Total gastos</label>
-          <div class="val">${formatCOP(total)}</div>
-        </div>
-        <div class="card">
-          <label>En efectivo</label>
-          <div class="val">${formatCOP(efectivo)}</div>
-        </div>
-        <div class="card">
-          <label>Por transferencia</label>
-          <div class="val">${formatCOP(transferencia)}</div>
-        </div>
-        <div class="card">
-          <label>Categorías</label>
-          <div class="val">${categorias.length}</div>
-        </div>
+        <div class="card green"><label>Total gastos</label><div class="val">${formatCOP(total)}</div></div>
+        <div class="card"><label>En efectivo</label><div class="val">${formatCOP(efectivo)}</div></div>
+        <div class="card"><label>Por transferencia</label><div class="val">${formatCOP(transferencia)}</div></div>
+        <div class="card"><label>Categorías</label><div class="val">${categorias.length}</div></div>
       </div>
-
-      <!-- Resumen por categoría -->
       <div class="seccion">
         <h2>Resumen por categoría</h2>
         <table>
-          <thead>
-            <tr>
-              <th>Categoría</th>
-              <th style="text-align:right">Total</th>
-              <th style="text-align:right">% del total</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Categoría</th><th style="text-align:right">Total</th><th style="text-align:right">% del total</th></tr></thead>
           <tbody>${filasCategorias}</tbody>
         </table>
       </div>
-
-      <!-- Detalle completo -->
       <div class="seccion">
         <h2>Detalle de gastos</h2>
         <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Categoría</th>
-              <th>Descripción</th>
-              <th>Bodega</th>
-              <th>Medio de pago</th>
-              <th style="text-align:right">Valor</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Bodega</th><th>Medio de pago</th><th style="text-align:right">Valor</th></tr></thead>
           <tbody>${filasDetalle}</tbody>
         </table>
       </div>
-
-      <div class="total-final">
-        <span>Total del período</span>
-        <strong>${formatCOP(total)}</strong>
-      </div>
-
+      <div class="total-final"><span>Total del período</span><strong>${formatCOP(total)}</strong></div>
       <div class="footer">
         <span>Café San Joaquín SAS · Reporte generado el ${new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
         <span>Para uso contable interno</span>
       </div>
-
       <script>window.onload = () => window.print()</script>
     </body>
     </html>
@@ -243,29 +200,63 @@ export default function GastosPage() {
   const [filtroBodega, setFiltroBodega] = useState('');
   const [confirmandoId, setConfirmandoId] = useState(null);
 
+  // ── NUEVO (ítem 17): paginación de la tabla ──
+  const [pagina, setPagina] = useState(1);
+  const [totalGastos, setTotalGastos] = useState(0);
+  const PAGE_SIZE = 10; // debe coincidir con settings.REST_FRAMEWORK['PAGE_SIZE']
+  const totalPaginas = Math.max(1, Math.ceil(totalGastos / PAGE_SIZE));
+
+  // ── NUEVO (ítem 17): resumen (total real del mes/filtro) viene de un
+  // endpoint aparte que SIEMPRE suma sobre el conjunto completo, sin
+  // paginar -- así la tarjeta de arriba no depende de cuántos gastos
+  // quepan en la página actual de la tabla. ──
+  const [resumen, setResumen] = useState({ total: 0, cantidad: 0 });
+
   const cargarGastos = () => {
     setCargando(true);
-    const params = {};
+    const params = { page: pagina };
     if (filtroMes) params.mes = filtroMes;
     if (filtroBodega) params.bodega = filtroBodega;
     getGastos(params)
-      .then(res => setGastos(res.data))
+      .then(res => {
+        setGastos(res.data.results);
+        setTotalGastos(res.data.count);
+      })
       .finally(() => setCargando(false));
   };
 
-  useEffect(() => { cargarGastos(); }, [filtroMes, filtroBodega]);
+  const cargarResumen = () => {
+    const params = {};
+    if (filtroMes) params.mes = filtroMes;
+    if (filtroBodega) params.bodega = filtroBodega;
+    getGastosResumen(params).then(res => setResumen(res.data));
+  };
+
+  useEffect(() => { cargarGastos(); }, [pagina, filtroMes, filtroBodega]);
+  useEffect(() => { cargarResumen(); setPagina(1); }, [filtroMes, filtroBodega]);
 
   useEffect(() => {
-    if (esJefe) getBodegas().then(res => setBodegas(res.data));
+    if (esJefe) getBodegas().then(res => setBodegas(res.data.results ?? res.data));
   }, []);
 
   const handleEliminar = async (id) => {
     await deleteGasto(id);
     setConfirmandoId(null);
-    cargarGastos();
+    // ── Si eliminamos el último registro de la página actual y no
+    // somos la página 1, retrocedemos una página (mismo patrón usado
+    // en ComprasPage.jsx / VentasPage.jsx) ──
+    if (gastos.length === 1 && pagina > 1) {
+      setPagina(p => p - 1);
+    } else {
+      cargarGastos();
+    }
+    cargarResumen();
   };
 
-  const totalMes = gastos.reduce((acc, g) => acc + parseFloat(g.valor), 0);
+  // ── ÍTEM 17: el total del mes ya NO se calcula sumando 'gastos'
+  // (que ahora solo trae 10 a la vez) -- viene de 'resumen', calculado
+  // en SQL sobre el conjunto completo del filtro. ──
+  const totalMes = resumen.total;
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto' }}>
@@ -279,7 +270,9 @@ export default function GastosPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          {/* Exportar reporte — solo jefe */}
+          {/* Exportar reporte — solo jefe.
+              NOTA (ítem 17): exporta solo los gastos de la página
+              actual (10 como máximo), no todos los del filtro. */}
           {esJefe && gastos.length > 0 && (
             <button
               onClick={() => exportarReporte({ gastos, filtroMes, filtroBodega, bodegas })}
@@ -312,7 +305,7 @@ export default function GastosPage() {
         </div>
       </div>
 
-      {/* Tarjeta total del mes */}
+      {/* Tarjeta total del mes — ahora viene de 'resumen' (ítem 17) */}
       <div style={{
         background: '#0f172a', borderRadius: 12, padding: '20px 28px',
         marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center'
@@ -326,7 +319,7 @@ export default function GastosPage() {
           </p>
         </div>
         <div style={{ color: '#475569', fontSize: 13 }}>
-          {gastos.length} registro{gastos.length !== 1 ? 's' : ''}
+          {resumen.cantidad} registro{resumen.cantidad !== 1 ? 's' : ''}
         </div>
       </div>
 
@@ -389,6 +382,7 @@ export default function GastosPage() {
             No hay gastos registrados para este período
           </div>
         ) : (
+          <>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#0f172a' }}>
@@ -500,6 +494,53 @@ export default function GastosPage() {
               ))}
             </tbody>
           </table>
+
+          {/* ── NUEVO (ítem 17): pie de tabla con conteo real + controles
+               de paginación, mismo patrón que ComprasPage.jsx / VentasPage.jsx ── */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '10px 16px', borderTop: '1px solid #f1f5f9',
+            flexWrap: 'wrap', gap: '10px',
+          }}>
+            <span style={{ color: '#94a3b8', fontSize: '12px' }}>
+              {totalGastos} registro{totalGastos !== 1 ? 's' : ''} en este período
+            </span>
+
+            {totalPaginas > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  onClick={() => setPagina(p => Math.max(1, p - 1))}
+                  disabled={pagina === 1}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '28px', height: '28px', borderRadius: '6px',
+                    border: '1px solid #e2e8f0', background: 'white',
+                    color: pagina === 1 ? '#cbd5e1' : '#475569',
+                    cursor: pagina === 1 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <IconChevronLeft />
+                </button>
+                <span style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                  Página {pagina} de {totalPaginas}
+                </span>
+                <button
+                  onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
+                  disabled={pagina === totalPaginas}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '28px', height: '28px', borderRadius: '6px',
+                    border: '1px solid #e2e8f0', background: 'white',
+                    color: pagina === totalPaginas ? '#cbd5e1' : '#475569',
+                    cursor: pagina === totalPaginas ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <IconChevronRight />
+                </button>
+              </div>
+            )}
+          </div>
+          </>
         )}
       </div>
 
@@ -508,7 +549,12 @@ export default function GastosPage() {
           gasto={gastoEditando}
           bodegas={bodegas}
           onCerrar={() => { setModalAbierto(false); setGastoEditando(null); }}
-          onGuardado={() => { setModalAbierto(false); setGastoEditando(null); cargarGastos(); }}
+          onGuardado={() => {
+            setModalAbierto(false);
+            setGastoEditando(null);
+            cargarGastos();
+            cargarResumen();
+          }}
         />
       )}
     </div>
