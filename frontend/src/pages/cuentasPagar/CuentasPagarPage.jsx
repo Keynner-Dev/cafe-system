@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getCuentasPagar } from '../../api/cuentasPagar';
+import { getCuentasPagar, getCuentasPagarResumen } from '../../api/cuentasPagar';
 import { getBodegas } from '../../api/inventario';
 import { useAuth } from '../../context/AuthContext';
 import CuentaPagarModal from '../../components/cuentasPagar/CuentasPagarModal';
@@ -21,6 +21,18 @@ const IconEdit = () => (
     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
   </svg>
 );
+const IconChevronLeft = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6"/>
+  </svg>
+)
+const IconChevronRight = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+)
 
 function formatCOP(valor) {
   return new Intl.NumberFormat('es-CO', {
@@ -48,25 +60,68 @@ export default function CuentasPagarPage() {
   const [modalAbono, setModalAbono] = useState(false);
   const [cuentaAbonando, setCuentaAbonando] = useState(null);
 
+  // ── NUEVO (ítem 17): paginación de la tabla ──
+  const [pagina, setPagina] = useState(1);
+  const [totalCuentas, setTotalCuentas] = useState(0);
+  const PAGE_SIZE = 10;
+  const totalPaginas = Math.max(1, Math.ceil(totalCuentas / PAGE_SIZE));
+
+  // ── NUEVO (ítem 17): resumen (saldo pendiente total + conteos por
+  // estado) viene de un endpoint aparte que SIEMPRE suma/cuenta sobre
+  // el conjunto completo del filtro, sin paginar. ──
+  const [resumen, setResumen] = useState({
+    saldo_pendiente_total: 0,
+    cantidad_pendiente: 0,
+    cantidad_parcial: 0,
+    cantidad_pagado: 0,
+    cantidad_total: 0,
+  });
+
   const cargarCuentas = () => {
     setCargando(true);
-    const params = {};
+    const params = { page: pagina };
     if (filtroEstado) params.estado = filtroEstado;
     if (filtroBodega) params.bodega = filtroBodega;
     getCuentasPagar(params)
-      .then(res => setCuentas(res.data))
+      .then(res => {
+        setCuentas(res.data.results);
+        setTotalCuentas(res.data.count);
+      })
       .finally(() => setCargando(false));
   };
 
-  useEffect(() => { cargarCuentas(); }, [filtroEstado, filtroBodega]);
+  const cargarResumen = () => {
+    const params = {};
+    if (filtroEstado) params.estado = filtroEstado;
+    if (filtroBodega) params.bodega = filtroBodega;
+    getCuentasPagarResumen(params).then(res => setResumen(res.data));
+  };
+
+  useEffect(() => { cargarCuentas(); }, [pagina, filtroEstado, filtroBodega]);
+  useEffect(() => { cargarResumen(); setPagina(1); }, [filtroEstado, filtroBodega]);
 
   useEffect(() => {
-    if (esJefe) getBodegas().then(res => setBodegas(res.data));
+    if (esJefe) getBodegas().then(res => setBodegas(res.data.results ?? res.data));
   }, []);
 
-  const totalPendiente = cuentas
-    .filter(c => c.estado !== 'pagado')
-    .reduce((acc, c) => acc + parseFloat(c.saldo), 0);
+  // ── ÍTEM 17: el total pendiente y los conteos por estado ya NO se
+  // calculan filtrando/sumando 'cuentas' (que ahora solo trae 10 a la
+  // vez) -- vienen de 'resumen'. ──
+  const totalPendiente = resumen.saldo_pendiente_total;
+
+  const handleCuentaGuardada = () => {
+    setModalCuenta(false);
+    setCuentaEditando(null);
+    cargarCuentas();
+    cargarResumen();
+  };
+
+  const handleAbonoGuardado = () => {
+    setModalAbono(false);
+    setCuentaAbonando(null);
+    cargarCuentas();
+    cargarResumen();
+  };
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto' }}>
@@ -108,9 +163,9 @@ export default function CuentasPagarPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 16, color: '#94a3b8', fontSize: 13 }}>
-          <span>{cuentas.filter(c => c.estado === 'pendiente').length} pendientes</span>
-          <span>{cuentas.filter(c => c.estado === 'parcial').length} parciales</span>
-          <span>{cuentas.filter(c => c.estado === 'pagado').length} pagadas</span>
+          <span>{resumen.cantidad_pendiente} pendientes</span>
+          <span>{resumen.cantidad_parcial} parciales</span>
+          <span>{resumen.cantidad_pagado} pagadas</span>
         </div>
       </div>
 
@@ -177,6 +232,7 @@ export default function CuentasPagarPage() {
             No hay cuentas por pagar registradas
           </div>
         ) : (
+          <>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#0f172a' }}>
@@ -260,6 +316,51 @@ export default function CuentasPagarPage() {
               })}
             </tbody>
           </table>
+          
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '10px 16px', borderTop: '1px solid #f1f5f9',
+            flexWrap: 'wrap', gap: '10px',
+          }}>
+            <span style={{ color: '#94a3b8', fontSize: '12px' }}>
+              {totalCuentas} cuenta{totalCuentas !== 1 ? 's' : ''} en total
+            </span>
+
+            {totalPaginas > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  onClick={() => setPagina(p => Math.max(1, p - 1))}
+                  disabled={pagina === 1}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '28px', height: '28px', borderRadius: '6px',
+                    border: '1px solid #e2e8f0', background: 'white',
+                    color: pagina === 1 ? '#cbd5e1' : '#475569',
+                    cursor: pagina === 1 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <IconChevronLeft />
+                </button>
+                <span style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                  Página {pagina} de {totalPaginas}
+                </span>
+                <button
+                  onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
+                  disabled={pagina === totalPaginas}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '28px', height: '28px', borderRadius: '6px',
+                    border: '1px solid #e2e8f0', background: 'white',
+                    color: pagina === totalPaginas ? '#cbd5e1' : '#475569',
+                    cursor: pagina === totalPaginas ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <IconChevronRight />
+                </button>
+              </div>
+            )}
+          </div>
+          </>
         )}
       </div>
 
@@ -268,7 +369,7 @@ export default function CuentasPagarPage() {
           cuenta={cuentaEditando}
           bodegas={bodegas}
           onCerrar={() => { setModalCuenta(false); setCuentaEditando(null); }}
-          onGuardado={() => { setModalCuenta(false); setCuentaEditando(null); cargarCuentas(); }}
+          onGuardado={handleCuentaGuardada}
         />
       )}
 
@@ -276,7 +377,7 @@ export default function CuentasPagarPage() {
         <AbonoModal
           cuenta={cuentaAbonando}
           onCerrar={() => { setModalAbono(false); setCuentaAbonando(null); }}
-          onGuardado={() => { setModalAbono(false); setCuentaAbonando(null); cargarCuentas(); }}
+          onGuardado={handleAbonoGuardado}
         />
       )}
     </div>
