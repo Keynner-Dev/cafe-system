@@ -112,6 +112,7 @@ function FormularioCedula({ onBuscar, cargando, error }) {
           <input
             type="text"
             inputMode="numeric"
+            maxLength={15}
             value={cedula}
             onChange={e => setCedula(e.target.value.replace(/\D/g, ''))}
             placeholder="Ej: 10452998"

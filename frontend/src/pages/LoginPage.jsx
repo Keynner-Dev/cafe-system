@@ -115,6 +115,7 @@ export default function LoginPage() {
                 </label>
                 <input
                   type="text"
+                  maxLength={30}
                   value={form.username}
                   onChange={e => setForm({ ...form, username: e.target.value })}
                   required
@@ -142,6 +143,7 @@ export default function LoginPage() {
                 <div style={{ position: 'relative' }}>
                   <input
                     type={verPassword ? 'text' : 'password'}
+                    maxLength={30}
                     value={form.password}
                     onChange={e => setForm({ ...form, password: e.target.value })}
                     required
