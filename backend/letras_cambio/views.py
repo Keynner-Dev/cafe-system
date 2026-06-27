@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from django.db.models import Sum, F
 from .models import LetraCambio, AbonoLetra
 from .serializers import LetraCambioSerializer, AbonoLetraSerializer
+from django.db import transaction
 
 
 def _queryset_letras_filtrado(request):
@@ -70,10 +71,11 @@ class AbonoLetraListCreateView(generics.ListCreateAPIView):
         letra_id = self.kwargs.get('letra_id')
         return AbonoLetra.objects.filter(letra_id=letra_id).select_related('creado_por')
 
+    @transaction.atomic
     def perform_create(self, serializer):
         letra_id = self.kwargs.get('letra_id')
         try:
-            letra = LetraCambio.objects.get(pk=letra_id)
+            letra = LetraCambio.objects.select_for_update().get(pk=letra_id)
         except LetraCambio.DoesNotExist:
             raise ValidationError('Letra no encontrada.')
 
@@ -83,7 +85,6 @@ class AbonoLetraListCreateView(generics.ListCreateAPIView):
                 f'El abono (${valor}) supera el saldo pendiente (${letra.saldo}).'
             )
         serializer.save(letra=letra, creado_por=self.request.user)
-
 
 class LetraCambioResumenView(APIView):
   
@@ -102,3 +103,4 @@ class LetraCambioResumenView(APIView):
             'saldo_total': total_adelantado - total_abonado,
             'cantidad': qs.count(),
         })
+

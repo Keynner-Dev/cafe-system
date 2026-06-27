@@ -5,16 +5,10 @@ from rest_framework.response import Response
 from django.db.models import Sum
 from .models import CuentaPorPagar, AbonoCuentaPorPagar
 from .serializers import CuentaPorPagarSerializer, AbonoCuentaPorPagarSerializer
+from django.db import transaction
 
 
 def _queryset_cuentas_filtrado(request):
-    """
-    Construye el queryset de CuentaPorPagar con las mismas reglas de
-    seguridad y filtros que ya usa CuentaPorPagarListCreateView.get_queryset()
-    -- extraído a su propia función para que tanto el listado paginado
-    como el nuevo endpoint de resumen (ítem 17) apliquen EXACTAMENTE
-    las mismas reglas, sin duplicar lógica.
-    """
     usuario = request.user
     qs = CuentaPorPagar.objects.select_related('caficultor', 'bodega', 'creado_por')
 
@@ -81,8 +75,18 @@ class AbonoListCreateView(APIView):
         serializer = AbonoCuentaPorPagarSerializer(abonos, many=True)
         return Response(serializer.data)
 
-    def post(self, request, pk):
-        cuenta = self.get_cuenta(pk, request.user)
+
+def post(self, request, pk):
+
+    with transaction.atomic():
+        try:
+            cuenta = CuentaPorPagar.objects.select_for_update().get(pk=pk)
+        except CuentaPorPagar.DoesNotExist:
+            raise ValidationError('Cuenta no encontrada.')
+
+        usuario = request.user
+        if usuario.rol == 'administrador' and cuenta.bodega != usuario.bodega:
+            raise PermissionDenied('No tienes acceso a esta cuenta.')
 
         if cuenta.estado == 'pagado':
             raise ValidationError('Esta cuenta ya está completamente pagada.')
@@ -97,7 +101,6 @@ class AbonoListCreateView(APIView):
             )
 
         serializer.save(creado_por=request.user, cuenta=cuenta)
-        # Devuelve la cuenta actualizada
         cuenta_serializer = CuentaPorPagarSerializer(cuenta)
         return Response({
             'abono': serializer.data,
@@ -106,33 +109,6 @@ class AbonoListCreateView(APIView):
 
 
 class CuentaPorPagarResumenView(APIView):
-    """
-    ── NUEVO (ítem 17) ──
-    Devuelve los totales agregados (saldo pendiente total, y conteos
-    por estado) sobre TODAS las cuentas que cumplen el filtro --
-    calculado en SQL, sin paginar y sin traer los registros completos.
-
-    Antes de que se activara la paginación global, CuentasPagarPage.jsx
-    calculaba 'totalPendiente' y los conteos por estado sumando/filtrando
-    en el frontend sobre 'cuentas' (que traía TODO sin límite). Ahora que
-    el listado pagina de 10 en 10, esos cálculos quedarían incompletos si
-    hay más de 10 cuentas en el filtro -- por eso este endpoint separado.
-
-    Nota sobre 'saldo': igual que en letras_cambio, CuentaPorPagar.saldo
-    es una @property (valor_total - valor_pagado), no una columna real
-    -- no se puede hacer Sum('saldo') en SQL directamente. Se suman
-    valor_total y valor_pagado por separado y se resta en Python,
-    matemáticamente equivalente a sumar los saldos individuales.
-
-    GET /api/cuentas-pagar/resumen/?estado=pendiente&bodega=3
-    → {
-        "saldo_pendiente_total": ...,
-        "cantidad_pendiente": ...,
-        "cantidad_parcial": ...,
-        "cantidad_pagado": ...,
-        "cantidad_total": ...,
-      }
-    """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):

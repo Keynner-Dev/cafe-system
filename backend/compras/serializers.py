@@ -219,7 +219,12 @@ class CompraSerializer(serializers.ModelSerializer):
         # El AbonoLetra dispara su propia señal post_save que registra el ingreso en caja.
         if abono_letra_data:
             from letras_cambio.models import LetraCambio, AbonoLetra
-            letra = LetraCambio.objects.get(pk=abono_letra_data['letra_id'])
+            # ── select_for_update() dentro del @transaction.atomic que ya
+            # tiene este método — bloquea la letra para que otro abono
+            # simultáneo espere antes de leer su saldo. ──
+            letra = LetraCambio.objects.select_for_update().get(
+                pk=abono_letra_data['letra_id']
+            )
             AbonoLetra.objects.create(
                 letra=letra,
                 valor=abono_letra_data['valor'],
