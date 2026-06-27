@@ -33,11 +33,6 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
 
   const formatCOP = (val) => `$${Number(val || 0).toLocaleString('es-CO')}`
 
-  // ── ÍTEM 16: desglose real de la compra. compra.total (del backend)
-  // sigue siendo SOLO el subtotal del café — nunca resta abonos a letra,
-  // porque es una @property que no los conoce. Los abonos llegan ahora
-  // en compra.abonos_letra (nuevo campo del serializer), así que el total
-  // real a pagar se calcula aquí restando la suma de esos abonos. ──
   const abonosLetra = compra.abonos_letra || []
   const totalAbonos = abonosLetra.reduce((acc, a) => acc + Number(a.valor || 0), 0)
   const hayAbonos = totalAbonos > 0
@@ -126,7 +121,7 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
           <div class="linea">
             <div class="linea-tipo">${d.tipo_cafe_nombre}</div>
             <div class="linea-sub">${d.bodega_nombre} · ${d.kilos} kg</div>
-            <div class="linea-deposito">DEPÓSITO — liquidar después</div>
+            <div class="linea-deposito">DEPOSITO — liquidar despues</div>
           </div>`
       }
       const subtotal = Number(d.kilos) * Number(d.precio_kilo)
@@ -143,19 +138,19 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
 
     const totalesHTML = hayAbonos ? `
       <div class="totales-desglose">
-        <div class="fila-total"><span>Subtotal café</span><span>${formatCOP(compra.total)}</span></div>
+        <div class="fila-total"><span>Subtotal cafe</span><span>${formatCOP(compra.total)}</span></div>
         ${abonosLetra.map(a => `
           <div class="fila-total fila-abono"><span>Abono a letra #${a.letra_id}</span><span>-${formatCOP(a.valor)}</span></div>
-          <div class="letra-detalle">Saldo restante de la letra: ${formatCOP(a.saldo_letra_restante)}</div>
+          <div class="letra-detalle">Saldo restante: ${formatCOP(a.saldo_letra_restante)}</div>
         `).join('')}
       </div>
       <div class="total-box">
-        <span>Total a pagar</span>
+        <span>TOTAL A PAGAR</span>
         <strong>${formatCOP(totalRealPagado)}</strong>
       </div>
     ` : `
       <div class="total-box">
-        <span>Total a pagar</span>
+        <span>TOTAL A PAGAR</span>
         <strong>${formatCOP(totalRealPagado)}</strong>
       </div>
     `
@@ -166,99 +161,87 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>Compra #${compra.id} — Café San Joaquín</title>
+        <title>Compra #${compra.id} — Cafe San Joaquin</title>
         <style>
-          @page { size: 80mm auto; margin: 3mm; }
+          @page { size: 80mm auto; margin: 2mm 3mm; }
           * { box-sizing: border-box; margin: 0; padding: 0; }
-          html, body {
-            width: 72mm;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            color: #0f172a;
+          html { width: 74mm; }
+          body {
+            width: 74mm;
+            height: fit-content;
+            font-family: 'Courier New', Courier, monospace;
+            color: #000000;
             font-size: 11px;
-            line-height: 1.4;
+            line-height: 1.35;
           }
-          .ticket { padding: 2mm 1mm; }
+          .ticket { width: 100%; padding: 1mm 0; }
 
-          .header { text-align: center; margin-bottom: 8px; }
-          .header h1 { font-size: 14px; font-weight: 700; }
-          .header p { font-size: 9px; color: #475569; margin-top: 1px; }
+          .header { text-align: center; margin-bottom: 6px; }
+          .header h1 { font-size: 13px; font-weight: 700; letter-spacing: 0.5px; }
+          .header p { font-size: 9px; margin-top: 2px; }
 
-          .sep { border-top: 1px dashed #0f172a; margin: 6px 0; }
-          .sep-double { border-top: 2px solid #0f172a; margin: 6px 0; }
+          .sep { border: none; border-top: 1px dashed #000; margin: 5px 0; }
+          .sep-double { border: none; border-top: 2px solid #000; margin: 5px 0; }
 
-          .compra-info { text-align: center; margin-bottom: 6px; }
-          .compra-info .num { font-size: 13px; font-weight: 700; color: #16a34a; }
-          .compra-info .fecha { font-size: 9.5px; color: #475569; margin-top: 1px; }
+          .compra-info { text-align: center; margin-bottom: 5px; }
+          .compra-info .num { font-size: 13px; font-weight: 700; }
+          .compra-info .fecha { font-size: 9px; margin-top: 1px; }
 
-          .caficultor { text-align: center; margin-bottom: 6px; }
-          .caficultor label { font-size: 8.5px; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; }
-          .caficultor p { font-size: 12px; font-weight: 700; margin-top: 1px; word-wrap: break-word; }
+          .caficultor { margin-bottom: 5px; }
+          .caficultor label { display: block; font-size: 8px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+          .caficultor p { font-size: 11px; font-weight: 700; margin-top: 1px; word-wrap: break-word; }
 
-          .detalle-titulo { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+          .detalle-titulo { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
 
-          .linea { margin-bottom: 7px; }
-          .linea-tipo { font-size: 11.5px; font-weight: 700; }
-          .linea-sub { font-size: 10px; color: #475569; }
-          .linea-precio { display: flex; justify-content: space-between; font-size: 10.5px; margin-top: 1px; }
+          .linea { margin-bottom: 6px; }
+          .linea-tipo { font-size: 11px; font-weight: 700; }
+          .linea-sub { font-size: 9.5px; }
+          .linea-precio { display: flex; justify-content: space-between; font-size: 10px; margin-top: 1px; }
           .linea-subtotal { font-weight: 700; }
-          .linea-deposito { font-size: 9.5px; font-weight: 700; color: #92400e; margin-top: 1px; }
+          .linea-deposito { font-size: 9px; font-weight: 700; margin-top: 1px; }
 
-          .totales-desglose { margin: 6px 0 2px; }
-          .fila-total { display: flex; justify-content: space-between; font-size: 10.5px; margin-bottom: 2px; }
-          .fila-abono { color: #92400e; font-weight: 600; }
-          .letra-detalle { font-size: 9px; color: #92400e; margin-bottom: 4px; line-height: 1.5; }
+          .totales-desglose { margin: 5px 0 2px; }
+          .fila-total { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px; }
+          .fila-abono { font-weight: 600; }
+          .letra-detalle { font-size: 8.5px; margin-bottom: 3px; line-height: 1.4; }
 
-          .total-box { text-align: center; margin: 8px 0; }
-          .total-box span { font-size: 10px; display: block; color: #475569; }
-          .total-box strong { font-size: 17px; font-weight: 700; color: #16a34a; display: block; margin-top: 2px; }
+          .total-box { text-align: center; margin: 6px 0 4px; }
+          .total-box span { font-size: 9px; display: block; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+          .total-box strong { font-size: 18px; font-weight: 700; display: block; margin-top: 2px; }
 
-          .nota { font-size: 9.5px; color: #475569; margin-bottom: 6px; word-wrap: break-word; }
+          .nota { font-size: 9px; margin-bottom: 5px; word-wrap: break-word; }
+          .footer { text-align: center; font-size: 8px; margin-top: 8px; }
 
-          .footer { text-align: center; font-size: 8.5px; color: #94a3b8; margin-top: 10px; }
-
-          @media print {
-            html, body { width: 80mm; }
-          }
+          @media print { html, body { width: 80mm; } }
         </style>
       </head>
       <body>
         <div class="ticket">
-
           <div class="header">
-            <h1>☕ Café San Joaquín</h1>
+            <h1>CAFE SAN JOAQUIN</h1>
             <p>NIT. 901659573-6</p>
           </div>
-
           <div class="sep"></div>
-
           <div class="compra-info">
             <div class="num">Compra #${compra.id}</div>
             <div class="fecha">${fecha}</div>
           </div>
-
+          <div class="sep"></div>
           <div class="caficultor">
             <label>Caficultor</label>
             <p>${compra.caficultor_nombre}</p>
           </div>
-
           <div class="sep"></div>
-
           <div class="detalle-titulo">Detalle</div>
           ${detallesHTML}
-
           <div class="sep-double"></div>
-
           ${totalesHTML}
-
-          ${compra.nota ? `<div class="sep"></div><p class="nota">📝 Nota: ${compra.nota}</p>` : ''}
-
+          ${compra.nota ? `<div class="sep"></div><p class="nota">Nota: ${compra.nota}</p>` : ''}
           <div class="sep"></div>
-
           <div class="footer">
-            Café San Joaquín SAS<br>
+            Cafe San Joaquin SAS<br>
             Reimpreso el ${new Date().toLocaleDateString('es-CO')}
           </div>
-
         </div>
         <script>window.onload = () => window.print()</script>
       </body>
@@ -471,10 +454,6 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
         </div>
 
         {/* ── Pie ── */}
-        {/* ── ÍTEM 16: botones de reimprimir y reenviar WhatsApp, antes
-             solo existían en la pantalla de éxito justo después de crear
-             la compra — ahora también disponibles aquí, en cualquier
-             momento que se abra el detalle desde la tabla de compras. ── */}
         <div style={{
           display: 'flex', flexDirection: 'column', gap: '10px',
           padding: '16px 20px', borderTop: '1px solid #f1f5f9',

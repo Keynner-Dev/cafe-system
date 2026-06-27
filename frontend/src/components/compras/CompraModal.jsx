@@ -175,153 +175,185 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
 
   // ── Imprimible adaptado a 80mm (impresora térmica) ──
   const handleImprimir = () => {
-    const fecha = new Date(compra.fecha + 'T12:00:00').toLocaleDateString('es-CO', {
-      day: '2-digit', month: 'long', year: 'numeric',
-    })
-    const detallesHTML = compra.detalles.map(d => {
-      if (d.es_deposito) {
-        return `
-          <div class="linea">
-            <div class="linea-tipo">${d.tipo_cafe_nombre}</div>
-            <div class="linea-sub">${d.bodega_nombre} · ${d.kilos} kg</div>
-            <div class="linea-deposito">DEPÓSITO — liquidar después</div>
-          </div>`
-      }
-      const subtotal = Number(d.kilos) * Number(d.precio_kilo)
+  const fecha = new Date(compra.fecha + 'T12:00:00').toLocaleDateString('es-CO', {
+    day: '2-digit', month: 'long', year: 'numeric',
+  })
+
+  const detallesHTML = compra.detalles.map(d => {
+    if (d.es_deposito) {
       return `
         <div class="linea">
           <div class="linea-tipo">${d.tipo_cafe_nombre}</div>
-          <div class="linea-sub">${d.bodega_nombre} · ${Number(d.kilos).toLocaleString('es-CO')} kg</div>
-          <div class="linea-precio">
-            <span>${formatCOP(d.precio_kilo)}/kg</span>
-            <span class="linea-subtotal">${formatCOP(subtotal)}</span>
-          </div>
+          <div class="linea-sub">${d.bodega_nombre} · ${d.kilos} kg</div>
+          <div class="linea-deposito">DEPOSITO — liquidar despues</div>
         </div>`
-    }).join('')
-
-    const totalesHTML = hayAbono ? `
-      <div class="totales-desglose">
-        <div class="fila-total"><span>Subtotal café</span><span>${formatCOP(subtotalCafe)}</span></div>
-        <div class="fila-total fila-abono"><span>Abono a letra${letraInfo ? ` #${letraInfo.id}` : ''}</span><span>-${formatCOP(valorAbono)}</span></div>
-        ${letraInfo ? `<div class="letra-detalle">Letra creada: ${fechaLetraFmt}<br>Saldo restante: ${formatCOP(saldoRestanteLetra)}</div>` : ''}
-      </div>
-      <div class="total-box">
-        <span>Total a pagar</span>
-        <strong>${formatCOP(totalFinal)}</strong>
-      </div>
-    ` : `
-      <div class="total-box">
-        <span>Total a pagar</span>
-        <strong>${formatCOP(totalFinal)}</strong>
-      </div>
-    `
-
-    const ventana = window.open('', '_blank', 'width=400,height=600')
-    ventana.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Compra #${compra.id} — Café San Joaquín</title>
-        <style>
-          @page { size: 80mm auto; margin: 3mm; }
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          html, body {
-            width: 72mm;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            color: #0f172a;
-            font-size: 11px;
-            line-height: 1.4;
-          }
-          .ticket { padding: 2mm 1mm; }
-
-          .header { text-align: center; margin-bottom: 8px; }
-          .header h1 { font-size: 14px; font-weight: 700; }
-          .header p { font-size: 9px; color: #475569; margin-top: 1px; }
-
-          .sep { border-top: 1px dashed #0f172a; margin: 6px 0; }
-          .sep-double { border-top: 2px solid #0f172a; margin: 6px 0; }
-
-          .compra-info { text-align: center; margin-bottom: 6px; }
-          .compra-info .num { font-size: 13px; font-weight: 700; color: #16a34a; }
-          .compra-info .fecha { font-size: 9.5px; color: #475569; margin-top: 1px; }
-
-          .caficultor { text-align: center; margin-bottom: 6px; }
-          .caficultor label { font-size: 8.5px; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; }
-          .caficultor p { font-size: 12px; font-weight: 700; margin-top: 1px; word-wrap: break-word; }
-
-          .detalle-titulo { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
-
-          .linea { margin-bottom: 7px; }
-          .linea-tipo { font-size: 11.5px; font-weight: 700; }
-          .linea-sub { font-size: 10px; color: #475569; }
-          .linea-precio { display: flex; justify-content: space-between; font-size: 10.5px; margin-top: 1px; }
-          .linea-subtotal { font-weight: 700; }
-          .linea-deposito { font-size: 9.5px; font-weight: 700; color: #92400e; margin-top: 1px; }
-
-          .totales-desglose { margin: 6px 0 2px; }
-          .fila-total { display: flex; justify-content: space-between; font-size: 10.5px; margin-bottom: 2px; }
-          .fila-abono { color: #92400e; font-weight: 600; }
-          .letra-detalle { font-size: 9px; color: #92400e; margin-bottom: 4px; line-height: 1.5; }
-
-          .total-box { text-align: center; margin: 8px 0; }
-          .total-box span { font-size: 10px; display: block; color: #475569; }
-          .total-box strong { font-size: 17px; font-weight: 700; color: #16a34a; display: block; margin-top: 2px; }
-
-          .nota { font-size: 9.5px; color: #475569; margin-bottom: 6px; word-wrap: break-word; }
-
-          .footer { text-align: center; font-size: 8.5px; color: #94a3b8; margin-top: 10px; }
-
-          @media print {
-            html, body { width: 80mm; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="ticket">
-
-          <div class="header">
-            <h1>☕ Café San Joaquín</h1>
-            <p>NIT. 901659573-6</p>
-          </div>
-
-          <div class="sep"></div>
-
-          <div class="compra-info">
-            <div class="num">Compra #${compra.id}</div>
-            <div class="fecha">${fecha}</div>
-          </div>
-
-          <div class="caficultor">
-            <label>Caficultor</label>
-            <p>${compra.caficultor_nombre}</p>
-          </div>
-
-          <div class="sep"></div>
-
-          <div class="detalle-titulo">Detalle</div>
-          ${detallesHTML}
-
-          <div class="sep-double"></div>
-
-          ${totalesHTML}
-
-          ${compra.nota ? `<div class="sep"></div><p class="nota">📝 Nota: ${compra.nota}</p>` : ''}
-
-          <div class="sep"></div>
-
-          <div class="footer">
-            Café San Joaquín SAS<br>
-            Generado el ${new Date().toLocaleDateString('es-CO')}
-          </div>
-
+    }
+    const subtotal = Number(d.kilos) * Number(d.precio_kilo)
+    return `
+      <div class="linea">
+        <div class="linea-tipo">${d.tipo_cafe_nombre}</div>
+        <div class="linea-sub">${d.bodega_nombre} · ${Number(d.kilos).toLocaleString('es-CO')} kg</div>
+        <div class="linea-precio">
+          <span>${formatCOP(d.precio_kilo)}/kg</span>
+          <span class="linea-subtotal">${formatCOP(subtotal)}</span>
         </div>
-        <script>window.onload = () => window.print()</script>
-      </body>
-      </html>
-    `)
-    ventana.document.close()
-  }
+      </div>`
+  }).join('')
+
+  const totalesHTML = hayAbono ? `
+    <div class="totales-desglose">
+      <div class="fila-total"><span>Subtotal cafe</span><span>${formatCOP(subtotalCafe)}</span></div>
+      <div class="fila-total fila-abono"><span>Abono a letra${letraInfo ? ` #${letraInfo.id}` : ''}</span><span>-${formatCOP(valorAbono)}</span></div>
+      ${letraInfo ? `<div class="letra-detalle">Letra creada: ${fechaLetraFmt} | Saldo restante: ${formatCOP(saldoRestanteLetra)}</div>` : ''}
+    </div>
+    <div class="total-box">
+      <span>TOTAL A PAGAR</span>
+      <strong>${formatCOP(totalFinal)}</strong>
+    </div>
+  ` : `
+    <div class="total-box">
+      <span>TOTAL A PAGAR</span>
+      <strong>${formatCOP(totalFinal)}</strong>
+    </div>
+  `
+
+  const ventana = window.open('', '_blank', 'width=400,height=600')
+  ventana.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Compra #${compra.id} — Cafe San Joaquin</title>
+      <style>
+        @page {
+          size: 80mm auto;
+          margin: 2mm 3mm;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html {
+          width: 74mm;
+        }
+        body {
+          width: 74mm;
+          height: fit-content;
+          font-family: 'Courier New', Courier, monospace;
+          color: #000000;
+          font-size: 11px;
+          line-height: 1.35;
+        }
+        .ticket {
+          width: 100%;
+          padding: 1mm 0;
+        }
+
+        .header { text-align: center; margin-bottom: 6px; }
+        .header h1 { font-size: 13px; font-weight: 700; color: #000; letter-spacing: 0.5px; }
+        .header p { font-size: 9px; color: #000; margin-top: 2px; }
+
+        .sep { border: none; border-top: 1px dashed #000; margin: 5px 0; }
+        .sep-double { border: none; border-top: 2px solid #000; margin: 5px 0; }
+
+        .compra-info { text-align: center; margin-bottom: 5px; }
+        .compra-info .num { font-size: 13px; font-weight: 700; color: #000; }
+        .compra-info .fecha { font-size: 9px; color: #000; margin-top: 1px; }
+
+        .caficultor { margin-bottom: 5px; }
+        .caficultor label {
+          display: block; font-size: 8px; color: #000;
+          text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;
+        }
+        .caficultor p { font-size: 11px; font-weight: 700; margin-top: 1px; word-wrap: break-word; color: #000; }
+
+        .detalle-titulo {
+          font-size: 8px; font-weight: 700;
+          text-transform: uppercase; letter-spacing: 0.05em;
+          margin-bottom: 4px; color: #000;
+        }
+
+        .linea { margin-bottom: 6px; }
+        .linea-tipo { font-size: 11px; font-weight: 700; color: #000; }
+        .linea-sub { font-size: 9.5px; color: #000; }
+        .linea-precio {
+          display: flex; justify-content: space-between;
+          font-size: 10px; margin-top: 1px; color: #000;
+        }
+        .linea-subtotal { font-weight: 700; }
+        .linea-deposito { font-size: 9px; font-weight: 700; color: #000; margin-top: 1px; }
+
+        .totales-desglose { margin: 5px 0 2px; }
+        .fila-total {
+          display: flex; justify-content: space-between;
+          font-size: 10px; margin-bottom: 2px; color: #000;
+        }
+        .fila-abono { font-weight: 600; }
+        .letra-detalle { font-size: 8.5px; color: #000; margin-bottom: 3px; line-height: 1.4; }
+
+        .total-box { text-align: center; margin: 6px 0 4px; }
+        .total-box span {
+          font-size: 9px; display: block; color: #000;
+          text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;
+        }
+        .total-box strong {
+          font-size: 18px; font-weight: 700; color: #000;
+          display: block; margin-top: 2px;
+        }
+
+        .nota { font-size: 9px; color: #000; margin-bottom: 5px; word-wrap: break-word; }
+
+        .footer { text-align: center; font-size: 8px; color: #000; margin-top: 8px; }
+
+        @media print {
+          html, body { width: 80mm; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="ticket">
+
+        <div class="header">
+          <h1>CAFE SAN JOAQUIN</h1>
+          <p>NIT. 901659573-6</p>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="compra-info">
+          <div class="num">Compra #${compra.id}</div>
+          <div class="fecha">${fecha}</div>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="caficultor">
+          <label>Caficultor</label>
+          <p>${compra.caficultor_nombre}</p>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="detalle-titulo">Detalle</div>
+        ${detallesHTML}
+
+        <div class="sep-double"></div>
+
+        ${totalesHTML}
+
+        ${compra.nota ? `<div class="sep"></div><p class="nota">Nota: ${compra.nota}</p>` : ''}
+
+        <div class="sep"></div>
+
+        <div class="footer">
+          Cafe San Joaquin SAS<br>
+          Generado el ${new Date().toLocaleDateString('es-CO')}
+        </div>
+
+      </div>
+      <script>window.onload = () => window.print()</script>
+    </body>
+    </html>
+  `)
+  ventana.document.close()
+}
 
   return (
     <div style={{ padding: '32px 24px', textAlign: 'center' }}>
