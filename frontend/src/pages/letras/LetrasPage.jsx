@@ -1,8 +1,21 @@
 import { useState, useEffect } from 'react';
-import { getLetras } from '../../api/letras';
+import { getLetras, getLetrasResumen } from '../../api/letras';
 import { useAuth } from '../../context/AuthContext';
 import LetraModal from '../../components/letras/LetraModal';
 import AbonoLetraModal from '../../components/letras/AbonoLetraModal';
+
+const IconChevronLeft = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6"/>
+  </svg>
+)
+const IconChevronRight = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+)
 
 const fmt = (n) =>
   Number(n).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
@@ -23,25 +36,59 @@ export default function LetrasPage() {
   const [modalCrear, setModalCrear] = useState(false);
   const [letraAbono, setLetraAbono] = useState(null);
 
+  // ── NUEVO (ítem 17): paginación de la tabla ──
+  const [pagina, setPagina] = useState(1);
+  const [totalLetras, setTotalLetras] = useState(0);
+  const PAGE_SIZE = 10; // debe coincidir con settings.REST_FRAMEWORK['PAGE_SIZE']
+  const totalPaginas = Math.max(1, Math.ceil(totalLetras / PAGE_SIZE));
+
+  // ── NUEVO (ítem 17): totales (adelantado/abonado/saldo) vienen de un
+  // endpoint aparte que SIEMPRE suma sobre el conjunto completo del
+  // filtro, sin paginar -- así las tarjetas resumen no dependen de
+  // cuántas letras quepan en la página actual de la tabla. ──
+  const [resumen, setResumen] = useState({
+    total_adelantado: 0, total_abonado: 0, saldo_total: 0, cantidad: 0,
+  });
+
   const cargar = () => {
     setLoading(true);
-    const params = {};
+    const params = { page: pagina };
     if (filtroEstado) params.estado = filtroEstado;
     getLetras(params)
-      .then(setLetras)
+      .then(res => {
+        setLetras(res.data.results);
+        setTotalLetras(res.data.count);
+      })
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { cargar(); }, [filtroEstado]);
+  const cargarResumen = () => {
+    const params = {};
+    if (filtroEstado) params.estado = filtroEstado;
+    getLetrasResumen(params).then(setResumen);
+  };
 
-  const totales = letras.reduce(
-    (acc, l) => ({
-      total: acc.total + Number(l.valor_total),
-      abonado: acc.abonado + Number(l.valor_abonado),
-      saldo: acc.saldo + Number(l.saldo),
-    }),
-    { total: 0, abonado: 0, saldo: 0 }
-  );
+  useEffect(() => { cargar(); }, [pagina, filtroEstado]);
+  useEffect(() => { cargarResumen(); setPagina(1); }, [filtroEstado]);
+
+  // ── ÍTEM 17: los totales ya NO se calculan sumando 'letras' (que
+  // ahora solo trae 10 a la vez) -- vienen de 'resumen', calculado en
+  // SQL sobre el conjunto completo del filtro. ──
+  const totales = {
+    total: resumen.total_adelantado,
+    abonado: resumen.total_abonado,
+    saldo: resumen.saldo_total,
+  };
+
+  const handleAbonoActualizado = () => {
+    cargar();
+    cargarResumen();
+  };
+
+  const handleLetraCreada = () => {
+    cargar();
+    cargarResumen();
+  };
 
   return (
     <div style={{ padding: '28px 32px', background: '#f8fafc', minHeight: '100vh' }}>
@@ -77,7 +124,8 @@ export default function LetrasPage() {
         </button>
       </div>
 
-      {/* Tarjetas resumen */}
+      {/* Tarjetas resumen — ítem 17: ahora vienen de 'resumen', no de
+          sumar el array 'letras' (que solo trae la página actual) */}
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
         gap: 16, marginBottom: 24,
@@ -101,7 +149,7 @@ export default function LetrasPage() {
               padding: '3px 8px', borderRadius: 4, fontSize: 11,
               background: bg, color,
             }}>
-              {letras.length} letra{letras.length !== 1 ? 's' : ''}
+              {resumen.cantidad} letra{resumen.cantidad !== 1 ? 's' : ''}
             </div>
           </div>
         ))}
@@ -232,20 +280,68 @@ export default function LetrasPage() {
             )}
           </tbody>
         </table>
+
+        {/* ── NUEVO (ítem 17): pie de tabla con conteo real + controles
+             de paginación, mismo patrón que ComprasPage.jsx / GastosPage.jsx ── */}
+        {!loading && letras.length > 0 && (
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '10px 16px', borderTop: '1px solid #f1f5f9',
+            flexWrap: 'wrap', gap: '10px',
+          }}>
+            <span style={{ color: '#94a3b8', fontSize: '12px' }}>
+              {totalLetras} letra{totalLetras !== 1 ? 's' : ''} en total
+            </span>
+
+            {totalPaginas > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  onClick={() => setPagina(p => Math.max(1, p - 1))}
+                  disabled={pagina === 1}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '28px', height: '28px', borderRadius: '6px',
+                    border: '1px solid #e2e8f0', background: 'white',
+                    color: pagina === 1 ? '#cbd5e1' : '#475569',
+                    cursor: pagina === 1 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <IconChevronLeft />
+                </button>
+                <span style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                  Página {pagina} de {totalPaginas}
+                </span>
+                <button
+                  onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
+                  disabled={pagina === totalPaginas}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '28px', height: '28px', borderRadius: '6px',
+                    border: '1px solid #e2e8f0', background: 'white',
+                    color: pagina === totalPaginas ? '#cbd5e1' : '#475569',
+                    cursor: pagina === totalPaginas ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <IconChevronRight />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Modales */}
       {modalCrear && (
         <LetraModal
           onClose={() => setModalCrear(false)}
-          onCreated={cargar}
+          onCreated={handleLetraCreada}
         />
       )}
       {letraAbono && (
         <AbonoLetraModal
           letra={letraAbono}
           onClose={() => setLetraAbono(null)}
-          onUpdated={cargar}
+          onUpdated={handleAbonoActualizado}
         />
       )}
     </div>
