@@ -5,7 +5,7 @@ import {
   getStockDetallado
 } from '../../api/inventario'
 import ItemModal from '../../components/inventario/ItemModal'
-import { useAuth } from '../../context/AuthContext'  // ← nuevo
+import { useAuth } from '../../context/AuthContext'
 
 // ─── Iconos SVG inline ────────────────────────────────────────────────────────
 const IconPlus = () => (
@@ -63,15 +63,14 @@ const camposBodega = [
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function InventarioPage() {
-  const { usuario } = useAuth()                        // ← nuevo
-  const esJefe = usuario?.rol === 'jefe'               // ← nuevo
+  const { usuario } = useAuth()
+  const esJefe = usuario?.rol === 'jefe'
 
-  // Las tabs disponibles dependen del rol
-  const TABS = esJefe                                  // ← nuevo
+  const TABS = esJefe
     ? ['Tipos de Café', 'Bodegas', 'Stock']
     : ['Stock']
 
-  const [tabActiva, setTabActiva] = useState(TABS[0]) // arranca en 'Tipos de Café' para jefe, 'Stock' para admin
+  const [tabActiva, setTabActiva] = useState(TABS[0])
 
   // Tipos de café
   const [tiposCafe, setTiposCafe] = useState([])
@@ -81,12 +80,14 @@ export default function InventarioPage() {
   const [bodegas, setBodegas] = useState([])
   const [loadingBodegas, setLoadingBodegas] = useState(true)
 
-  // Stock — si es administrador, su bodega queda preseleccionada y bloqueada.
-  // `stockFilas`: desglose por bodega + tipo de café. `stockTotales`: resumen.
+  // Stock
+  // FIX: el campo correcto en la respuesta de /me/ es 'bodega_id', no
+  // 'bodega'. Con 'bodega' el valor era undefined, String(undefined ?? '')
+  // daba '' y el admin no filtraba por su propia bodega al consultar stock.
   const [stockFilas, setStockFilas] = useState([])
   const [stockTotales, setStockTotales] = useState(null)
   const [filtroBodega, setFiltroBodega] = useState(
-    esJefe ? '' : String(usuario?.bodega ?? '')        // ← nuevo
+    esJefe ? '' : String(usuario?.bodega_id ?? '')
   )
   const [filtroTipo, setFiltroTipo] = useState('')
   const [loadingStock, setLoadingStock] = useState(false)
@@ -100,14 +101,16 @@ export default function InventarioPage() {
   const cargarTipos = () => {
     setLoadingTipos(true)
     getTiposCafe()
-      .then(res => setTiposCafe(res.data))
+      .then(res => setTiposCafe(Array.isArray(res.data) ? res.data : res.data?.results ?? []))
+      .catch(() => setTiposCafe([]))
       .finally(() => setLoadingTipos(false))
   }
 
   const cargarBodegas = () => {
     setLoadingBodegas(true)
     getBodegas()
-      .then(res => setBodegas(res.data))
+      .then(res => setBodegas(Array.isArray(res.data) ? res.data : res.data?.results ?? []))
+      .catch(() => setBodegas([]))
       .finally(() => setLoadingBodegas(false))
   }
 
@@ -119,21 +122,27 @@ export default function InventarioPage() {
     if (filtroTipo) params.tipo_cafe = filtroTipo
     getStockDetallado(params)
       .then(res => {
-        setStockFilas(res.data.filas)
-        setStockTotales(res.data.totales)
+        setStockFilas(Array.isArray(res.data.filas) ? res.data.filas : [])
+        setStockTotales(res.data.totales ?? null)
       })
       .catch(() => setErrorStock('No se pudo cargar el stock. Intenta de nuevo.'))
       .finally(() => setLoadingStock(false))
   }
 
+  // FIX: el administrador nunca usa las pestañas de Tipos de Café ni
+  // Bodegas, así que no tiene sentido cargar esos datos para su sesión.
+  // Esto también elimina el riesgo de race condition donde la redirección
+  // automática a Precios (activada en AuthContext para el admin) pudiera
+  // interrumpir el render mientras esas cargas estaban en curso, dejando
+  // tiposCafe o bodegas en estado no-array y rompiendo cualquier .map()
+  // posterior.
   useEffect(() => {
-    cargarTipos()
-    cargarBodegas()
+    if (esJefe) {
+      cargarTipos()
+      cargarBodegas()
+    }
   }, [])
 
-  // Carga automática al entrar a la pestaña Stock y cada vez que cambian
-  // los filtros — ya no requiere que el usuario presione un botón para
-  // ver algo.
   useEffect(() => {
     if (tabActiva === 'Stock') consultarStock()
   }, [tabActiva, filtroBodega, filtroTipo])
@@ -175,9 +184,6 @@ export default function InventarioPage() {
   const handleEditar = (item) => { setItemEditando(item); setModalOpen(true) }
   const handleNuevo  = ()     => { setItemEditando(null);  setModalOpen(true) }
 
-  // Solo mostramos la columna Bodega si el jefe está viendo más de una
-  // bodega a la vez (consolidado o varias filas) — si filtró a una sola,
-  // o si es administrador, sobra repetir el mismo nombre en cada fila.
   const mostrarColumnaBodega = esJefe && !filtroBodega
 
   return (
@@ -195,7 +201,6 @@ export default function InventarioPage() {
               : 'Consulta de stock de tu bodega'}
           </p>
         </div>
-        {/* Botón nuevo: solo visible para jefe y solo en tabs que no son Stock */}
         {esJefe && tabActiva !== 'Stock' && (
           <button
             onClick={handleNuevo}
@@ -215,7 +220,7 @@ export default function InventarioPage() {
         )}
       </div>
 
-      {/* ── Tabs — solo se renderizan si hay más de una ── */}
+      {/* ── Tabs ── */}
       {TABS.length > 1 && (
         <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #e2e8f0' }}>
           {TABS.map(tab => {
@@ -455,7 +460,6 @@ export default function InventarioPage() {
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
 
-              {/* Select Bodega — jefe elige, administrador ve solo la suya */}
               <div style={{ flex: '1', minWidth: '160px' }}>
                 <label style={{
                   display: 'block', fontSize: '12px', fontWeight: 500,
@@ -482,19 +486,20 @@ export default function InventarioPage() {
                     ))}
                   </select>
                 ) : (
-                  /* Administrador: campo de solo lectura mostrando su bodega */
+                  // FIX: usar bodega_id (nombre correcto del campo en /me/)
+                  // en vez de bodega, que era undefined y mostraba 'Tu bodega'
+                  // siempre, aunque la bodega sí estuviera asignada.
                   <div style={{
                     width: '100%', boxSizing: 'border-box',
                     border: '1px solid #e2e8f0', borderRadius: '6px',
                     padding: '8px 12px', fontSize: '13px', color: '#475569',
                     background: '#f8fafc',
                   }}>
-                    {bodegas.find(b => b.id === Number(usuario?.bodega))?.nombre ?? 'Tu bodega'}
+                    {usuario?.bodega_nombre ?? 'Tu bodega'}
                   </div>
                 )}
               </div>
 
-              {/* Select Tipo — igual para ambos roles */}
               <div style={{ flex: '1', minWidth: '160px' }}>
                 <label style={{
                   display: 'block', fontSize: '12px', fontWeight: 500,
@@ -533,7 +538,7 @@ export default function InventarioPage() {
             </div>
           )}
 
-          {/* Totales — resumen, ya no es el único resultado */}
+          {/* Totales */}
           {stockTotales && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
               {[
@@ -558,7 +563,7 @@ export default function InventarioPage() {
             </div>
           )}
 
-          {/* Desglose por bodega y tipo de café */}
+          {/* Desglose */}
           <div style={{
             background: 'white', border: '1px solid #e2e8f0',
             borderRadius: '10px', overflow: 'hidden',
@@ -627,7 +632,7 @@ export default function InventarioPage() {
         </div>
       )}
 
-      {/* ── Modal — solo jefe lo usa ── */}
+      {/* ── Modal — solo jefe ── */}
       {modalOpen && esJefe && (
         <ItemModal
           titulo={tabActiva === 'Tipos de Café' ? 'Tipo de Café' : 'Bodega'}
