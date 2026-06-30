@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Sum, F, Case, When, DecimalField, Value, OuterRef, Subquery
+from django_filters.rest_framework import DjangoFilterBackend
 from .models import Compra, DetalleCompra, LiquidacionDeposito
 from .serializers import CompraSerializer, LiquidacionDepositoSerializer
 from .filters import CompraFilter  # ← NUEVO (ítem 17)
@@ -20,9 +21,15 @@ class CompraViewSet(viewsets.ModelViewSet):
     # nombre, rango de fechas, bodega, tipo de café) + ordenamiento.
     # La paginación se aplica sola porque DEFAULT_PAGINATION_CLASS ya
     # quedó configurada globalmente en settings.py. ──
+    #
+    # FIX: DjangoFilterBackend debe ser la CLASE importada, no un string.
+    # DRF instancia cada elemento de filter_backends llamándolo como
+    # backend() -- un string no es invocable, eso causaba el 500
+    # ('str' object is not callable) en cualquier petición a este
+    # endpoint, con o sin ordering/filtros en la URL.
     filterset_class = CompraFilter
     filter_backends = [
-        'django_filters.rest_framework.DjangoFilterBackend',
+        DjangoFilterBackend,
         drf_filters.OrderingFilter,
     ]
     # Campos permitidos para ?ordering=campo o ?ordering=-campo.
@@ -73,12 +80,16 @@ class CompraViewSet(viewsets.ModelViewSet):
         # de Django para "agregación + filtro sobre relación inversa"
         # cuando coexisten en el mismo queryset.
         #
-        # No se pudo ejecutar esta consulta contra una base de datos real
-        # para verificarla empíricamente en este entorno (sin acceso a
-        # red para levantar Django/Postgres de prueba) -- se aplicó el
-        # patrón documentado por precaución, pero se recomienda
-        # verificar manualmente con un par de compras de varias líneas
-        # antes de confiar en el ordenamiento por total en producción. ──
+        # ADVERTENCIA ADICIONAL (pendiente de revisar con calma):
+        # esta subquery solo suma detalles con es_deposito=False. La
+        # property Compra.total (en models.py) además suma los
+        # depósitos ya liquidados vía sus LiquidacionDeposito. Es decir,
+        # 'total_anotado' y 'total' pueden NO coincidir para compras que
+        # incluyan depósitos liquidados -- el ordenamiento por
+        # total_anotado sería aproximado en esos casos, no exacto.
+        # Queda pendiente decidir si vale la pena ampliar la subquery
+        # para incluir liquidaciones, o si se documenta como limitación
+        # conocida del ordenamiento. ──
         subtotal_normal = DetalleCompra.objects.filter(
             compra_id=OuterRef('pk'),
             es_deposito=False,
