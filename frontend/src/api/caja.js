@@ -23,6 +23,7 @@ export const abrirCaja  = (cajaId)        => api.post(`/caja/cajas/${cajaId}/abr
 export const getTraslados   = ()      => api.get('/caja/traslados/').then(res => ({ ...res, data: desenvolver(res) }));
 export const createTraslado = (datos) => api.post('/caja/traslados/', datos);
 
-// Historial de cierres (jefe: todos o filtrado por ?caja=; admin: solo su bodega)
-export const getHistorialCierres = (cajaId) =>
-  api.get(`/caja/cajas/${cajaId}/historial/`).then(res => ({ ...res, data: desenvolver(res) }));
+export const getHistorialCierres = (cajaId, opciones = {}) => {
+  const params = cajaId ? { caja: cajaId, ...opciones } : { ...opciones };
+  return api.get('/caja/historial-cierres/', { params });
+};

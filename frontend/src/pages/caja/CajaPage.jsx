@@ -45,6 +45,18 @@ const IconHistory = () => (
     <path d="M12 7v5l4 2"/>
   </svg>
 );
+const IconChevronLeft = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6"/>
+  </svg>
+)
+const IconChevronRight = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+)
 
 function formatCOP(valor) {
   return new Intl.NumberFormat('es-CO', {
@@ -409,6 +421,16 @@ export default function CajaPage() {
   const [loadingAbrir,      setLoadingAbrir]      = useState(false);
   const [tabActiva,         setTabActiva]         = useState('movimientos');
 
+  // ── NUEVO: paginación de "Historial cierres" ──
+  // Estos registros crecen con el tiempo (un cierre por día por bodega
+  // como mínimo), así que igual que Cuentas/Gastos/Letras, esta tabla
+  // necesita paginar desde ya en vez de esperar a que falle en
+  // producción con muchos registros.
+  const [paginaHistorial,   setPaginaHistorial]   = useState(1);
+  const [totalCierres,      setTotalCierres]      = useState(0);
+  const PAGE_SIZE_HISTORIAL = 10; // debe coincidir con settings.REST_FRAMEWORK['PAGE_SIZE']
+  const totalPaginasHistorial = Math.max(1, Math.ceil(totalCierres / PAGE_SIZE_HISTORIAL));
+
   // Carga inicial de cajas
   useEffect(() => {
     getCajas()
@@ -424,10 +446,12 @@ export default function CajaPage() {
     }
   }, []);
 
-  // Carga movimientos al cambiar de caja — resetea pestaña e historial
+  // Carga movimientos al cambiar de caja — resetea pestaña, historial y su paginación
   useEffect(() => {
     if (!cajaSeleccionada) return;
     setHistorialCierres([]);
+    setTotalCierres(0);
+    setPaginaHistorial(1);
     setTabActiva('movimientos');
     setCargandoMov(true);
     getMovimientos(cajaSeleccionada.id)
@@ -435,14 +459,20 @@ export default function CajaPage() {
       .finally(() => setCargandoMov(false));
   }, [cajaSeleccionada]);
 
-  // Carga historial de cierres al activar esa pestaña
+  // Carga historial de cierres al activar esa pestaña o cambiar de página
   useEffect(() => {
     if (!cajaSeleccionada || tabActiva !== 'historial') return;
     setCargandoHistorial(true);
-    getHistorialCierres(cajaSeleccionada.id)
-      .then(res => setHistorialCierres(res.data))
+    getHistorialCierres(cajaSeleccionada.id, { page: paginaHistorial })
+      .then(res => {
+        const data = res.data;
+        const results = Array.isArray(data) ? data : (data?.results ?? []);
+        const count = Array.isArray(data) ? data.length : (data?.count ?? results.length);
+        setHistorialCierres(results);
+        setTotalCierres(count);
+      })
       .finally(() => setCargandoHistorial(false));
-  }, [cajaSeleccionada, tabActiva]);
+  }, [cajaSeleccionada, tabActiva, paginaHistorial]);
 
   const refrescar = () => {
     getCajas().then(res => {
@@ -786,6 +816,7 @@ export default function CajaPage() {
                 Esta caja aún no tiene cierres registrados
               </div>
             ) : (
+              <>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#0f172a' }}>
@@ -835,6 +866,53 @@ export default function CajaPage() {
                   ))}
                 </tbody>
               </table>
+
+              {/* ── NUEVO: pie de tabla con conteo real + controles de
+                   paginación, mismo patrón que LetrasPage/GastosPage ── */}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '10px 16px', borderTop: '1px solid #f1f5f9',
+                flexWrap: 'wrap', gap: '10px',
+              }}>
+                <span style={{ color: '#94a3b8', fontSize: '12px' }}>
+                  {totalCierres} cierre{totalCierres !== 1 ? 's' : ''} en total
+                </span>
+
+                {totalPaginasHistorial > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <button
+                      onClick={() => setPaginaHistorial(p => Math.max(1, p - 1))}
+                      disabled={paginaHistorial === 1}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: '28px', height: '28px', borderRadius: '6px',
+                        border: '1px solid #e2e8f0', background: 'white',
+                        color: paginaHistorial === 1 ? '#cbd5e1' : '#475569',
+                        cursor: paginaHistorial === 1 ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <IconChevronLeft />
+                    </button>
+                    <span style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                      Página {paginaHistorial} de {totalPaginasHistorial}
+                    </span>
+                    <button
+                      onClick={() => setPaginaHistorial(p => Math.min(totalPaginasHistorial, p + 1))}
+                      disabled={paginaHistorial === totalPaginasHistorial}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: '28px', height: '28px', borderRadius: '6px',
+                        border: '1px solid #e2e8f0', background: 'white',
+                        color: paginaHistorial === totalPaginasHistorial ? '#cbd5e1' : '#475569',
+                        cursor: paginaHistorial === totalPaginasHistorial ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <IconChevronRight />
+                    </button>
+                  </div>
+                )}
+              </div>
+              </>
             )
           )}
         </div>
