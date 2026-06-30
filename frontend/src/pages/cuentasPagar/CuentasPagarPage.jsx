@@ -84,8 +84,11 @@ export default function CuentasPagarPage() {
     if (filtroBodega) params.bodega = filtroBodega;
     getCuentasPagar(params)
       .then(res => {
-        setCuentas(res.data.results);
-        setTotalCuentas(res.data.count);
+        const data = res.data;
+        const results = Array.isArray(data) ? data : (data?.results ?? []);
+        const count = Array.isArray(data) ? data.length : (data?.count ?? results.length);
+        setCuentas(results);
+        setTotalCuentas(count);
       })
       .finally(() => setCargando(false));
   };

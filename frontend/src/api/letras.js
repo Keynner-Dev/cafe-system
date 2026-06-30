@@ -1,11 +1,7 @@
 import api from './axios';
 
-const desenvolver = (res) =>
-  Array.isArray(res.data) ? res.data : (res.data?.results ?? [])
-
-// getLetras devuelve array desenvuelto — las tablas de letras hacen .map()
 export const getLetras = (params = {}) =>
-  api.get('/letras/', { params }).then(res => ({ ...res, data: desenvolver(res) }));
+  api.get('/letras/', { params });
 
 export const getLetrasResumen = (params = {}) =>
   api.get('/letras/resumen/', { params }).then(r => r.data);

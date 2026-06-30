@@ -56,8 +56,11 @@ export default function LetrasPage() {
     if (filtroEstado) params.estado = filtroEstado;
     getLetras(params)
       .then(res => {
-        setLetras(res.data.results);
-        setTotalLetras(res.data.count);
+        const data = res.data;
+        const results = Array.isArray(data) ? data : (data?.results ?? []);
+        const count = Array.isArray(data) ? data.length : (data?.count ?? results.length);
+        setLetras(results);
+        setTotalLetras(count);
       })
       .finally(() => setLoading(false));
   };

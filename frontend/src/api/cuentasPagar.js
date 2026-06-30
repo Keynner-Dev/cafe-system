@@ -3,7 +3,7 @@ import api from './axios';
 const desenvolver = (res) =>
   Array.isArray(res.data) ? res.data : (res.data?.results ?? [])
 
-export const getCuentasPagar        = (params = {}) => api.get('/cuentas-pagar/', { params }).then(res => ({ ...res, data: desenvolver(res) }));
+export const getCuentasPagar        = (params = {}) => api.get('/cuentas-pagar/', { params });
 export const getCuentasPagarResumen = (params = {}) => api.get('/cuentas-pagar/resumen/', { params });
 
 export const createCuentaPagar = (datos)      => api.post('/cuentas-pagar/', datos);

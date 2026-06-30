@@ -219,8 +219,11 @@ export default function GastosPage() {
     if (filtroBodega) params.bodega = filtroBodega;
     getGastos(params)
       .then(res => {
-        setGastos(res.data.results);
-        setTotalGastos(res.data.count);
+        const data = res.data;
+        const results = Array.isArray(data) ? data : (data?.results ?? []);
+        const count = Array.isArray(data) ? data.length : (data?.count ?? results.length);
+        setGastos(results);
+        setTotalGastos(count);
       })
       .finally(() => setCargando(false));
   };
