@@ -2,6 +2,7 @@ from rest_framework import viewsets, filters as drf_filters
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
+from django_filters.rest_framework import DjangoFilterBackend
 from .models import Venta
 from .serializers import VentaSerializer
 from .filters import VentaFilter  # ← NUEVO (ítem 17)
@@ -11,8 +12,14 @@ from inventario.models import MovimientoInventario
 class VentaViewSet(viewsets.ModelViewSet):
     serializer_class = VentaSerializer
     filterset_class = VentaFilter
+    # FIX: DjangoFilterBackend debe ser la CLASE importada, no un string.
+    # DRF instancia cada elemento de filter_backends llamándolo como
+    # backend() -- un string no es invocable, eso causaba el 500
+    # ('str' object is not callable) en cualquier petición a este
+    # endpoint, con o sin ordering/filtros en la URL. Mismo bug que
+    # tenía CompraViewSet.
     filter_backends = [
-        'django_filters.rest_framework.DjangoFilterBackend',
+        DjangoFilterBackend,
         drf_filters.OrderingFilter,
     ]
     # 'id' sirve para ordenar por remisión también, porque
