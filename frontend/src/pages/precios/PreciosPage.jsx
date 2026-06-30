@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getPrecios, deletePrecio, createPrecio, updatePrecio } from '../../api/precios'
+import { getPrecios, getPreciosHoy, deletePrecio, createPrecio, updatePrecio } from '../../api/precios'
 import { getTiposCafe } from '../../api/inventario'
 import { useAuth } from '../../context/AuthContext'
 import PrecioModal from '../../components/precios/PrecioModal'
@@ -66,18 +66,34 @@ export default function PreciosPage() {
 
   const hoy = new Date().toISOString().split('T')[0]
 
-  const cargarPrecios = () => {
+  const cargarPreciosHoy = () => {
+  setLoading(true)
+  getPreciosHoy()
+    .then(res => setPrecios(Array.isArray(res.data) ? res.data : []))
+    .catch(() => setPrecios([]))
+    .finally(() => setLoading(false))
+}
+
+  const cargarTodosPrecios = () => {
     setLoading(true)
     getPrecios()
-      .then(res => setPrecios(res.data))
+      .then(res => setPrecios(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setPrecios([]))
       .finally(() => setLoading(false))
   }
 
   useEffect(() => {
-    cargarPrecios()
+    setFiltroFecha(hoy)
     getTiposCafe().then(res => setTiposCafe(res.data))
   }, [])
 
+  useEffect(() => {
+    if (filtroFecha === hoy) {
+      cargarPreciosHoy()
+    } else {
+      cargarTodosPrecios()
+    }
+  }, [filtroFecha])
   const handleNuevo = () => { setPrecioEdit(null); setModalOpen(true) }
   const handleEditar = (p) => { setPrecioEdit(p); setModalOpen(true) }
 
@@ -85,7 +101,7 @@ export default function PreciosPage() {
     if (!confirm('¿Eliminar este precio?')) return
     try {
       await deletePrecio(id)
-      cargarPrecios()
+      filtroFecha === hoy ? cargarPreciosHoy() : cargarTodosPrecios()
     } catch {
       alert('No se pudo eliminar.')
     }
@@ -98,13 +114,12 @@ export default function PreciosPage() {
       await createPrecio(form)
       marcarPreciosRegistrados()
     }
-    cargarPrecios()
+    filtroFecha === hoy ? cargarPreciosHoy() : cargarTodosPrecios()
   }
 
   const preciosFiltrados = precios.filter(p =>
     filtroFecha ? p.fecha === filtroFecha : true
   )
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
@@ -324,7 +339,7 @@ export default function PreciosPage() {
           precio={precioEditando}
           tiposCafe={tiposCafe}
           onClose={() => setModalOpen(false)}
-          onSaved={cargarPrecios}
+          onSaved={() => (filtroFecha === hoy ? cargarPreciosHoy() : cargarTodosPrecios())}
           onSubmit={handleSubmit}
         />
       )}

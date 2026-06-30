@@ -8,8 +8,7 @@ from django.utils import timezone
 class PrecioDiarioViewSet(viewsets.ModelViewSet):
     queryset = PrecioDiario.objects.all()
     serializer_class = PrecioDiarioSerializer
-
-    # Endpoint: /api/precios/precio-diario/hoy/
+    pagination_class = None 
     @action(detail=False, methods=['get'])
     def hoy(self, request):
         """Retorna los precios del día actual"""
