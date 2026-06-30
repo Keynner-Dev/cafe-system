@@ -86,7 +86,7 @@ function PantallaExito({ venta, onClose, onNuevaRemision }) {
         d.factor  ? `Factor: ${d.factor}`   : '',
         d.humedad ? `Humedad: ${d.humedad}%` : '',
         d.pasilla ? `Pasilla: ${d.pasilla}%` : '',
-      ].filter(Boolean).join(' · ')
+      ].filter(Boolean).join(' | ')
 
       return `
         <div class="linea">
@@ -106,164 +106,113 @@ function PantallaExito({ venta, onClose, onNuevaRemision }) {
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>${venta.numero_remision} — Café San Joaquín</title>
+        <title>${venta.numero_remision} — Cafe San Joaquin</title>
         <style>
-          @page { size: 80mm auto; margin: 3mm; }
+          @page { size: 80mm auto; margin: 2mm 3mm; }
           * { box-sizing: border-box; margin: 0; padding: 0; }
-          html, body {
-            width: 72mm;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            color: #0f172a;
+          html { width: 74mm; }
+          body {
+            width: 74mm;
+            height: fit-content;
+            font-family: 'Courier New', Courier, monospace;
+            color: #000000;
             font-size: 11px;
-            line-height: 1.4;
+            line-height: 1.35;
           }
-          .ticket { padding: 2mm 1mm; }
+          .ticket { width: 100%; padding: 1mm 0; }
 
-          /* Cabecera */
           .header { text-align: center; margin-bottom: 6px; }
-          .header h1 { font-size: 14px; font-weight: 700; }
-          .header p  { font-size: 9px; color: #475569; margin-top: 1px; }
+          .header h1 { font-size: 13px; font-weight: 700; letter-spacing: 0.5px; }
+          .header p { font-size: 9px; margin-top: 2px; }
 
-          /* Separadores */
-          .sep        { border-top: 1px dashed #0f172a; margin: 5px 0; }
-          .sep-solid  { border-top: 1px solid #0f172a;  margin: 5px 0; }
-          .sep-double { border-top: 2px solid #0f172a;  margin: 6px 0; }
+          .sep        { border: none; border-top: 1px dashed #000; margin: 5px 0; }
+          .sep-solid  { border: none; border-top: 1px solid #000;  margin: 5px 0; }
+          .sep-double { border: none; border-top: 2px solid #000;  margin: 6px 0; }
 
-          /* Remisión info */
           .rem-info { text-align: center; margin-bottom: 5px; }
-          .rem-info .num   { font-size: 13px; font-weight: 700; color: #16a34a; }
-          .rem-info .fecha { font-size: 9.5px; color: #475569; margin-top: 1px; }
+          .rem-info .num   { font-size: 13px; font-weight: 700; }
+          .rem-info .fecha { font-size: 9px; margin-top: 1px; }
 
-          /* Empresa */
           .empresa { text-align: center; margin-bottom: 5px; }
-          .empresa label { font-size: 8.5px; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; }
-          .empresa p { font-size: 12px; font-weight: 700; margin-top: 1px; word-wrap: break-word; }
-          .empresa .cuenta { font-size: 10px; color: #475569; margin-top: 2px; }
+          .empresa label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
+          .empresa p { font-size: 11px; font-weight: 700; margin-top: 1px; word-wrap: break-word; }
+          .empresa .cuenta { font-size: 9.5px; margin-top: 2px; }
 
-          /* Secciones de datos */
-          .seccion-titulo {
-            font-size: 8.5px; font-weight: 700;
-            text-transform: uppercase; letter-spacing: 0.05em;
-            color: #475569; margin-bottom: 3px;
-          }
-          .dato-row {
-            display: flex; justify-content: space-between;
-            font-size: 10px; margin-bottom: 2px;
-          }
-          .dato-row .etiq { color: #475569; }
-          .dato-row .val  { font-weight: 600; text-align: right; max-width: 55%; word-break: break-word; }
+          .seccion-titulo { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
+
+          .dato-row { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px; }
+          .dato-row .val { font-weight: 600; text-align: right; max-width: 55%; word-break: break-word; }
           .dato-full { font-size: 10px; margin-bottom: 2px; word-wrap: break-word; }
 
-          /* Mercancía */
-          .detalle-titulo {
-            font-size: 9px; font-weight: 700;
-            text-transform: uppercase; letter-spacing: 0.04em;
-            margin-bottom: 4px;
-          }
-          .linea { margin-bottom: 7px; }
-          .linea-tipo { font-size: 11.5px; font-weight: 700; }
-          .linea-sub  { font-size: 10px; color: #475569; }
-          .linea-row  {
-            display: flex; justify-content: space-between;
-            font-size: 10.5px; margin-top: 1px;
-          }
+          .detalle-titulo { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+
+          .linea { margin-bottom: 6px; }
+          .linea-tipo { font-size: 11px; font-weight: 700; }
+          .linea-sub  { font-size: 9.5px; }
+          .linea-row  { display: flex; justify-content: space-between; font-size: 10px; margin-top: 1px; }
           .linea-kilos  { font-weight: 700; }
-          .linea-calidad { font-size: 9.5px; color: #64748b; margin-top: 1px; }
+          .linea-calidad { font-size: 9px; margin-top: 1px; }
 
-          /* Totales */
           .totales { margin: 4px 0; }
-          .total-row {
-            display: flex; justify-content: space-between;
-            font-size: 11px; font-weight: 700; margin-bottom: 2px;
-          }
+          .total-row { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; margin-bottom: 2px; }
 
-          /* Flete */
           .flete { font-size: 10px; margin-bottom: 4px; word-wrap: break-word; }
           .flete strong { font-weight: 700; }
 
-          /* Nota */
-          .nota { font-size: 9.5px; color: #475569; margin-bottom: 5px; word-wrap: break-word; }
-
-          /* Footer */
-          .footer { text-align: center; font-size: 8.5px; color: #94a3b8; margin-top: 10px; }
+          .nota { font-size: 9px; margin-bottom: 5px; word-wrap: break-word; }
+          .footer { text-align: center; font-size: 8px; margin-top: 8px; }
 
           @media print { html, body { width: 80mm; } }
         </style>
       </head>
       <body>
         <div class="ticket">
-
           <div class="header">
-            <h1>☕ Café San Joaquín</h1>
+            <h1>CAFE SAN JOAQUIN</h1>
             <p>NIT. 901659573-6</p>
           </div>
-
           <div class="sep"></div>
-
           <div class="rem-info">
             <div class="num">${venta.numero_remision}</div>
             <div class="fecha">${fecha}</div>
           </div>
-
           <div class="empresa">
             <label>Empresa compradora</label>
             <p>${venta.empresa_nombre}</p>
             ${venta.cuenta ? `<div class="cuenta">Cuenta: ${venta.cuenta}</div>` : ''}
           </div>
-
           <div class="sep"></div>
-
           <div class="seccion-titulo">Conductor</div>
           <div class="dato-full"><strong>${venta.conductor_nombre}</strong> — CC ${venta.conductor_cedula}</div>
-          ${venta.conductor_telefono ? `<div class="dato-full" style="color:#475569">${venta.conductor_telefono}</div>` : ''}
-          ${venta.conductor_direccion ? `<div class="dato-full" style="color:#475569">${venta.conductor_direccion}</div>` : ''}
-
+          ${venta.conductor_telefono ? `<div class="dato-full">${venta.conductor_telefono}</div>` : ''}
+          ${venta.conductor_direccion ? `<div class="dato-full">${venta.conductor_direccion}</div>` : ''}
           <div class="sep-solid" style="margin-top:5px"></div>
-
-          <div class="seccion-titulo">Vehículo</div>
-          <div class="dato-row">
-            <span class="etiq">Placas</span>
-            <span class="val">${venta.vehiculo_placas}</span>
-          </div>
-          ${venta.vehiculo_clase ? `<div class="dato-row"><span class="etiq">Clase</span><span class="val">${venta.vehiculo_clase}</span></div>` : ''}
-          ${venta.vehiculo_marca ? `<div class="dato-row"><span class="etiq">Marca</span><span class="val">${venta.vehiculo_marca}</span></div>` : ''}
-          ${venta.vehiculo_color ? `<div class="dato-row"><span class="etiq">Color</span><span class="val">${venta.vehiculo_color}</span></div>` : ''}
-          ${venta.vehiculo_modelo ? `<div class="dato-row"><span class="etiq">Modelo</span><span class="val">${venta.vehiculo_modelo}</span></div>` : ''}
-
+          <div class="seccion-titulo">Vehiculo</div>
+          <div class="dato-row"><span>Placas</span><span class="val">${venta.vehiculo_placas}</span></div>
+          ${venta.vehiculo_clase  ? `<div class="dato-row"><span>Clase</span><span class="val">${venta.vehiculo_clase}</span></div>`  : ''}
+          ${venta.vehiculo_marca  ? `<div class="dato-row"><span>Marca</span><span class="val">${venta.vehiculo_marca}</span></div>`  : ''}
+          ${venta.vehiculo_color  ? `<div class="dato-row"><span>Color</span><span class="val">${venta.vehiculo_color}</span></div>`  : ''}
+          ${venta.vehiculo_modelo ? `<div class="dato-row"><span>Modelo</span><span class="val">${venta.vehiculo_modelo}</span></div>` : ''}
           <div class="sep"></div>
-
-          <div class="detalle-titulo">Mercancía</div>
+          <div class="detalle-titulo">Mercancia</div>
           ${bloquesMercancia}
-
           <div class="sep-double"></div>
-
           <div class="totales">
-            <div class="total-row">
-              <span>Total bultos</span>
-              <span>${venta.total_bultos}</span>
-            </div>
-            <div class="total-row">
-              <span>Total kilos</span>
-              <span>${Number(venta.total_kilos).toLocaleString('es-CO')} kg</span>
-            </div>
+            <div class="total-row"><span>Total bultos</span><span>${venta.total_bultos}</span></div>
+            <div class="total-row"><span>Total kilos</span><span>${Number(venta.total_kilos).toLocaleString('es-CO')} kg</span></div>
           </div>
-
           ${venta.flete_valor && Number(venta.flete_valor) > 0 ? `
           <div class="sep"></div>
           <div class="flete">
             <strong>Flete:</strong> ${formatCOP(venta.flete_valor)}
             ${venta.flete_pagadero_por ? `<br>Pagadero por: ${venta.flete_pagadero_por}` : ''}
           </div>` : ''}
-
-          ${venta.nota ? `<div class="sep"></div><p class="nota">📝 Nota: ${venta.nota}</p>` : ''}
-
+          ${venta.nota ? `<div class="sep"></div><p class="nota">Nota: ${venta.nota}</p>` : ''}
           <div class="sep"></div>
-
           <div class="footer">
-            Café San Joaquín SAS<br>
+            Cafe San Joaquin SAS<br>
             Generado el ${new Date().toLocaleDateString('es-CO')}
           </div>
-
         </div>
         <script>window.onload = () => window.print()</script>
       </body>
@@ -469,14 +418,12 @@ export default function VentaModal({ onClose, onSaved }) {
 
   if (ventaGuardada) {
     return (
-      <div
-        style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(15, 23, 42, 0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 50, padding: '16px',
-        }}
-      >
+      <div style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(15, 23, 42, 0.5)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 50, padding: '16px',
+      }}>
         <div style={{
           background: 'white', borderRadius: '12px',
           width: '100%', maxWidth: '420px',
@@ -501,14 +448,12 @@ export default function VentaModal({ onClose, onSaved }) {
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(15, 23, 42, 0.5)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 50, padding: '16px',
-      }}
-    >
+    <div style={{
+      position: 'fixed', inset: 0,
+      background: 'rgba(15, 23, 42, 0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 50, padding: '16px',
+    }}>
       <div style={{
         background: 'white', borderRadius: '12px',
         width: '100%', maxWidth: '760px',

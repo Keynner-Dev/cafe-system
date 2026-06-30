@@ -8,6 +8,14 @@ const IconX = () => (
     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 )
+const IconPrint = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 6 2 18 2 18 9"/>
+    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+    <rect x="6" y="14" width="12" height="8"/>
+  </svg>
+)
 
 function Dato({ label, value }) {
   if (!value) return null
@@ -51,17 +59,149 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
     setGuardando(true)
     setError('')
     try {
-      await updateVenta(venta.id, {
-        precio_kilo_jefe: precioKilo || null,
-      })
+      await updateVenta(venta.id, { precio_kilo_jefe: precioKilo || null })
       setGuardado(true)
       onUpdated?.()
       setTimeout(() => setGuardado(false), 2000)
-    } catch (err) {
+    } catch {
       setError('Error al guardar. Intenta de nuevo.')
     } finally {
       setGuardando(false)
     }
+  }
+
+  const handleReimprimir = () => {
+    const fecha = new Date(venta.fecha + 'T12:00:00').toLocaleDateString('es-CO', {
+      day: '2-digit', month: 'long', year: 'numeric',
+    })
+
+    const bloquesMercancia = venta.detalles.map(d => {
+      const calidad = [
+        d.muestra ? `Muestra: ${d.muestra}` : '',
+        d.factor  ? `Factor: ${d.factor}`   : '',
+        d.humedad ? `Humedad: ${d.humedad}%` : '',
+        d.pasilla ? `Pasilla: ${d.pasilla}%` : '',
+      ].filter(Boolean).join(' | ')
+
+      return `
+        <div class="linea">
+          <div class="linea-tipo">${d.tipo_cafe_nombre}</div>
+          <div class="linea-sub">${d.bodega_nombre}</div>
+          <div class="linea-row">
+            <span>${d.bultos} bulto${d.bultos !== 1 ? 's' : ''}</span>
+            <span class="linea-kilos">${Number(d.kilos).toLocaleString('es-CO')} kg</span>
+          </div>
+          ${calidad ? `<div class="linea-calidad">${calidad}</div>` : ''}
+        </div>`
+    }).join('')
+
+    const ventana = window.open('', '_blank', 'width=400,height=700')
+    ventana.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>${venta.numero_remision} — Cafe San Joaquin</title>
+        <style>
+          @page { size: 80mm auto; margin: 2mm 3mm; }
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          html { width: 74mm; }
+          body {
+            width: 74mm;
+            height: fit-content;
+            font-family: 'Courier New', Courier, monospace;
+            color: #000000;
+            font-size: 11px;
+            line-height: 1.35;
+          }
+          .ticket { width: 100%; padding: 1mm 0; }
+          .header { text-align: center; margin-bottom: 6px; }
+          .header h1 { font-size: 13px; font-weight: 700; letter-spacing: 0.5px; }
+          .header p { font-size: 9px; margin-top: 2px; }
+          .sep        { border: none; border-top: 1px dashed #000; margin: 5px 0; }
+          .sep-solid  { border: none; border-top: 1px solid #000;  margin: 5px 0; }
+          .sep-double { border: none; border-top: 2px solid #000;  margin: 6px 0; }
+          .rem-info { text-align: center; margin-bottom: 5px; }
+          .rem-info .num   { font-size: 13px; font-weight: 700; }
+          .rem-info .fecha { font-size: 9px; margin-top: 1px; }
+          .empresa { text-align: center; margin-bottom: 5px; }
+          .empresa label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
+          .empresa p { font-size: 11px; font-weight: 700; margin-top: 1px; word-wrap: break-word; }
+          .empresa .cuenta { font-size: 9.5px; margin-top: 2px; }
+          .seccion-titulo { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
+          .dato-row { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px; }
+          .dato-row .val { font-weight: 600; text-align: right; max-width: 55%; word-break: break-word; }
+          .dato-full { font-size: 10px; margin-bottom: 2px; word-wrap: break-word; }
+          .detalle-titulo { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+          .linea { margin-bottom: 6px; }
+          .linea-tipo { font-size: 11px; font-weight: 700; }
+          .linea-sub  { font-size: 9.5px; }
+          .linea-row  { display: flex; justify-content: space-between; font-size: 10px; margin-top: 1px; }
+          .linea-kilos  { font-weight: 700; }
+          .linea-calidad { font-size: 9px; margin-top: 1px; }
+          .totales { margin: 4px 0; }
+          .total-row { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+          .flete { font-size: 10px; margin-bottom: 4px; word-wrap: break-word; }
+          .flete strong { font-weight: 700; }
+          .nota { font-size: 9px; margin-bottom: 5px; word-wrap: break-word; }
+          .footer { text-align: center; font-size: 8px; margin-top: 8px; }
+          @media print { html, body { width: 80mm; } }
+        </style>
+      </head>
+      <body>
+        <div class="ticket">
+          <div class="header">
+            <h1>CAFE SAN JOAQUIN</h1>
+            <p>NIT. 901659573-6</p>
+          </div>
+          <div class="sep"></div>
+          <div class="rem-info">
+            <div class="num">${venta.numero_remision}</div>
+            <div class="fecha">${fecha}</div>
+          </div>
+          <div class="empresa">
+            <label>Empresa compradora</label>
+            <p>${venta.empresa_nombre}</p>
+            ${venta.cuenta ? `<div class="cuenta">Cuenta: ${venta.cuenta}</div>` : ''}
+          </div>
+          <div class="sep"></div>
+          <div class="seccion-titulo">Conductor</div>
+          <div class="dato-full"><strong>${venta.conductor_nombre}</strong> — CC ${venta.conductor_cedula}</div>
+          ${venta.conductor_telefono ? `<div class="dato-full">${venta.conductor_telefono}</div>` : ''}
+          ${venta.conductor_direccion ? `<div class="dato-full">${venta.conductor_direccion}</div>` : ''}
+          <div class="sep-solid" style="margin-top:5px"></div>
+          <div class="seccion-titulo">Vehiculo</div>
+          <div class="dato-row"><span>Placas</span><span class="val">${venta.vehiculo_placas}</span></div>
+          ${venta.vehiculo_clase  ? `<div class="dato-row"><span>Clase</span><span class="val">${venta.vehiculo_clase}</span></div>`  : ''}
+          ${venta.vehiculo_marca  ? `<div class="dato-row"><span>Marca</span><span class="val">${venta.vehiculo_marca}</span></div>`  : ''}
+          ${venta.vehiculo_color  ? `<div class="dato-row"><span>Color</span><span class="val">${venta.vehiculo_color}</span></div>`  : ''}
+          ${venta.vehiculo_modelo ? `<div class="dato-row"><span>Modelo</span><span class="val">${venta.vehiculo_modelo}</span></div>` : ''}
+          <div class="sep"></div>
+          <div class="detalle-titulo">Mercancia</div>
+          ${bloquesMercancia}
+          <div class="sep-double"></div>
+          <div class="totales">
+            <div class="total-row"><span>Total bultos</span><span>${venta.total_bultos}</span></div>
+            <div class="total-row"><span>Total kilos</span><span>${Number(venta.total_kilos).toLocaleString('es-CO')} kg</span></div>
+          </div>
+          ${venta.flete_valor && Number(venta.flete_valor) > 0 ? `
+          <div class="sep"></div>
+          <div class="flete">
+            <strong>Flete:</strong> ${fmt(venta.flete_valor)}
+            ${venta.flete_pagadero_por ? `<br>Pagadero por: ${venta.flete_pagadero_por}` : ''}
+          </div>` : ''}
+          ${venta.nota ? `<div class="sep"></div><p class="nota">Nota: ${venta.nota}</p>` : ''}
+          <div class="sep"></div>
+          <div class="footer">
+            Cafe San Joaquin SAS<br>
+            Reimpreso el ${new Date().toLocaleDateString('es-CO')}
+          </div>
+        </div>
+        <script>window.onload = () => window.print()</script>
+      </body>
+      </html>
+    `)
+    ventana.document.close()
   }
 
   const tieneCalidad = venta.detalles.some(
@@ -69,14 +209,12 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
   )
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(15, 23, 42, 0.5)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 50, padding: '16px',
-      }}
-    >
+    <div style={{
+      position: 'fixed', inset: 0,
+      background: 'rgba(15, 23, 42, 0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 50, padding: '16px',
+    }}>
       <div style={{
         background: 'white', borderRadius: '12px',
         width: '100%', maxWidth: '720px',
@@ -144,7 +282,6 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
               </p>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', alignItems: 'start' }}>
-
                 <div>
                   <label style={{ ...labelStyle, color: '#92400e' }}>
                     Precio de venta por kilo
@@ -262,26 +399,16 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
                       </td>
                       {tieneCalidad && (
                         <>
-                          <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>
-                            {d.muestra || '—'}
-                          </td>
-                          <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>
-                            {d.factor ?? '—'}
-                          </td>
-                          <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>
-                            {d.humedad ?? '—'}
-                          </td>
-                          <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>
-                            {d.pasilla ?? '—'}
-                          </td>
+                          <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>{d.muestra || '—'}</td>
+                          <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>{d.factor ?? '—'}</td>
+                          <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>{d.humedad ?? '—'}</td>
+                          <td style={{ padding: '9px 14px', color: '#475569', textAlign: 'right' }}>{d.pasilla ?? '—'}</td>
                         </>
                       )}
                     </tr>
                   ))}
                   <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
-                    <td colSpan={2} style={{
-                      padding: '9px 14px', fontSize: '12px', fontWeight: 600, color: '#475569',
-                    }}>
+                    <td colSpan={2} style={{ padding: '9px 14px', fontSize: '12px', fontWeight: 600, color: '#475569' }}>
                       Total
                     </td>
                     <td style={{ padding: '9px 14px', fontWeight: 700, color: '#0f172a', textAlign: 'right' }}>
@@ -299,14 +426,8 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
 
           {/* ── Conductor y vehículo ── */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div style={{
-              border: '1px solid #e2e8f0', borderRadius: '8px',
-              padding: '14px', background: '#f8fafc',
-            }}>
-              <p style={{
-                fontSize: '11px', fontWeight: 600, color: '#475569',
-                marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px',
-              }}>
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px', background: '#f8fafc' }}>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                 Conductor
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -316,14 +437,8 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
                 <Dato label="Teléfono"  value={venta.conductor_telefono} />
               </div>
             </div>
-            <div style={{
-              border: '1px solid #e2e8f0', borderRadius: '8px',
-              padding: '14px', background: '#f8fafc',
-            }}>
-              <p style={{
-                fontSize: '11px', fontWeight: 600, color: '#475569',
-                marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px',
-              }}>
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px', background: '#f8fafc' }}>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                 Vehículo
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -336,7 +451,7 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
             </div>
           </div>
 
-          {/* ── Flete — informativo, asignado automáticamente ── */}
+          {/* ── Flete ── */}
           {Number(venta.flete_valor) > 0 && (
             <div style={{
               background: '#f0fdf4', border: '1px solid #bbf7d0',
@@ -344,9 +459,7 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             }}>
               <div>
-                <p style={{ fontSize: '12px', fontWeight: 600, color: '#15803d', margin: '0 0 2px' }}>
-                  Flete
-                </p>
+                <p style={{ fontSize: '12px', fontWeight: 600, color: '#15803d', margin: '0 0 2px' }}>Flete</p>
                 {venta.flete_pagadero_por && (
                   <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 2px' }}>
                     Pagadero por: {venta.flete_pagadero_por}
@@ -365,9 +478,7 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
                     )}
                   </p>
                 ) : (
-                  <p style={{ fontSize: '11px', color: '#94a3b8', margin: 0 }}>
-                    Caja sin asignar
-                  </p>
+                  <p style={{ fontSize: '11px', color: '#94a3b8', margin: 0 }}>Caja sin asignar</p>
                 )}
               </div>
               <span style={{ fontSize: '18px', fontWeight: 700, color: '#16a34a' }}>
@@ -382,11 +493,26 @@ export default function VentaDetalle({ venta, onClose, onUpdated }) {
               <strong style={{ color: '#475569' }}>Nota:</strong> {venta.nota}
             </p>
           )}
-
         </div>
 
         {/* ── Pie ── */}
-        <div style={{ padding: '16px 20px', borderTop: '1px solid #f1f5f9' }}>
+        <div style={{
+          padding: '16px 20px', borderTop: '1px solid #f1f5f9',
+          display: 'flex', flexDirection: 'column', gap: '10px',
+        }}>
+          <button
+            onClick={handleReimprimir}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: 8, padding: '9px', borderRadius: 6,
+              border: '1px solid #e2e8f0', background: 'white',
+              color: '#0f172a', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+            onMouseLeave={e => e.currentTarget.style.background = 'white'}
+          >
+            <IconPrint /> Reimprimir remisión
+          </button>
           <button onClick={onClose} style={{
             width: '100%', padding: '9px',
             border: '1px solid #e2e8f0', borderRadius: '6px',
