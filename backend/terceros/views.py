@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.throttling import ScopedRateThrottle
+from django.db.models.functions import Lower
 from .models import Tercero
 from .serializers import TerceroSerializer
 from rest_framework.pagination import PageNumberPagination
@@ -88,6 +89,12 @@ def armar_perfil_tercero(tercero):
     }
 
 
+# Campos de texto que deben ordenarse sin distinguir mayúsculas/minúsculas.
+# Si en el futuro se agregan más columnas ordenables tipo texto (ej. "cedula"
+# si se vuelve campo libre alfanumérico), se agregan aquí.
+CAMPOS_ORDEN_INSENSIBLE = {'nombre'}
+
+
 class TerceroViewSet(viewsets.ModelViewSet):
     queryset = Tercero.objects.all()
     serializer_class = TerceroSerializer
@@ -110,17 +117,37 @@ class TerceroViewSet(viewsets.ModelViewSet):
                 queryset.filter(nombre__icontains=buscar)
                 | queryset.filter(cedula__icontains=buscar)
             )
-            return queryset.distinct()
+            queryset = queryset.distinct()
+            return self.aplicar_ordering(queryset)
 
         if not todos:
             return Tercero.objects.none()
 
-        return queryset
+        return self.aplicar_ordering(queryset)
+
+    def aplicar_ordering(self, queryset):
+        """Aplica el ordering pedido por el frontend (?ordering=nombre o
+        ?ordering=-nombre). Para campos de texto como 'nombre', ordena
+        con Lower() para que no separe mayúsculas y minúsculas en bloques
+        distintos (comportamiento por defecto de Postgres, que es
+        case-sensitive). Para el resto de campos (ej. 'id'), usa el
+        ordering normal de Django."""
+        ordering = self.request.query_params.get('ordering')
+        if not ordering:
+            return queryset
+
+        descendente = ordering.startswith('-')
+        campo = ordering.lstrip('-')
+
+        if campo in CAMPOS_ORDEN_INSENSIBLE:
+            expresion = Lower(campo)
+            return queryset.order_by(expresion.desc() if descendente else expresion.asc())
+
+        return queryset.order_by(ordering)
 
     def get_paginator(self):
-        todos  = self.request.query_params.get('todos')
         buscar = self.request.query_params.get('search') or self.request.query_params.get('buscar')
-        if todos or buscar:
+        if buscar:
             return None
         return TerceroPagination()
 
