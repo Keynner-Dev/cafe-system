@@ -75,37 +75,42 @@ class AbonoListCreateView(APIView):
         serializer = AbonoCuentaPorPagarSerializer(abonos, many=True)
         return Response(serializer.data)
 
+    # ── FIX: este método estaba definido fuera de la clase (a nivel de
+    # módulo, sin indentación), por lo que DRF no lo reconocía como el
+    # handler POST de AbonoListCreateView. Cualquier petición
+    # POST /api/cuentas-pagar/<id>/abonos/ devolvía 405 Method Not
+    # Allowed -- no se podían registrar abonos a vales. Se corrigió
+    # únicamente la indentación (4 espacios, dentro de la clase); la
+    # lógica interna no cambió. ──
+    def post(self, request, pk):
+        with transaction.atomic():
+            try:
+                cuenta = CuentaPorPagar.objects.select_for_update().get(pk=pk)
+            except CuentaPorPagar.DoesNotExist:
+                raise ValidationError('Cuenta no encontrada.')
 
-def post(self, request, pk):
+            usuario = request.user
+            if usuario.rol == 'administrador' and cuenta.bodega != usuario.bodega:
+                raise PermissionDenied('No tienes acceso a esta cuenta.')
 
-    with transaction.atomic():
-        try:
-            cuenta = CuentaPorPagar.objects.select_for_update().get(pk=pk)
-        except CuentaPorPagar.DoesNotExist:
-            raise ValidationError('Cuenta no encontrada.')
+            if cuenta.estado == 'pagado':
+                raise ValidationError('Esta cuenta ya está completamente pagada.')
 
-        usuario = request.user
-        if usuario.rol == 'administrador' and cuenta.bodega != usuario.bodega:
-            raise PermissionDenied('No tienes acceso a esta cuenta.')
+            serializer = AbonoCuentaPorPagarSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
 
-        if cuenta.estado == 'pagado':
-            raise ValidationError('Esta cuenta ya está completamente pagada.')
+            valor_abono = serializer.validated_data['valor']
+            if valor_abono > cuenta.saldo:
+                raise ValidationError(
+                    f'El abono (${valor_abono}) supera el saldo pendiente (${cuenta.saldo}).'
+                )
 
-        serializer = AbonoCuentaPorPagarSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        valor_abono = serializer.validated_data['valor']
-        if valor_abono > cuenta.saldo:
-            raise ValidationError(
-                f'El abono (${valor_abono}) supera el saldo pendiente (${cuenta.saldo}).'
-            )
-
-        serializer.save(creado_por=request.user, cuenta=cuenta)
-        cuenta_serializer = CuentaPorPagarSerializer(cuenta)
-        return Response({
-            'abono': serializer.data,
-            'cuenta': cuenta_serializer.data
-        })
+            serializer.save(creado_por=request.user, cuenta=cuenta)
+            cuenta_serializer = CuentaPorPagarSerializer(cuenta)
+            return Response({
+                'abono': serializer.data,
+                'cuenta': cuenta_serializer.data
+            })
 
 
 class CuentaPorPagarResumenView(APIView):
