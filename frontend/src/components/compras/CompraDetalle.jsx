@@ -48,49 +48,49 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
 
     const lineasDetalle = compra.detalles.map(d => {
       if (d.es_deposito) {
-        return `  ☕ ${d.tipo_cafe_nombre}\n  📦 ${d.kilos} kg — _Depósito (liquidar después)_`
+        return `• ${d.tipo_cafe_nombre}\n  ${d.kilos} kg — _Depósito (liquidar después)_`
       }
       const subtotal = Number(d.kilos) * Number(d.precio_kilo)
       return (
-        `  ☕ ${d.tipo_cafe_nombre}\n` +
-        `  📦 ${Number(d.kilos).toLocaleString('es-CO')} kg × ${formatCOP(d.precio_kilo)}/kg\n` +
-        `  💵 Subtotal: *${formatCOP(subtotal)}*`
+        `• ${d.tipo_cafe_nombre}\n` +
+        `  ${Number(d.kilos).toLocaleString('es-CO')} kg × ${formatCOP(d.precio_kilo)}/kg\n` +
+        `  Subtotal: *${formatCOP(subtotal)}*`
       )
     }).join('\n\n')
 
-    const separador = '━━━━━━━━━━━━━━━━━━━━━━'
+    const marco = '───────────────────────'
 
     let msg = ''
-    msg += `🌿 *CAFÉ SAN JOAQUÍN*\n`
-    msg += `_Comprobante de compra_\n`
-    msg += `${separador}\n\n`
-    msg += `🧾 *Compra #${compra.id}*\n`
-    msg += `📅 Fecha: ${fecha}\n`
-    msg += `👤 Caficultor: *${compra.caficultor_nombre}*\n\n`
-    msg += `${separador}\n`
+    msg += `╔═══════════════════════╗\n`
+    msg += `  *CAFÉ SAN JOAQUÍN*\n`
+    msg += `  _Comprobante de compra_\n`
+    msg += `╚═══════════════════════╝\n\n`
+    msg += `*Compra #${compra.id}* · ${fecha}\n`
+    msg += `Caficultor: *${compra.caficultor_nombre}*\n\n`
+    msg += `${marco}\n`
     msg += `*DETALLE*\n`
-    msg += `${separador}\n\n`
+    msg += `${marco}\n`
     msg += `${lineasDetalle}\n\n`
-    msg += `${separador}\n`
+    msg += `${marco}\n`
 
     if (hayAbonos) {
-      msg += `💵 Subtotal café: *${formatCOP(compra.total)}*\n`
+      msg += `Subtotal café: *${formatCOP(compra.total)}*\n`
       abonosLetra.forEach(a => {
-        msg += `📋 Abono a letra #${a.letra_id}: *-${formatCOP(a.valor)}*\n`
-        msg += `   _Saldo restante de la letra: ${formatCOP(a.saldo_letra_restante)}_\n`
+        msg += `Abono a letra #${a.letra_id}: *-${formatCOP(a.valor)}*\n`
+        msg += `_Saldo restante de la letra: ${formatCOP(a.saldo_letra_restante)}_\n`
       })
-      msg += `💰 *TOTAL PAGADO: ${formatCOP(totalRealPagado)}*\n`
+      msg += `*TOTAL PAGADO: ${formatCOP(totalRealPagado)}*\n`
     } else {
-      msg += `💰 *TOTAL PAGADO: ${formatCOP(totalRealPagado)}*\n`
+      msg += `*TOTAL PAGADO: ${formatCOP(totalRealPagado)}*\n`
     }
-    msg += `${separador}\n\n`
+    msg += `${marco}\n\n`
 
     if (compra.nota) {
-      msg += `📝 _Nota: ${compra.nota}_\n\n`
+      msg += `_Nota: ${compra.nota}_\n\n`
     }
 
-    msg += `_¡Gracias por su confianza!_ 🤝\n`
-    msg += `_Café San Joaquín — Calidad desde el campo_`
+    msg += `_¡Gracias por su confianza!_\n`
+    msg += `_Café San Joaquín — calidad desde el campo_`
 
     return encodeURIComponent(msg)
   }

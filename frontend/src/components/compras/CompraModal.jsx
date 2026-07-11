@@ -116,50 +116,50 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
 
     const lineasDetalle = compra.detalles.map(d => {
         if (d.es_deposito) {
-        return `  ☕ ${d.tipo_cafe_nombre}\n  📦 ${d.kilos} kg — _Depósito (liquidar después)_`
+        return `• ${d.tipo_cafe_nombre}\n  ${d.kilos} kg — _Depósito (liquidar después)_`
         }
         const subtotal = Number(d.kilos) * Number(d.precio_kilo)
         return (
-        `  ☕ ${d.tipo_cafe_nombre}\n` +
-        `  📦 ${Number(d.kilos).toLocaleString('es-CO')} kg × ${formatCOP(d.precio_kilo)}/kg\n` +
-        `  💵 Subtotal: *${formatCOP(subtotal)}*`
+        `• ${d.tipo_cafe_nombre}\n` +
+        `  ${Number(d.kilos).toLocaleString('es-CO')} kg × ${formatCOP(d.precio_kilo)}/kg\n` +
+        `  Subtotal: *${formatCOP(subtotal)}*`
         )
     }).join('\n\n')
 
-    const separador = '━━━━━━━━━━━━━━━━━━━━━━'
+    const marco = '───────────────────────'
 
     let msg = ''
-    msg += `🌿 *CAFÉ SAN JOAQUÍN*\n`
-    msg += `_Comprobante de compra_\n`
-    msg += `${separador}\n\n`
-    msg += `🧾 *Compra #${compra.id}*\n`
-    msg += `📅 Fecha: ${fecha}\n`
-    msg += `👤 Caficultor: *${compra.caficultor_nombre}*\n\n`
-    msg += `${separador}\n`
+    msg += `╔═══════════════════════╗\n`
+    msg += `  *CAFÉ SAN JOAQUÍN*\n`
+    msg += `  _Comprobante de compra_\n`
+    msg += `╚═══════════════════════╝\n\n`
+    msg += `*Compra #${compra.id}* · ${fecha}\n`
+    msg += `Caficultor: *${compra.caficultor_nombre}*\n\n`
+    msg += `${marco}\n`
     msg += `*DETALLE*\n`
-    msg += `${separador}\n\n`
+    msg += `${marco}\n`
     msg += `${lineasDetalle}\n\n`
-    msg += `${separador}\n`
+    msg += `${marco}\n`
 
     // ── Desglose si hubo abono a letra ──
     if (hayAbono) {
-      msg += `💵 Subtotal café: *${formatCOP(subtotalCafe)}*\n`
-      msg += `📋 Abono a letra${letraInfo ? ` #${letraInfo.id}` : ''}${fechaLetraFmt ? ` (creada ${fechaLetraFmt})` : ''}: *-${formatCOP(valorAbono)}*\n`
+      msg += `Subtotal café: *${formatCOP(subtotalCafe)}*\n`
+      msg += `Abono a letra${letraInfo ? ` #${letraInfo.id}` : ''}${fechaLetraFmt ? ` (creada ${fechaLetraFmt})` : ''}: *-${formatCOP(valorAbono)}*\n`
       if (letraInfo) {
-        msg += `   _Saldo restante de la letra: ${formatCOP(saldoRestanteLetra)}_\n`
+        msg += `_Saldo restante de la letra: ${formatCOP(saldoRestanteLetra)}_\n`
       }
-      msg += `💰 *TOTAL PAGADO: ${formatCOP(totalFinal)}*\n`
+      msg += `*TOTAL PAGADO: ${formatCOP(totalFinal)}*\n`
     } else {
-      msg += `💰 *TOTAL PAGADO: ${formatCOP(totalFinal)}*\n`
+      msg += `*TOTAL PAGADO: ${formatCOP(totalFinal)}*\n`
     }
-    msg += `${separador}\n\n`
+    msg += `${marco}\n\n`
 
     if (compra.nota) {
-        msg += `📝 _Nota: ${compra.nota}_\n\n`
+        msg += `_Nota: ${compra.nota}_\n\n`
     }
 
-    msg += `_¡Gracias por su confianza!_ 🤝\n`
-    msg += `_Café San Joaquín — Calidad desde el campo_`
+    msg += `_¡Gracias por su confianza!_\n`
+    msg += `_Café San Joaquín — calidad desde el campo_`
 
     return encodeURIComponent(msg)
     }
