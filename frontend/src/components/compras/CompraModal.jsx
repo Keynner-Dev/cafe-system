@@ -95,6 +95,15 @@ function limpiarNumeroWhatsApp(numero) {
   return String(numero).replace(/\D/g, '')
 }
 
+// ── ÍTEM 23: logo "Cafe San" en blanco y negro, sin fondo, incrustado
+// como base64 para que el ticket imprimible (abierto con window.open +
+// document.write) no dependa de rutas de assets del bundle de Vite.
+// Fuente: logo_cafe_san_bn_ticket_300px.png (versión binarizada, sin
+// grises intermedios, pensada para impresoras térmicas de baja resolución
+// como la JAL-POS80U/POS80UL). Duplicado a propósito en CompraDetalle.jsx,
+// mismo criterio que el resto del imprimible (ver notas del ítem 16/22). ──
+const LOGO_CAFE_SAN_BASE64 = 'data:image/png;base64,LOGO_BASE64_PLACEHOLDER'
+
 
 function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, letraInfo, onClose, onNuevaCompra }) {
 
@@ -184,7 +193,7 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
       return `
         <div class="linea">
           <div class="linea-tipo">${d.tipo_cafe_nombre}</div>
-          <div class="linea-sub">${d.bodega_nombre} · ${d.kilos} kg</div>
+          <div class="linea-sub">${d.bodega_nombre} - ${d.kilos} kg</div>
           <div class="linea-deposito">DEPOSITO — liquidar despues</div>
         </div>`
     }
@@ -192,7 +201,7 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
     return `
       <div class="linea">
         <div class="linea-tipo">${d.tipo_cafe_nombre}</div>
-        <div class="linea-sub">${d.bodega_nombre} · ${Number(d.kilos).toLocaleString('es-CO')} kg</div>
+        <div class="linea-sub">${d.bodega_nombre} - ${Number(d.kilos).toLocaleString('es-CO')} kg</div>
         <div class="linea-precio">
           <span>${formatCOP(d.precio_kilo)}/kg</span>
           <span class="linea-subtotal">${formatCOP(subtotal)}</span>
@@ -238,8 +247,10 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
           height: fit-content;
           font-family: 'Courier New', Courier, monospace;
           color: #000000;
-          font-size: 11px;
-          line-height: 1.35;
+          /* ÍTEM 23: 11px -> 12px de base, igual que en CompraDetalle.jsx.
+             Ver comentario gemelo allá para el detalle del porqué. */
+          font-size: 12px;
+          line-height: 1.4;
         }
         .ticket {
           width: 100%;
@@ -247,60 +258,63 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
         }
 
         .header { text-align: center; margin-bottom: 6px; }
-        .header h1 { font-size: 13px; font-weight: 700; color: #000; letter-spacing: 0.5px; }
-        .header p { font-size: 9px; color: #000; margin-top: 2px; }
+        .header .logo { width: 26mm; height: auto; margin: 0 auto 4px; display: block; }
+        .header h1 { font-size: 15px; font-weight: 700; color: #000; letter-spacing: 0.5px; }
+        .header p.subnombre { font-size: 11.5px; font-weight: 700; color: #000; margin-top: 2px; }
+        .header p.nit { font-size: 10.5px; font-weight: 600; color: #000; margin-top: 2px; }
 
         .sep { border: none; border-top: 1px dashed #000; margin: 5px 0; }
         .sep-double { border: none; border-top: 2px solid #000; margin: 5px 0; }
 
         .compra-info { text-align: center; margin-bottom: 5px; }
-        .compra-info .num { font-size: 13px; font-weight: 700; color: #000; }
-        .compra-info .fecha { font-size: 9px; color: #000; margin-top: 1px; }
+        .compra-info .num { font-size: 14px; font-weight: 700; color: #000; }
+        .compra-info .fecha { font-size: 10.5px; font-weight: 600; color: #000; margin-top: 1px; }
 
         .caficultor { margin-bottom: 5px; }
         .caficultor label {
-          display: block; font-size: 8px; color: #000;
+          display: block; font-size: 9.5px; color: #000;
           text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;
         }
-        .caficultor p { font-size: 11px; font-weight: 700; margin-top: 1px; word-wrap: break-word; color: #000; }
+        .caficultor p { font-size: 12px; font-weight: 700; margin-top: 1px; word-wrap: break-word; color: #000; }
 
         .detalle-titulo {
-          font-size: 8px; font-weight: 700;
+          font-size: 9.5px; font-weight: 700;
           text-transform: uppercase; letter-spacing: 0.05em;
           margin-bottom: 4px; color: #000;
         }
 
         .linea { margin-bottom: 6px; }
-        .linea-tipo { font-size: 11px; font-weight: 700; color: #000; }
-        .linea-sub { font-size: 9.5px; color: #000; }
+        .linea-tipo { font-size: 12px; font-weight: 700; color: #000; }
+        .linea-sub { font-size: 10.5px; font-weight: 600; color: #000; }
         .linea-precio {
           display: flex; justify-content: space-between;
-          font-size: 10px; margin-top: 1px; color: #000;
+          font-size: 11px; margin-top: 1px; color: #000;
         }
         .linea-subtotal { font-weight: 700; }
-        .linea-deposito { font-size: 9px; font-weight: 700; color: #000; margin-top: 1px; }
+        .linea-deposito { font-size: 10px; font-weight: 700; color: #000; margin-top: 1px; }
 
         .totales-desglose { margin: 5px 0 2px; }
         .fila-total {
           display: flex; justify-content: space-between;
-          font-size: 10px; margin-bottom: 2px; color: #000;
+          font-size: 11px; margin-bottom: 2px; color: #000;
         }
         .fila-abono { font-weight: 600; }
-        .letra-detalle { font-size: 8.5px; color: #000; margin-bottom: 3px; line-height: 1.4; }
+        .letra-detalle { font-size: 10px; font-weight: 600; color: #000; margin-bottom: 3px; line-height: 1.4; }
 
         .total-box { text-align: center; margin: 6px 0 4px; }
         .total-box span {
-          font-size: 9px; display: block; color: #000;
+          font-size: 10px; display: block; color: #000;
           text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;
         }
         .total-box strong {
-          font-size: 18px; font-weight: 700; color: #000;
+          font-size: 19px; font-weight: 700; color: #000;
           display: block; margin-top: 2px;
         }
 
-        .nota { font-size: 9px; color: #000; margin-bottom: 5px; word-wrap: break-word; }
+        .nota { font-size: 10.5px; color: #000; margin-bottom: 5px; word-wrap: break-word; }
 
-        .footer { text-align: center; font-size: 8px; color: #000; margin-top: 8px; }
+        .footer { text-align: center; font-size: 10px; font-weight: 600; color: #000; margin-top: 8px; }
+        .footer .telefono { font-size: 11px; font-weight: 700; margin-top: 2px; }
 
         @media print {
           html, body { width: 80mm; }
@@ -311,8 +325,10 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
       <div class="ticket">
 
         <div class="header">
-          <h1>CAFE SAN JOAQUIN</h1>
-          <p>NIT. 901659573-6</p>
+          <img class="logo" src="${LOGO_CAFE_SAN_BASE64}" alt="Cafe San" />
+          <h1>Cafe San</h1>
+          <p class="subnombre">Jimmi Martinez</p>
+          <p class="nit">NIT. 901659573-6</p>
         </div>
 
         <div class="sep"></div>
@@ -344,6 +360,7 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
 
         <div class="footer">
           Cafe San Joaquin SAS<br>
+          <span class="telefono">Tel: 3126164059</span><br>
           Generado el ${new Date().toLocaleDateString('es-CO')}
         </div>
 
