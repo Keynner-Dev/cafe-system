@@ -51,6 +51,16 @@ function BadgeEstado({ activo }) {
   )
 }
 
+// ─── Formato de kilos ─────────────────────────────────────────────────────────
+// Ítem 12 (UX): antes se imprimía el float crudo del backend (p. ej. 3098.5,
+// o potencialmente 15000.333333 si algún cálculo dejaba decimales largos),
+// sin separador de miles. Esto normaliza a máximo 2 decimales (sin ceros de
+// más) y separador de miles en formato local.
+function formatKg(valor) {
+  const n = Number(valor) || 0
+  return n.toLocaleString('es-CO', { maximumFractionDigits: 2 })
+}
+
 const camposTipoCafe = [
   { name: 'nombre', label: 'Nombre', required: true, placeholder: 'Ej: Café seco' },
   { name: 'descripcion', label: 'Descripción', type: 'textarea', placeholder: 'Descripción opcional' },
@@ -125,7 +135,15 @@ export default function InventarioPage() {
         setStockFilas(Array.isArray(res.data.filas) ? res.data.filas : [])
         setStockTotales(res.data.totales ?? null)
       })
-      .catch(() => setErrorStock('No se pudo cargar el stock. Intenta de nuevo.'))
+      .catch(() => {
+        // Ítem 12 (UX): antes, si la consulta fallaba, el mensaje de error
+        // se mostraba junto a la tabla/tarjetas de la consulta ANTERIOR,
+        // dando a entender que esos números seguían siendo válidos. Ahora
+        // se limpian para que el error sea la única fuente de verdad visible.
+        setStockFilas([])
+        setStockTotales(null)
+        setErrorStock('No se pudo cargar el stock. Intenta de nuevo.')
+      })
       .finally(() => setLoadingStock(false))
   }
 
@@ -185,6 +203,24 @@ export default function InventarioPage() {
   const handleNuevo  = ()     => { setItemEditando(null);  setModalOpen(true) }
 
   const mostrarColumnaBodega = esJefe && !filtroBodega
+
+  // Ítem 12 (UX): las filas ya vienen ordenadas por bodega_nombre desde el
+  // backend (ver stock_detallado en views.py). Aquí solo se calcula, para
+  // cada fila, cuántas filas seguidas comparten su bodega (rowSpan) y si es
+  // la primera del grupo — así la celda "Bodega" se fusiona visualmente en
+  // vez de repetir el mismo nombre en cada fila, y queda claro dónde
+  // empieza y termina cada bodega cuando el jefe ve varias a la vez.
+  const filasConGrupo = stockFilas.map((fila, i) => {
+    const esInicioGrupo = i === 0 || stockFilas[i - 1].bodega_id !== fila.bodega_id
+    let rowSpan = 1
+    if (esInicioGrupo) {
+      for (let j = i + 1; j < stockFilas.length && stockFilas[j].bodega_id === fila.bodega_id; j++) {
+        rowSpan++
+      }
+    }
+    const sinMovimiento = fila.entradas === 0 && fila.salidas === 0 && fila.stock_actual === 0
+    return { ...fila, esInicioGrupo, rowSpan, sinMovimiento }
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -544,7 +580,19 @@ export default function InventarioPage() {
               {[
                 { label: 'Total Entradas', value: stockTotales.entradas,     color: '#2563eb', bg: '#eff6ff' },
                 { label: 'Total Salidas',  value: stockTotales.salidas,      color: '#dc2626', bg: '#fef2f2' },
-                { label: 'Stock Actual',   value: stockTotales.stock_actual, color: '#16a34a', bg: '#f0fdf4' },
+                {
+                  label: 'Stock Actual',
+                  value: stockTotales.stock_actual,
+                  // Ítem 12 (UX): antes siempre verde, incluso si por algún
+                  // error de datos el total diera negativo. Ahora refleja
+                  // el signo real: verde solo si es positivo, gris si es
+                  // exactamente 0, rojo si es negativo (caso anómalo que
+                  // merece llamar la atención en vez de disfrazarse de OK).
+                  color: stockTotales.stock_actual > 0 ? '#16a34a'
+                       : stockTotales.stock_actual < 0 ? '#dc2626'
+                       : '#94a3b8',
+                  bg: '#f0fdf4',
+                },
               ].map(card => (
                 <div key={card.label} style={{
                   background: 'white', border: '1px solid #e2e8f0',
@@ -555,7 +603,7 @@ export default function InventarioPage() {
                     {card.label}
                   </p>
                   <p style={{ fontSize: '26px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                    {card.value}
+                    {formatKg(card.value)}
                     <span style={{ fontSize: '14px', fontWeight: 400, color: '#94a3b8', marginLeft: '4px' }}>kg</span>
                   </p>
                 </div>
@@ -601,27 +649,60 @@ export default function InventarioPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {stockFilas.map(fila => (
+                  {filasConGrupo.map(fila => (
                     <tr
                       key={`${fila.bodega_id}-${fila.tipo_cafe_id}`}
-                      style={{ borderTop: '1px solid #f1f5f9', transition: 'background 0.1s' }}
+                      style={{
+                        // Ítem 12 (UX): primera fila de cada bodega lleva un
+                        // borde superior más marcado para separar los grupos
+                        // visualmente cuando el jefe ve varias bodegas juntas.
+                        borderTop: mostrarColumnaBodega && fila.esInicioGrupo && fila.rowSpan
+                          ? '2px solid #e2e8f0' : '1px solid #f1f5f9',
+                        transition: 'background 0.1s',
+                        // Filas sin ningún movimiento se atenúan para que no
+                        // compitan visualmente con las que sí tienen stock.
+                        color: fila.sinMovimiento ? '#94a3b8' : 'inherit',
+                      }}
                       onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
                       onMouseLeave={e => e.currentTarget.style.background = 'white'}
                     >
-                      {mostrarColumnaBodega && (
-                        <td style={{ padding: '11px 16px', color: '#475569' }}>{fila.bodega_nombre}</td>
+                      {mostrarColumnaBodega && fila.esInicioGrupo && (
+                        <td
+                          rowSpan={fila.rowSpan}
+                          style={{
+                            padding: '11px 16px', color: '#0f172a', fontWeight: 600,
+                            verticalAlign: 'top', background: '#f8fafc',
+                            borderRight: '1px solid #f1f5f9',
+                          }}
+                        >
+                          {fila.bodega_nombre}
+                        </td>
                       )}
-                      <td style={{ padding: '11px 16px', fontWeight: 500, color: '#0f172a' }}>
+                      <td style={{
+                        padding: '11px 16px', fontWeight: fila.sinMovimiento ? 400 : 500,
+                        color: fila.sinMovimiento ? '#94a3b8' : '#0f172a',
+                      }}>
                         {fila.tipo_cafe_nombre}
                       </td>
-                      <td style={{ padding: '11px 16px', textAlign: 'right', color: '#2563eb' }}>
-                        {fila.entradas}
+                      <td style={{
+                        padding: '11px 16px', textAlign: 'right',
+                        color: fila.sinMovimiento ? '#cbd5e1' : '#2563eb',
+                      }}>
+                        {formatKg(fila.entradas)}
                       </td>
-                      <td style={{ padding: '11px 16px', textAlign: 'right', color: '#dc2626' }}>
-                        {fila.salidas}
+                      <td style={{
+                        padding: '11px 16px', textAlign: 'right',
+                        color: fila.sinMovimiento ? '#cbd5e1' : '#dc2626',
+                      }}>
+                        {formatKg(fila.salidas)}
                       </td>
-                      <td style={{ padding: '11px 16px', textAlign: 'right', fontWeight: 600, color: '#16a34a' }}>
-                        {fila.stock_actual}
+                      <td style={{
+                        padding: '11px 16px', textAlign: 'right', fontWeight: fila.sinMovimiento ? 400 : 600,
+                        color: fila.sinMovimiento
+                          ? '#cbd5e1'
+                          : fila.stock_actual < 0 ? '#dc2626' : '#16a34a',
+                      }}>
+                        {formatKg(fila.stock_actual)}
                       </td>
                     </tr>
                   ))}
