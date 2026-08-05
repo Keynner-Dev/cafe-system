@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getTerceros, deleteTercero } from '../../api/terceros'
 import TerceroModal from '../../components/terceros/TerceroModal'
 import TerceroPerfil from '../../components/terceros/TerceroPerfil'
+import EstadoError from '../../components/common/EstadoError' // NUEVO
 
 const IconPlus = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -105,6 +106,7 @@ export default function TercerosPage() {
   const [terceros, setTerceros]           = useState([])
   const [totalTerceros, setTotalTerceros] = useState(0)
   const [loading, setLoading]             = useState(true)
+  const [errorCarga, setErrorCarga]       = useState(false) // NUEVO
   const [modalOpen, setModalOpen]         = useState(false)
   const [terceroEditando, setTerceroEdit] = useState(null)
   const [perfilId, setPerfilId]           = useState(null)
@@ -152,7 +154,9 @@ export default function TercerosPage() {
           setTerceros(res.data.results)
           setTotalTerceros(res.data.count)
         }
+        setErrorCarga(false) // NUEVO
       })
+      .catch(() => setErrorCarga(true)) // NUEVO
       .finally(() => setLoading(false))
   }
 
@@ -299,12 +303,20 @@ export default function TercerosPage() {
         )}
       </div>
 
+      {/* ── Error de carga (NUEVO) ── */}
+      {errorCarga && !loading && (
+        <EstadoError
+          mensaje="No se pudieron cargar los terceros. Verifica tu conexión e intenta de nuevo."
+          onReintentar={cargarTerceros}
+        />
+      )}
+
       {/* Tabla */}
       {loading ? (
         <div style={{ color: '#94a3b8', fontSize: '13px', padding: '20px 0' }}>
           Cargando terceros...
         </div>
-      ) : (
+      ) : errorCarga ? null : (
         <div style={{
           background: 'white', border: '1px solid #e2e8f0',
           borderRadius: '10px', overflow: 'hidden',

@@ -6,6 +6,7 @@ import CompraModal from '../../components/compras/CompraModal'
 import LiquidacionModal from '../../components/compras/LiquidacionModal'
 import CompraDetalle from '../../components/compras/CompraDetalle'
 import AbonoModal from '../../components/cuentasPagar/AbonoModal'
+import EstadoError from '../../components/common/EstadoError' // NUEVO
 
 // ─── Iconos SVG inline ────────────────────────────────────────────────────────
 const IconPlus = () => (
@@ -138,6 +139,7 @@ export default function ComprasPage() {
   const [compras, setCompras]                         = useState([])
   const [totalCompras, setTotalCompras]               = useState(0)   // ← NUEVO (ítem 17)
   const [loading, setLoading]                         = useState(true)
+  const [errorCarga, setErrorCarga]                   = useState(false) // NUEVO
   const [modalOpen, setModalOpen]                     = useState(false)
   const [liquidacionOpen, setLiquidacionOpen]         = useState(false)
   const [detalleOpen, setDetalleOpen]                 = useState(false)
@@ -209,6 +211,12 @@ export default function ComprasPage() {
       .then(res => {
         setCompras(res.data.results)
         setTotalCompras(res.data.count)
+        setErrorCarga(false) // NUEVO: limpia el error si un reintento funciona
+      })
+      .catch(() => {
+        // NUEVO: antes, si esto fallaba, la tabla quedaba vacía en silencio
+        // como si de verdad no hubiera compras registradas. Ahora se avisa.
+        setErrorCarga(true)
       })
       .finally(() => setLoading(false))
   }
@@ -437,12 +445,20 @@ export default function ComprasPage() {
         )}
       </div>
 
+      {/* ── Error de carga (NUEVO) ── */}
+      {errorCarga && !loading && (
+        <EstadoError
+          mensaje="No se pudieron cargar las compras. Verifica tu conexión e intenta de nuevo."
+          onReintentar={cargarCompras}
+        />
+      )}
+
       {/* ── Tabla ── */}
       {loading ? (
         <div style={{ color: '#94a3b8', fontSize: '13px', padding: '20px 0' }}>
           Cargando compras...
         </div>
-      ) : (
+      ) : errorCarga ? null : (
         <div style={{
           background: 'white', border: '1px solid #e2e8f0',
           borderRadius: '10px', overflow: 'hidden',

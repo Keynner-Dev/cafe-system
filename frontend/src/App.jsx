@@ -15,6 +15,7 @@ import GastosPage from './pages/gastos/GastosPage'
 import CuentasPagarPage from './pages/cuentasPagar/CuentasPagarPage'
 import LetrasPage from './pages/letras/LetrasPage'
 import PortalCaficultorPage from './pages/portal/PortalCaficultorPage'
+import NotFoundPage from './pages/NotFoundPage' // NUEVO
 
 
 function RutaProtegida({ children }) {
@@ -77,7 +78,15 @@ export default function App() {
         <Route path="gastos"        element={<GastosPage />} />
         <Route path="cuentas-pagar" element={<CuentasPagarPage />} />
         <Route path="letras"        element={<LetrasPage />} />
+
+        {/* NUEVO: 404 dentro del layout (con sidebar) para rutas internas
+            que no existen, ej. /algo-que-no-es */}
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
+
+      {/* NUEVO: 404 fuera del layout, para cualquier URL que ni siquiera
+          coincida con "/" -- antes de esto, la app quedaba en blanco. */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }

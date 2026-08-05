@@ -3,6 +3,7 @@ import { getGastos, getGastosResumen, deleteGasto } from '../../api/gastos';
 import { getBodegas } from '../../api/inventario';
 import { useAuth } from '../../context/AuthContext';
 import GastoModal from '../../components/gastos/GastosModal';
+import EstadoError from '../../components/common/EstadoError'; // NUEVO
 
 const IconPlus = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -194,6 +195,7 @@ export default function GastosPage() {
   const [gastos, setGastos] = useState([]);
   const [bodegas, setBodegas] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(false); // NUEVO
   const [modalAbierto, setModalAbierto] = useState(false);
   const [gastoEditando, setGastoEditando] = useState(null);
   const [filtroMes, setFiltroMes] = useState(getMesActual());
@@ -224,7 +226,9 @@ export default function GastosPage() {
         const count = Array.isArray(data) ? data.length : (data?.count ?? results.length);
         setGastos(results);
         setTotalGastos(count);
+        setErrorCarga(false); // NUEVO
       })
+      .catch(() => setErrorCarga(true)) // NUEVO
       .finally(() => setCargando(false));
   };
 
@@ -379,6 +383,13 @@ export default function GastosPage() {
               border: '3px solid #e2e8f0', borderTopColor: '#16a34a',
               animation: 'spin 0.8s linear infinite'
             }} />
+          </div>
+        ) : errorCarga ? (
+          <div style={{ padding: 20 }}>
+            <EstadoError
+              mensaje="No se pudieron cargar los gastos. Verifica tu conexión e intenta de nuevo."
+              onReintentar={cargarGastos}
+            />
           </div>
         ) : gastos.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 14 }}>

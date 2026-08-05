@@ -3,6 +3,7 @@ import { getVentas, getVenta, deleteVenta } from '../../api/ventas'
 import { useAuth } from '../../context/AuthContext'
 import VentaModal from '../../components/ventas/VentaModal'
 import VentaDetalle from '../../components/ventas/VentaDetalle'
+import EstadoError from '../../components/common/EstadoError' // NUEVO
 
 const IconPlus = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -72,6 +73,7 @@ export default function VentasPage() {
   const [ventas, setVentas]                       = useState([])
   const [totalVentas, setTotalVentas]             = useState(0) 
   const [loading, setLoading]                     = useState(true)
+  const [errorCarga, setErrorCarga]               = useState(false) // NUEVO
   const [modalOpen, setModalOpen]                 = useState(false)
   const [detalleOpen, setDetalleOpen]             = useState(false)
   const [ventaSeleccionada, setVentaSeleccionada] = useState(null)
@@ -121,7 +123,9 @@ export default function VentasPage() {
       .then(res => {
         setVentas(res.data.results)
         setTotalVentas(res.data.count)
+        setErrorCarga(false) // NUEVO
       })
+      .catch(() => setErrorCarga(true)) // NUEVO
       .finally(() => setLoading(false))
   }
 
@@ -327,12 +331,20 @@ export default function VentasPage() {
         </p>
       )}
 
+      {/* ── Error de carga (NUEVO) ── */}
+      {errorCarga && !loading && (
+        <EstadoError
+          mensaje="No se pudieron cargar las ventas. Verifica tu conexión e intenta de nuevo."
+          onReintentar={cargarVentas}
+        />
+      )}
+
       {/* Tabla */}
       {loading ? (
         <div style={{ color: '#94a3b8', fontSize: '13px', padding: '20px 0' }}>
           Cargando ventas...
         </div>
-      ) : (
+      ) : errorCarga ? null : (
         <div style={{
           background: 'white', border: '1px solid #e2e8f0',
           borderRadius: '10px', overflow: 'hidden',

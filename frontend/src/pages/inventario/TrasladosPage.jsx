@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getTiposCafe, getBodegas, trasladar } from '../../api/inventario'
+import EstadoError from '../../components/common/EstadoError' // NUEVO
 
 // ─── Iconos SVG inline ────────────────────────────────────────────────────────
 const IconArrow = () => (
@@ -74,10 +75,23 @@ export default function TrasladosPage() {
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState(null)
   const [exito, setExito]         = useState(null)
+  const [errorCarga, setErrorCarga] = useState(false) // NUEVO
+
+  // NUEVO: si estos dos fallan, antes el formulario se quedaba con los
+  // selects de "tipo de café" y "bodega" vacíos, sin ninguna explicación
+  // de por qué el usuario no podía elegir nada.
+  const cargarOpciones = () => {
+    setErrorCarga(false)
+    Promise.all([getTiposCafe(), getBodegas()])
+      .then(([resTipos, resBodegas]) => {
+        setTiposCafe(resTipos.data)
+        setBodegas(resBodegas.data)
+      })
+      .catch(() => setErrorCarga(true))
+  }
 
   useEffect(() => {
-    getTiposCafe().then(res => setTiposCafe(res.data))
-    getBodegas().then(res => setBodegas(res.data))
+    cargarOpciones()
   }, [])
 
   const handleChange = (e) => {
@@ -181,6 +195,16 @@ export default function TrasladosPage() {
           </span>
           {error}
         </div>
+      )}
+
+      {/* ── Error al cargar tipos de café / bodegas (NUEVO) ──
+           Sin esto, si esta petición fallaba, los selects del formulario
+           quedaban vacíos sin ninguna pista de por qué. ── */}
+      {errorCarga && (
+        <EstadoError
+          mensaje="No se pudieron cargar los tipos de café y las bodegas. El formulario no puede usarse hasta que esto cargue."
+          onReintentar={cargarOpciones}
+        />
       )}
 
       {/* ── Layout principal ── */}

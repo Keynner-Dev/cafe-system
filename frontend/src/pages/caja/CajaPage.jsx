@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getCajas, getCajasDestino, getMovimientos, cerrarCaja, abrirCaja, createTraslado, getHistorialCierres } from '../../api/caja';
 import { useAuth } from '../../context/AuthContext';
 import MovimientoModal from '../../components/caja/MovimientoModal';
+import EstadoError from '../../components/common/EstadoError'; // NUEVO
 
 const IconPlus = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -414,6 +415,12 @@ export default function CajaPage() {
   const [cargandoCajas,     setCargandoCajas]     = useState(true);
   const [cargandoMov,       setCargandoMov]       = useState(false);
   const [cargandoHistorial, setCargandoHistorial] = useState(false);
+  // NUEVO: una carga por cada uno de los 3 fetches independientes de esta
+  // página — cada uno puede fallar por separado y necesita su propio aviso
+  // (ej. las cajas cargaron bien pero el historial de cierres falló).
+  const [errorCajas,        setErrorCajas]        = useState(false);
+  const [errorMov,          setErrorMov]          = useState(false);
+  const [errorHistorial,    setErrorHistorial]    = useState(false);
   const [modalAbierto,      setModalAbierto]      = useState(false);
   const [modalCierre,       setModalCierre]       = useState(false);
   const [modalTraslado,     setModalTraslado]     = useState(false);
@@ -432,18 +439,25 @@ export default function CajaPage() {
   const totalPaginasHistorial = Math.max(1, Math.ceil(totalCierres / PAGE_SIZE_HISTORIAL));
 
   // Carga inicial de cajas
-  useEffect(() => {
+  const cargarCajas = () => {
+    setCargandoCajas(true);
     getCajas()
       .then(res => {
         const data = res.data;
         setCajas(data);
         if (!esJefe && data.length > 0) setCajaSeleccionada(data[0]);
+        setErrorCajas(false); // NUEVO
       })
+      .catch(() => setErrorCajas(true)) // NUEVO
       .finally(() => setCargandoCajas(false));
 
     if (!esJefe) {
-      getCajasDestino().then(res => setCajasDestino(res.data));
+      getCajasDestino().then(res => setCajasDestino(res.data)).catch(() => {}); // NUEVO: catch silencioso -- solo alimenta el selector de traslado, no bloquea la página
     }
+  };
+
+  useEffect(() => {
+    cargarCajas();
   }, []);
 
   // Carga movimientos al cambiar de caja — resetea pestaña, historial y su paginación
@@ -455,7 +469,11 @@ export default function CajaPage() {
     setTabActiva('movimientos');
     setCargandoMov(true);
     getMovimientos(cajaSeleccionada.id)
-      .then(res => setMovimientos(res.data))
+      .then(res => {
+        setMovimientos(res.data);
+        setErrorMov(false); // NUEVO
+      })
+      .catch(() => setErrorMov(true)) // NUEVO
       .finally(() => setCargandoMov(false));
   }, [cajaSeleccionada]);
 
@@ -470,7 +488,9 @@ export default function CajaPage() {
         const count = Array.isArray(data) ? data.length : (data?.count ?? results.length);
         setHistorialCierres(results);
         setTotalCierres(count);
+        setErrorHistorial(false); // NUEVO
       })
+      .catch(() => setErrorHistorial(true)) // NUEVO
       .finally(() => setCargandoHistorial(false));
   }, [cajaSeleccionada, tabActiva, paginaHistorial]);
 
@@ -510,6 +530,20 @@ export default function CajaPage() {
           border: '3px solid #e2e8f0', borderTopColor: '#16a34a',
           animation: 'spin 0.8s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    );
+  }
+
+  // NUEVO: si esta carga falla, nada más en la página puede funcionar
+  // (no hay caja seleccionada, no hay movimientos que mostrar), así que
+  // se reemplaza toda la página por el error en vez de dejarla a medias.
+  if (errorCajas) {
+    return (
+      <div style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto' }}>
+        <EstadoError
+          mensaje="No se pudieron cargar las cajas. Verifica tu conexión e intenta de nuevo."
+          onReintentar={cargarCajas}
+        />
       </div>
     );
   }
@@ -758,6 +792,19 @@ export default function CajaPage() {
                   border: '3px solid #e2e8f0', borderTopColor: '#16a34a',
                   animation: 'spin 0.8s linear infinite' }} />
               </div>
+            ) : errorMov ? (
+              <div style={{ padding: 20 }}>
+                <EstadoError
+                  mensaje="No se pudieron cargar los movimientos de esta caja."
+                  onReintentar={() => {
+                    setCargandoMov(true);
+                    getMovimientos(cajaSeleccionada.id)
+                      .then(res => { setMovimientos(res.data); setErrorMov(false); })
+                      .catch(() => setErrorMov(true))
+                      .finally(() => setCargandoMov(false));
+                  }}
+                />
+              </div>
             ) : movimientosFiltrados.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 14 }}>
                 No hay movimientos {filtroTipo !== 'todos' ? `de tipo "${filtroTipo}"` : 'registrados aún'}
@@ -810,6 +857,26 @@ export default function CajaPage() {
                 <div style={{ width: 28, height: 28, borderRadius: '50%',
                   border: '3px solid #e2e8f0', borderTopColor: '#16a34a',
                   animation: 'spin 0.8s linear infinite' }} />
+              </div>
+            ) : errorHistorial ? (
+              <div style={{ padding: 20 }}>
+                <EstadoError
+                  mensaje="No se pudo cargar el historial de cierres de esta caja."
+                  onReintentar={() => {
+                    setCargandoHistorial(true);
+                    getHistorialCierres(cajaSeleccionada.id, { page: paginaHistorial })
+                      .then(res => {
+                        const data = res.data;
+                        const results = Array.isArray(data) ? data : (data?.results ?? []);
+                        const count = Array.isArray(data) ? data.length : (data?.count ?? results.length);
+                        setHistorialCierres(results);
+                        setTotalCierres(count);
+                        setErrorHistorial(false);
+                      })
+                      .catch(() => setErrorHistorial(true))
+                      .finally(() => setCargandoHistorial(false));
+                  }}
+                />
               </div>
             ) : historialCierres.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 14 }}>

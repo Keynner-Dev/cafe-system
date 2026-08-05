@@ -3,6 +3,7 @@ import { getLetras, getLetrasResumen } from '../../api/letras';
 import { useAuth } from '../../context/AuthContext';
 import LetraModal from '../../components/letras/LetraModal';
 import AbonoLetraModal from '../../components/letras/AbonoLetraModal';
+import EstadoError from '../../components/common/EstadoError'; // NUEVO
 
 const IconChevronLeft = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -32,6 +33,7 @@ export default function LetrasPage() {
 
   const [letras, setLetras] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(false); // NUEVO
   const [filtroEstado, setFiltroEstado] = useState('');
   const [modalCrear, setModalCrear] = useState(false);
   const [letraAbono, setLetraAbono] = useState(null);
@@ -61,7 +63,9 @@ export default function LetrasPage() {
         const count = Array.isArray(data) ? data.length : (data?.count ?? results.length);
         setLetras(results);
         setTotalLetras(count);
+        setErrorCarga(false); // NUEVO
       })
+      .catch(() => setErrorCarga(true)) // NUEVO
       .finally(() => setLoading(false));
   };
 
@@ -212,6 +216,15 @@ export default function LetrasPage() {
                     animation: 'spin 0.7s linear infinite', margin: '0 auto',
                   }}/>
                   <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                </td>
+              </tr>
+            ) : errorCarga ? (
+              <tr>
+                <td colSpan={8} style={{ padding: '16px' }}>
+                  <EstadoError
+                    mensaje="No se pudieron cargar las letras. Verifica tu conexión e intenta de nuevo."
+                    onReintentar={cargar}
+                  />
                 </td>
               </tr>
             ) : letras.length === 0 ? (
