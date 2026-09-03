@@ -87,9 +87,20 @@ const labelStyle = {
 
 const hoy = new Date().toISOString().split('T')[0]
 
-const crearDetalleVacio = (bodegaDefault = '') => ({
-  tipo_cafe: '', bodega: bodegaDefault, kilos: '', precio_kilo: '', es_deposito: false
+const crearDetalleVacio = (bodegaDefault = '', tipoCafeDefault = '') => ({
+  tipo_cafe: tipoCafeDefault, bodega: bodegaDefault, kilos: '', precio_kilo: '', es_deposito: false
 })
+
+// NUEVO [Sprint 6, ítem 40]: "Café Seco" por defecto en cada línea nueva de
+// compra -- el usuario lo puede cambiar como cualquier otro campo. Se busca
+// por nombre (sin distinguir mayúsculas/tildes) en vez de un ID fijo, porque
+// el ID puede variar entre entornos.
+const buscarIdCafeSeco = (tiposCafe) => {
+  const encontrado = tiposCafe.find(t =>
+    t.nombre?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim() === 'cafe seco'
+  )
+  return encontrado ? String(encontrado.id) : ''
+}
 
 function formatCOP(val) {
   return `$${Number(val || 0).toLocaleString('es-CO')}`
@@ -569,6 +580,27 @@ export default function CompraModal({ onClose, onSaved }) {
     getPreciosHoy().then(res => setPreciosHoy(res.data))
   }, [])
 
+  // NUEVO [Sprint 6, ítem 40]: cuando llegan los tipos de café, si la
+  // primera línea todavía no tiene tipo elegido (formulario recién abierto,
+  // sin tocar), se preselecciona "Café Seco" -- igual que si el usuario lo
+  // hubiera elegido a mano, incluyendo el precio del día si ya está
+  // disponible. Si el usuario ya eligió algo mientras tanto, no se pisa.
+  useEffect(() => {
+    if (tiposCafe.length === 0) return
+    const idCafeSeco = buscarIdCafeSeco(tiposCafe)
+    if (!idCafeSeco) return
+    const precioHoy = preciosHoy.find(p => String(p.tipo_cafe) === idCafeSeco)
+    setDetalles(prev =>
+      prev.length === 1 && !prev[0].tipo_cafe
+        ? [{
+            ...prev[0],
+            tipo_cafe: idCafeSeco,
+            precio_kilo: precioHoy ? precioHoy.precio : prev[0].precio_kilo,
+          }]
+        : prev
+    )
+  }, [tiposCafe, preciosHoy])
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target))
@@ -644,7 +676,7 @@ export default function CompraModal({ onClose, onSaved }) {
 
   const agregarDetalle = () => setDetalles([
     ...detalles,
-    crearDetalleVacio(esAdministrador ? bodegaUsuario : '')
+    crearDetalleVacio(esAdministrador ? bodegaUsuario : '', buscarIdCafeSeco(tiposCafe))
   ])
   const eliminarDetalle = (index) => {
     if (detalles.length === 1) return
@@ -721,7 +753,7 @@ export default function CompraModal({ onClose, onSaved }) {
   const handleNuevaCompra = () => {
     setCompraCreadada(null)
     setForm({ caficultor: '', fecha: hoy, nota: '' })
-    setDetalles([crearDetalleVacio(esAdministrador ? bodegaUsuario : '')])
+    setDetalles([crearDetalleVacio(esAdministrador ? bodegaUsuario : '', buscarIdCafeSeco(tiposCafe))])
     setBusqueda('')
     setCaficultorSeleccionado(null)
     setError(null)

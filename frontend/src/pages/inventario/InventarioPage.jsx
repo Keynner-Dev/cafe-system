@@ -95,7 +95,8 @@ export default function InventarioPage() {
   // 'bodega'. Con 'bodega' el valor era undefined, String(undefined ?? '')
   // daba '' y el admin no filtraba por su propia bodega al consultar stock.
   const [stockFilas, setStockFilas] = useState([])
-  const [stockTotales, setStockTotales] = useState(null)
+  // NUEVO [Sprint 6, ítem 29]: stockTotales se quitó -- las tarjetas de
+  // Total Entradas/Salidas/Stock que lo usaban ya no se muestran.
   const [filtroBodega, setFiltroBodega] = useState(
     esJefe ? '' : String(usuario?.bodega_id ?? '')
   )
@@ -133,15 +134,13 @@ export default function InventarioPage() {
     getStockDetallado(params)
       .then(res => {
         setStockFilas(Array.isArray(res.data.filas) ? res.data.filas : [])
-        setStockTotales(res.data.totales ?? null)
       })
       .catch(() => {
         // Ítem 12 (UX): antes, si la consulta fallaba, el mensaje de error
-        // se mostraba junto a la tabla/tarjetas de la consulta ANTERIOR,
-        // dando a entender que esos números seguían siendo válidos. Ahora
-        // se limpian para que el error sea la única fuente de verdad visible.
+        // se mostraba junto a la tabla de la consulta ANTERIOR, dando a
+        // entender que esos números seguían siendo válidos. Ahora se limpia
+        // para que el error sea la única fuente de verdad visible.
         setStockFilas([])
-        setStockTotales(null)
         setErrorStock('No se pudo cargar el stock. Intenta de nuevo.')
       })
       .finally(() => setLoadingStock(false))
@@ -574,42 +573,9 @@ export default function InventarioPage() {
             </div>
           )}
 
-          {/* Totales */}
-          {stockTotales && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-              {[
-                { label: 'Total Entradas', value: stockTotales.entradas,     color: '#2563eb', bg: '#eff6ff' },
-                { label: 'Total Salidas',  value: stockTotales.salidas,      color: '#dc2626', bg: '#fef2f2' },
-                {
-                  label: 'Stock Actual',
-                  value: stockTotales.stock_actual,
-                  // Ítem 12 (UX): antes siempre verde, incluso si por algún
-                  // error de datos el total diera negativo. Ahora refleja
-                  // el signo real: verde solo si es positivo, gris si es
-                  // exactamente 0, rojo si es negativo (caso anómalo que
-                  // merece llamar la atención en vez de disfrazarse de OK).
-                  color: stockTotales.stock_actual > 0 ? '#16a34a'
-                       : stockTotales.stock_actual < 0 ? '#dc2626'
-                       : '#94a3b8',
-                  bg: '#f0fdf4',
-                },
-              ].map(card => (
-                <div key={card.label} style={{
-                  background: 'white', border: '1px solid #e2e8f0',
-                  borderRadius: '10px', padding: '20px',
-                  borderLeft: `3px solid ${card.color}`,
-                }}>
-                  <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 8px 0', fontWeight: 500 }}>
-                    {card.label}
-                  </p>
-                  <p style={{ fontSize: '26px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                    {formatKg(card.value)}
-                    <span style={{ fontSize: '14px', fontWeight: 400, color: '#94a3b8', marginLeft: '4px' }}>kg</span>
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* NUEVO [Sprint 6, ítem 29]: se quitaron las tarjetas de Total
+              Entradas/Salidas/Stock Actual a pedido de Jimmi — se queda
+              solo el desglose por bodega y tipo de café de abajo. */}
 
           {/* Desglose */}
           <div style={{

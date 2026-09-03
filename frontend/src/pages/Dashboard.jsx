@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getDashboard } from '../api/dashboard'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import DepositosPendientesModal from '../components/dashboard/DepositosPendientesModal' // ÍTEM 38
 
 const formatCOP = (val) => `$${Number(val || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 })}`
 const formatKg  = (val) => `${Number(val || 0).toLocaleString('es-CO')} kg`
@@ -19,13 +20,6 @@ const IconVentas = () => (
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-  </svg>
-)
-const IconStock = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
-    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
   </svg>
 )
 const IconDeposito = () => (
@@ -95,13 +89,31 @@ const IconCafe = () => (
   </svg>
 )
 
-function CardMetrica({ icono, label, valor, sub, accentColor, bgColor }) {
+// ── ÍTEMS 38/39: CardMetrica ahora acepta un onClick opcional. Si
+// viene, la tarjeta se vuelve clicable (cursor pointer + leve hover),
+// sin afectar a las tarjetas que no lo usan. ──
+function CardMetrica({ icono, label, valor, sub, accentColor, bgColor, onClick }) {
   return (
-    <div style={{
-      background: 'white', border: '1px solid #e2e8f0',
-      borderRadius: '10px', padding: '20px',
-      display: 'flex', alignItems: 'center', gap: '16px',
-    }}>
+    <div
+      onClick={onClick}
+      style={{
+        background: 'white', border: '1px solid #e2e8f0',
+        borderRadius: '10px', padding: '20px',
+        display: 'flex', alignItems: 'center', gap: '16px',
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'box-shadow 0.15s, transform 0.15s',
+      }}
+      onMouseEnter={e => {
+        if (!onClick) return
+        e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.08)'
+        e.currentTarget.style.transform = 'translateY(-1px)'
+      }}
+      onMouseLeave={e => {
+        if (!onClick) return
+        e.currentTarget.style.boxShadow = 'none'
+        e.currentTarget.style.transform = 'translateY(0)'
+      }}
+    >
       <div style={{
         width: '48px', height: '48px', borderRadius: '10px',
         background: bgColor, display: 'flex', alignItems: 'center',
@@ -180,6 +192,7 @@ export default function Dashboard() {
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
   const [periodo, setPeriodo] = useState('dia')
+  const [depositosModalOpen, setDepositosModalOpen] = useState(false) // ÍTEM 38
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -252,14 +265,9 @@ export default function Dashboard() {
           accentColor="#2563eb"
           bgColor="#eff6ff"
         />
-        <CardMetrica
-          icono={<IconStock />}
-          label="Stock total"
-          valor={formatKg(data.stock.total_kilos)}
-          sub={esJefe ? 'En todas las bodegas' : data.bodega_nombre}
-          accentColor="#d97706"
-          bgColor="#fffbeb"
-        />
+        {/* NUEVO [Sprint 6, ítem 28]: se quitó la tarjeta "Stock total" a
+            pedido de Jimmi. El desglose de stock por bodega y por tipo de
+            café más abajo en esta misma página se queda igual. */}
         <CardMetrica
           icono={<IconDeposito />}
           label="Depósitos pendientes"
@@ -267,6 +275,9 @@ export default function Dashboard() {
           sub={`${data.depositos.cantidad} depósito(s)`}
           accentColor="#ea580c"
           bgColor="#fff7ed"
+          // ── ÍTEM 38: clic → abre el modal con el detalle depósito por
+          // depósito (antes solo se veía el total agregado) ──
+          onClick={() => setDepositosModalOpen(true)}
         />
         <CardMetrica
           icono={<IconVentas />}
@@ -275,6 +286,9 @@ export default function Dashboard() {
           sub={`${data.remisiones.cantidad_hoy} remisión(es)`}
           accentColor="#16a34a"
           bgColor="#f0fdf4"
+          // ── ÍTEM 39: clic → Ventas, con el formulario de nueva
+          // remisión ya abierto (VentasPage.jsx lee ?nuevo=true) ──
+          onClick={() => navigate('/ventas?nuevo=true')}
         />
         {esJefe ? (
           <CardMetrica
@@ -585,6 +599,11 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* ÍTEM 38: modal de detalle de depósitos pendientes */}
+      {depositosModalOpen && (
+        <DepositosPendientesModal onClose={() => setDepositosModalOpen(false)} />
+      )}
 
     </div>
   )

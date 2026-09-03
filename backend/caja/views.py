@@ -104,13 +104,24 @@ class MovimientoCajaViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         usuario = self.request.user
         caja_id = self.request.query_params.get('caja')
+        # NUEVO (Sprint 6, ítem 32): filtro por fecha y por tipo
+        # (ingreso/egreso), + paginación ya activa por default de DRF
+        # (PAGE_SIZE=10) -- antes el frontend descartaba la info de
+        # paginación y solo mostraba los primeros 10 movimientos sin
+        # forma de ver más.
+        fecha = self.request.query_params.get('fecha')
+        tipo = self.request.query_params.get('tipo')
         qs = MovimientoCaja.objects.select_related('creado_por')
 
         if usuario.rol == 'administrador':
             qs = qs.filter(caja__bodega=usuario.bodega)
         if caja_id:
             qs = qs.filter(caja_id=caja_id)
-        return qs
+        if fecha:
+            qs = qs.filter(fecha__date=fecha)
+        if tipo and tipo != 'todos':
+            qs = qs.filter(tipo=tipo)
+        return qs.order_by('-fecha')
 
     def perform_create(self, serializer):
         usuario = self.request.user
@@ -124,6 +135,88 @@ class MovimientoCajaViewSet(viewsets.ModelViewSet):
             raise ValidationError('La caja está cerrada. Debes abrirla antes de registrar movimientos.')
 
         serializer.save(creado_por=usuario)
+
+    @action(detail=False, methods=['get'], url_path='resumen-dia')
+    def resumen_dia(self, request):
+        """NUEVO (Sprint 6, ítem 33): totales de ingresos y egresos de HOY
+        para la caja indicada, para poder cuadrar caja. Es independiente
+        de la paginación/filtros de la lista de movimientos -- siempre es
+        el total real del día, sin importar qué página esté viendo el
+        usuario."""
+        from django.utils import timezone
+        from django.db.models import Sum
+
+        usuario = request.user
+        caja_id = request.query_params.get('caja')
+        if not caja_id:
+            raise ValidationError('Debes especificar la caja.')
+
+        qs = MovimientoCaja.objects.filter(
+            caja_id=caja_id, fecha__date=timezone.localdate()
+        )
+        if usuario.rol == 'administrador':
+            qs = qs.filter(caja__bodega=usuario.bodega)
+
+        ingresos = qs.filter(tipo='ingreso').aggregate(total=Sum('valor'))['total'] or 0
+        egresos = qs.filter(tipo='egreso').aggregate(total=Sum('valor'))['total'] or 0
+
+        return Response({
+            'ingresos': float(ingresos),
+            'egresos': float(egresos),
+            'neto': float(ingresos) - float(egresos),
+        })
+
+    @action(detail=False, methods=['get'], url_path='exportar-dia')
+    def exportar_dia(self, request):
+        """NUEVO (Sprint 6, ítem 34): datos completos (sin paginar) de los
+        movimientos de HOY para exportar en Excel/PDF desde el frontend.
+        Se hace aparte del listado normal porque ese sí va paginado de a
+        10 y para exportar hace falta el día completo.
+
+        Cada movimiento se categoriza por "concepto" a partir del prefijo
+        de su descripción (todo lo que va antes de " — "), ej. "Gasto",
+        "Vale", "Abono vale", "Letra de cambio", "Flete remisión". No
+        existe un campo de categoría en el modelo -- se deriva del patrón
+        de texto que ya usan Gastos, Letras, Cuentas por pagar y Ventas al
+        crear cada movimiento. Si el patrón de esos módulos cambia en el
+        futuro, esta categorización hay que revisarla también.
+        """
+        from django.utils import timezone
+        from django.db.models import Sum
+
+        usuario = request.user
+        caja_id = request.query_params.get('caja')
+        if not caja_id:
+            raise ValidationError('Debes especificar la caja.')
+
+        qs = MovimientoCaja.objects.filter(
+            caja_id=caja_id, fecha__date=timezone.localdate()
+        ).select_related('creado_por').order_by('fecha')
+        if usuario.rol == 'administrador':
+            qs = qs.filter(caja__bodega=usuario.bodega)
+
+        movimientos = []
+        totales_por_concepto = {}
+        for mov in qs:
+            concepto = mov.descripcion.split(' — ')[0].strip() if ' — ' in mov.descripcion else mov.descripcion
+            movimientos.append({
+                'fecha': mov.fecha.isoformat(),
+                'tipo': mov.tipo,
+                'concepto': concepto,
+                'descripcion': mov.descripcion,
+                'valor': float(mov.valor),
+                'registrado_por': mov.creado_por.username if mov.creado_por else '',
+            })
+            clave = f"{mov.tipo}:{concepto}"
+            totales_por_concepto[clave] = totales_por_concepto.get(clave, 0) + float(mov.valor)
+
+        return Response({
+            'movimientos': movimientos,
+            'totales_por_concepto': [
+                {'tipo': clave.split(':')[0], 'concepto': clave.split(':')[1], 'total': total}
+                for clave, total in totales_por_concepto.items()
+            ],
+        })
 
 
 class CierreCajaViewSet(viewsets.ReadOnlyModelViewSet):

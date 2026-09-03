@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getCajas, getCajasDestino, getMovimientos, cerrarCaja, abrirCaja, createTraslado, getHistorialCierres } from '../../api/caja';
+import { getCajas, getCajasDestino, getMovimientos, getResumenDiaCaja, getExportarDiaCaja, cerrarCaja, abrirCaja, createTraslado, getHistorialCierres } from '../../api/caja';
+import { exportarExcelCaja, exportarPDFCaja } from '../../utils/exportarCaja';
 import { useAuth } from '../../context/AuthContext';
 import MovimientoModal from '../../components/caja/MovimientoModal';
 import EstadoError from '../../components/common/EstadoError'; // NUEVO
@@ -438,6 +439,20 @@ export default function CajaPage() {
   const PAGE_SIZE_HISTORIAL = 10; // debe coincidir con settings.REST_FRAMEWORK['PAGE_SIZE']
   const totalPaginasHistorial = Math.max(1, Math.ceil(totalCierres / PAGE_SIZE_HISTORIAL));
 
+  // ── NUEVO (Sprint 6, ítem 32): filtro por fecha + paginación de
+  // "Movimientos", mismo patrón que el historial de cierres de arriba.
+  const [paginaMov,      setPaginaMov]      = useState(1);
+  const [totalMov,       setTotalMov]       = useState(0);
+  const [filtroFecha,    setFiltroFecha]    = useState('');
+  const PAGE_SIZE_MOV = 10; // debe coincidir con settings.REST_FRAMEWORK['PAGE_SIZE']
+  const totalPaginasMov = Math.max(1, Math.ceil(totalMov / PAGE_SIZE_MOV));
+
+  // ── NUEVO (Sprint 6, ítem 33): totales de ingresos/egresos de HOY,
+  // para poder cuadrar caja -- independiente de la página/filtro que
+  // esté viendo el usuario en la tabla de movimientos.
+  const [resumenDia, setResumenDia] = useState(null);
+  const [exportando, setExportando] = useState(false); // NUEVO (ítem 34)
+
   // Carga inicial de cajas
   const cargarCajas = () => {
     setCargandoCajas(true);
@@ -460,21 +475,50 @@ export default function CajaPage() {
     cargarCajas();
   }, []);
 
-  // Carga movimientos al cambiar de caja — resetea pestaña, historial y su paginación
+  // Carga movimientos al cambiar de caja, de página, o de filtros
   useEffect(() => {
     if (!cajaSeleccionada) return;
-    setHistorialCierres([]);
-    setTotalCierres(0);
-    setPaginaHistorial(1);
-    setTabActiva('movimientos');
     setCargandoMov(true);
-    getMovimientos(cajaSeleccionada.id)
+    getMovimientos(cajaSeleccionada.id, {
+      page: paginaMov,
+      fecha: filtroFecha || undefined,
+      tipo: filtroTipo,
+    })
       .then(res => {
-        setMovimientos(res.data);
+        const data = res.data;
+        const results = Array.isArray(data) ? data : (data?.results ?? []);
+        const count = Array.isArray(data) ? data.length : (data?.count ?? results.length);
+        setMovimientos(results);
+        setTotalMov(count);
         setErrorMov(false); // NUEVO
       })
       .catch(() => setErrorMov(true)) // NUEVO
       .finally(() => setCargandoMov(false));
+  }, [cajaSeleccionada, paginaMov, filtroFecha, filtroTipo]);
+
+  // Si el usuario cambia el filtro de fecha o de tipo, vuelve a la
+  // página 1 -- si no, podría quedar en una página que ya no existe
+  // para el nuevo filtro (ej. estaba en la página 3 y el filtro nuevo
+  // solo tiene 1 página de resultados).
+  useEffect(() => {
+    setPaginaMov(1);
+  }, [filtroFecha, filtroTipo]);
+
+  // Al cambiar de caja: vuelve a la pestaña "movimientos", resetea el
+  // historial de cierres (pertenece a otra caja) y las paginaciones/filtros
+  useEffect(() => {
+    setTabActiva('movimientos');
+    setHistorialCierres([]);
+    setTotalCierres(0);
+    setPaginaHistorial(1);
+    setPaginaMov(1);
+    setFiltroFecha('');
+    setResumenDia(null);
+    if (cajaSeleccionada) {
+      getResumenDiaCaja(cajaSeleccionada.id)
+        .then(res => setResumenDia(res.data))
+        .catch(() => setResumenDia(null)); // silencioso -- no bloquea el resto de la página si falla
+    }
   }, [cajaSeleccionada]);
 
   // Carga historial de cierres al activar esa pestaña o cambiar de página
@@ -503,7 +547,40 @@ export default function CajaPage() {
       }
     });
     if (cajaSeleccionada) {
-      getMovimientos(cajaSeleccionada.id).then(res => setMovimientos(res.data));
+      getMovimientos(cajaSeleccionada.id, {
+        page: paginaMov,
+        fecha: filtroFecha || undefined,
+        tipo: filtroTipo,
+      }).then(res => {
+        const data = res.data;
+        const results = Array.isArray(data) ? data : (data?.results ?? []);
+        const count = Array.isArray(data) ? data.length : (data?.count ?? results.length);
+        setMovimientos(results);
+        setTotalMov(count);
+      });
+      getResumenDiaCaja(cajaSeleccionada.id)
+        .then(res => setResumenDia(res.data))
+        .catch(() => {});
+    }
+  };
+
+  // NUEVO (Sprint 6, ítem 34): exportar movimientos del día en Excel o PDF
+  const handleExportar = async (formato) => {
+    if (!cajaSeleccionada) return;
+    setExportando(true);
+    try {
+      const res = await getExportarDiaCaja(cajaSeleccionada.id);
+      const fechaHoy = new Date().toISOString().split('T')[0];
+      const nombreBodega = cajaActual?.bodega_nombre?.replace(/\s+/g, '_') || 'caja';
+      if (formato === 'excel') {
+        exportarExcelCaja(res.data, nombreBodega, fechaHoy);
+      } else {
+        exportarPDFCaja(res.data, nombreBodega, fechaHoy);
+      }
+    } catch {
+      alert('No se pudo exportar. Intenta de nuevo.');
+    } finally {
+      setExportando(false);
     }
   };
 
@@ -514,9 +591,9 @@ export default function CajaPage() {
   };
 
   const totalConsolidado = cajas.reduce((acc, c) => acc + Number(c.saldo_actual), 0);
-  const movimientosFiltrados = movimientos.filter(mov =>
-    filtroTipo === 'todos' ? true : mov.tipo === filtroTipo
-  );
+  // NUEVO (Sprint 6, ítem 32): el filtro por tipo ya lo aplica el backend
+  // (ver getMovimientos con params.tipo), así que `movimientos` ya viene
+  // filtrado -- ya no hace falta filtrarlo de nuevo aquí.
   const cajaActual = cajaSeleccionada
     ? cajas.find(c => c.id === cajaSeleccionada.id) || cajaSeleccionada
     : null;
@@ -744,6 +821,43 @@ export default function CajaPage() {
               ))}
             </div>
 
+            {/* NUEVO (Sprint 6, ítem 33): totales de ingresos/egresos de
+                HOY, para cuadrar caja -- visible sin importar la pestaña
+                o el filtro que se esté usando en la tabla de abajo. */}
+            {resumenDia && (
+              <div style={{
+                display: 'flex', gap: 20, padding: '14px 20px',
+                borderBottom: '1px solid #f1f5f9', background: '#f8fafc',
+                flexWrap: 'wrap',
+              }}>
+                <div>
+                  <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase' }}>
+                    Ingresos hoy
+                  </span>
+                  <p style={{ margin: '2px 0 0', fontSize: 18, fontWeight: 700, color: '#16a34a' }}>
+                    {formatCOP(resumenDia.ingresos)}
+                  </p>
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase' }}>
+                    Egresos hoy
+                  </span>
+                  <p style={{ margin: '2px 0 0', fontSize: 18, fontWeight: 700, color: '#dc2626' }}>
+                    {formatCOP(resumenDia.egresos)}
+                  </p>
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase' }}>
+                    Neto del día
+                  </span>
+                  <p style={{ margin: '2px 0 0', fontSize: 18, fontWeight: 700,
+                    color: resumenDia.neto >= 0 ? '#16a34a' : '#dc2626' }}>
+                    {formatCOP(resumenDia.neto)}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Filtros tipo — solo en pestaña movimientos */}
             {tabActiva === 'movimientos' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -766,12 +880,43 @@ export default function CajaPage() {
                     </button>
                   ))}
                 </div>
+                {/* NUEVO (Sprint 6, ítem 32): filtro por fecha */}
+                <input
+                  type="date"
+                  value={filtroFecha}
+                  onChange={e => setFiltroFecha(e.target.value)}
+                  style={{
+                    padding: '5px 10px', borderRadius: 8, fontSize: 12,
+                    border: '1px solid #e2e8f0', color: '#334155',
+                  }}
+                />
+                {filtroFecha && (
+                  <button onClick={() => setFiltroFecha('')}
+                    style={{ fontSize: 12, color: '#64748b', background: 'none',
+                      border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                    Quitar fecha</button>
+                )}
                 {esJefe && cajaActual && (
                   <button onClick={() => setCajaSeleccionada(null)}
                     style={{ fontSize: 12, color: '#64748b', background: 'none',
                       border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
                     Volver al consolidado</button>
                 )}
+                {/* NUEVO (Sprint 6, ítem 34): exportar movimientos del día */}
+                <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+                  <button onClick={() => handleExportar('excel')} disabled={exportando}
+                    style={{ padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                      border: '1px solid #e2e8f0', background: 'white', color: '#166534',
+                      cursor: exportando ? 'not-allowed' : 'pointer', opacity: exportando ? 0.6 : 1 }}>
+                    {exportando ? 'Exportando…' : 'Excel'}
+                  </button>
+                  <button onClick={() => handleExportar('pdf')} disabled={exportando}
+                    style={{ padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                      border: '1px solid #e2e8f0', background: 'white', color: '#991b1b',
+                      cursor: exportando ? 'not-allowed' : 'pointer', opacity: exportando ? 0.6 : 1 }}>
+                    {exportando ? 'Exportando…' : 'PDF'}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -798,18 +943,33 @@ export default function CajaPage() {
                   mensaje="No se pudieron cargar los movimientos de esta caja."
                   onReintentar={() => {
                     setCargandoMov(true);
-                    getMovimientos(cajaSeleccionada.id)
-                      .then(res => { setMovimientos(res.data); setErrorMov(false); })
+                    getMovimientos(cajaSeleccionada.id, {
+                      page: paginaMov,
+                      fecha: filtroFecha || undefined,
+                      tipo: filtroTipo,
+                    })
+                      .then(res => {
+                        const data = res.data;
+                        const results = Array.isArray(data) ? data : (data?.results ?? []);
+                        const count = Array.isArray(data) ? data.length : (data?.count ?? results.length);
+                        setMovimientos(results);
+                        setTotalMov(count);
+                        setErrorMov(false);
+                      })
                       .catch(() => setErrorMov(true))
                       .finally(() => setCargandoMov(false));
                   }}
                 />
               </div>
-            ) : movimientosFiltrados.length === 0 ? (
+            ) : movimientos.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 14 }}>
-                No hay movimientos {filtroTipo !== 'todos' ? `de tipo "${filtroTipo}"` : 'registrados aún'}
+                No hay movimientos
+                {filtroTipo !== 'todos' ? ` de tipo "${filtroTipo}"` : ''}
+                {filtroFecha ? ` el ${filtroFecha}` : ''}
+                {filtroTipo === 'todos' && !filtroFecha ? ' registrados aún' : ''}
               </div>
             ) : (
+              <>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#0f172a' }}>
@@ -821,7 +981,7 @@ export default function CajaPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {movimientosFiltrados.map((mov, i) => (
+                  {movimientos.map((mov, i) => (
                     <tr key={mov.id}
                       style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #f1f5f9' }}
                       onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
@@ -847,6 +1007,57 @@ export default function CajaPage() {
                   ))}
                 </tbody>
               </table>
+
+              {/* NUEVO (Sprint 6, ítem 32): pie de tabla con conteo real +
+                   controles de paginación, mismo patrón que Historial de
+                   cierres / LetrasPage / GastosPage. Antes esta tabla no
+                   tenía paginación -- el backend siempre paginó de a 10,
+                   pero el frontend descartaba esa info y solo mostraba los
+                   10 movimientos más recientes sin forma de ver el resto. */}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '10px 16px', borderTop: '1px solid #f1f5f9',
+                flexWrap: 'wrap', gap: '10px',
+              }}>
+                <span style={{ color: '#94a3b8', fontSize: '12px' }}>
+                  {totalMov} movimiento{totalMov !== 1 ? 's' : ''} en total
+                </span>
+
+                {totalPaginasMov > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <button
+                      onClick={() => setPaginaMov(p => Math.max(1, p - 1))}
+                      disabled={paginaMov === 1}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: '28px', height: '28px', borderRadius: '6px',
+                        border: '1px solid #e2e8f0', background: 'white',
+                        color: paginaMov === 1 ? '#cbd5e1' : '#475569',
+                        cursor: paginaMov === 1 ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <IconChevronLeft />
+                    </button>
+                    <span style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                      Página {paginaMov} de {totalPaginasMov}
+                    </span>
+                    <button
+                      onClick={() => setPaginaMov(p => Math.min(totalPaginasMov, p + 1))}
+                      disabled={paginaMov === totalPaginasMov}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: '28px', height: '28px', borderRadius: '6px',
+                        border: '1px solid #e2e8f0', background: 'white',
+                        color: paginaMov === totalPaginasMov ? '#cbd5e1' : '#475569',
+                        cursor: paginaMov === totalPaginasMov ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <IconChevronRight />
+                    </button>
+                  </div>
+                )}
+              </div>
+              </>
             )
           )}
 

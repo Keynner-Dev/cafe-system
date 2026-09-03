@@ -1,9 +1,5 @@
 import api from './axios';
 
-// ── Helper interno ─────────────────────────────────────────────────────────────
-// La paginación global (PAGE_SIZE: 10) envuelve las respuestas de lista en
-// {count, next, previous, results}. Se desenvuelve aquí para que ningún
-// caller tenga que saber si la respuesta está paginada o no.
 const desenvolver = (res) =>
   Array.isArray(res.data) ? res.data : (res.data?.results ?? []);
 
@@ -12,8 +8,13 @@ export const getCajas        = ()       => api.get('/caja/cajas/').then(res => (
 export const getCajasDestino = ()       => api.get('/caja/cajas/destinos/').then(res => ({ ...res, data: desenvolver(res) }));
 
 // Movimientos
-export const getMovimientos   = (cajaId) => api.get(`/caja/movimientos/?caja=${cajaId}`).then(res => ({ ...res, data: desenvolver(res) }));
+export const getMovimientos = (cajaId, opciones = {}) =>
+  api.get('/caja/movimientos/', { params: { caja: cajaId, ...opciones } });
 export const createMovimiento = (datos)  => api.post('/caja/movimientos/', datos);
+//totales de ingresos/egresos de HOY para cuadrar caja
+export const getResumenDiaCaja = (cajaId) => api.get('/caja/movimientos/resumen-dia/', { params: { caja: cajaId } });
+//datos completos del día para exportar en Excel/PDF
+export const getExportarDiaCaja = (cajaId) => api.get('/caja/movimientos/exportar-dia/', { params: { caja: cajaId } });
 
 // Cierre / apertura
 export const cerrarCaja = (cajaId, datos) => api.post(`/caja/cajas/${cajaId}/cerrar/`, datos);

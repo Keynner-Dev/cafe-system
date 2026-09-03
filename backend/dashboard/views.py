@@ -247,3 +247,31 @@ def dashboard_data(request):
         'ultimas_compras': ultimas_compras,
         'ultimas_ventas': ultimas_ventas,
     })
+    
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def depositos_pendientes_detalle(request):
+    """Detalle depósito por depósito de los pendientes de liquidar, para
+    el modal que se abre al hacer clic en la tarjeta "Depósitos
+    pendientes" del Dashboard. Antes de este ítem, dashboard_data solo
+    exponía el total agregado (kilos_pendientes, cantidad)."""
+    usuario = request.user
+    es_jefe = usuario.rol == 'jefe'
+    bodega_id = None if es_jefe else usuario.bodega_id
+ 
+    depositos = DetalleCompra.objects.filter(
+        es_deposito=True, liquidado=False
+    ).select_related('compra', 'compra__caficultor', 'bodega').order_by('compra__fecha')
+ 
+    if bodega_id:
+        depositos = depositos.filter(bodega_id=bodega_id)
+ 
+    data = [{
+        'compra_id': d.compra_id,
+        'caficultor': d.compra.caficultor.nombre,
+        'bodega': d.bodega.nombre,
+        'fecha': str(d.compra.fecha),
+        'kilos_pendientes': float(d.kilos_pendientes_liquidar),
+    } for d in depositos]
+ 
+    return Response(data)
