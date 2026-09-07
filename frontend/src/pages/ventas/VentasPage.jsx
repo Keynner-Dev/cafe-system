@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { getVentas, getVenta, deleteVenta } from '../../api/ventas'
 import { useAuth } from '../../context/AuthContext'
 import VentaModal from '../../components/ventas/VentaModal'
@@ -69,6 +70,7 @@ const CAMPOS_ORDEN_BACKEND_SOPORTADOS = ['id', 'fecha']
 export default function VentasPage() {
   const { usuario } = useAuth()
   const esJefe = usuario?.rol === 'jefe'
+  const [searchParams, setSearchParams] = useSearchParams() // ÍTEM 39
 
   const [ventas, setVentas]                       = useState([])
   const [totalVentas, setTotalVentas]             = useState(0) 
@@ -132,6 +134,20 @@ export default function VentasPage() {
   useEffect(() => {
     cargarVentas()
   }, [pagina, busquedaDebounced, ordenCampo, ordenDir, filtroFechaDesde, filtroFechaHasta])
+
+  // ── ÍTEM 39: si se llega desde la tarjeta "Remisiones hoy" del
+  // Dashboard (/ventas?nuevo=true), abre el formulario de nueva
+  // remisión automáticamente. Se limpia el parámetro de la URL
+  // enseguida (con replace, sin agregar entrada al historial) para
+  // que recargar la página o volver con el botón "atrás" del
+  // navegador no vuelva a abrir el modal solo. ──
+  useEffect(() => {
+    if (searchParams.get('nuevo') === 'true') {
+      setModalOpen(true)
+      setSearchParams({}, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleVerDetalle = (venta) => {
     setVentaSeleccionada(venta)
