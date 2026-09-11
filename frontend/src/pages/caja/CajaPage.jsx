@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getCajas, getCajasDestino, getMovimientos, getResumenDiaCaja, getExportarDiaCaja, cerrarCaja, abrirCaja, createTraslado, getHistorialCierres } from '../../api/caja';
+import { getCajas, getCajasDestino, getMovimientos, getResumenDiaCaja, getExportarDiaCaja, getGastoPorProducto, cerrarCaja, abrirCaja, createTraslado, getHistorialCierres } from '../../api/caja';
 import { exportarExcelCaja, exportarPDFCaja } from '../../utils/exportarCaja';
 import { useAuth } from '../../context/AuthContext';
 import MovimientoModal from '../../components/caja/MovimientoModal';
@@ -79,6 +79,20 @@ function CierreModal({ caja, onCerrar, onConfirmar }) {
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState(null);
 
+  // ── ÍTEM 27: resumen de gasto por producto, justo antes de cerrar ──
+  const [gastoProducto, setGastoProducto]   = useState(null);
+  const [loadingGasto, setLoadingGasto]     = useState(true);
+  const [errorGasto, setErrorGasto]         = useState(false);
+
+  useEffect(() => {
+    setLoadingGasto(true);
+    setErrorGasto(false);
+    getGastoPorProducto(caja.id)
+      .then(res => setGastoProducto(res.data))
+      .catch(() => setErrorGasto(true))
+      .finally(() => setLoadingGasto(false));
+  }, [caja.id]);
+
   const saldoTeorico = Number(caja.saldo_actual);
   const diferencia   = saldoFisico !== '' ? Number(saldoFisico) - saldoTeorico : null;
 
@@ -117,6 +131,43 @@ function CierreModal({ caja, onCerrar, onConfirmar }) {
             <p style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', margin: '4px 0 0' }}>
               {formatCOP(saldoTeorico)}</p>
           </div>
+
+          {/* ── ÍTEM 27: gasto por producto de hoy, en efectivo ── */}
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '14px 16px' }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', margin: '0 0 8px' }}>
+              Gasto de hoy por producto (efectivo)
+            </p>
+            {loadingGasto ? (
+              <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>Cargando...</p>
+            ) : errorGasto ? (
+              <p style={{ fontSize: 12, color: '#dc2626', margin: 0 }}>
+                No se pudo cargar el gasto por producto.
+              </p>
+            ) : !gastoProducto || gastoProducto.filas.length === 0 ? (
+              <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>
+                No hay compras en efectivo registradas hoy en esta caja.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {gastoProducto.filas.map(fila => (
+                  <div key={fila.tipo_cafe_id} style={{
+                    display: 'flex', justifyContent: 'space-between', fontSize: 13,
+                  }}>
+                    <span style={{ color: '#475569' }}>{fila.tipo_cafe_nombre}</span>
+                    <span style={{ color: '#0f172a', fontWeight: 600 }}>{formatCOP(fila.total)}</span>
+                  </div>
+                ))}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', fontSize: 13,
+                  borderTop: '1px solid #f1f5f9', paddingTop: 6, marginTop: 2,
+                }}>
+                  <span style={{ color: '#0f172a', fontWeight: 600 }}>Total</span>
+                  <span style={{ color: '#0f172a', fontWeight: 700 }}>{formatCOP(gastoProducto.total_general)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#475569', marginBottom: 5 }}>
               Efectivo físico contado *</label>

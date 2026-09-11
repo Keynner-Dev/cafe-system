@@ -15,6 +15,8 @@ export const createMovimiento = (datos)  => api.post('/caja/movimientos/', datos
 export const getResumenDiaCaja = (cajaId) => api.get('/caja/movimientos/resumen-dia/', { params: { caja: cajaId } });
 //datos completos del día para exportar en Excel/PDF
 export const getExportarDiaCaja = (cajaId) => api.get('/caja/movimientos/exportar-dia/', { params: { caja: cajaId } });
+// ítem 27: gasto por tipo de producto HOY, en efectivo, para el resumen previo a cerrar caja
+export const getGastoPorProducto = (cajaId) => api.get('/caja/movimientos/gasto-por-producto/', { params: { caja: cajaId } });
 
 // Cierre / apertura
 export const cerrarCaja = (cajaId, datos) => api.post(`/caja/cajas/${cajaId}/cerrar/`, datos);

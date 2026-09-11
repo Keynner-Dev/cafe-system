@@ -218,6 +218,116 @@ class MovimientoCajaViewSet(viewsets.ModelViewSet):
             ],
         })
 
+    # ── ÍTEM 27: gasto por producto antes de cerrar caja ──
+    @action(detail=False, methods=['get'], url_path='gasto-por-producto')
+    def gasto_por_producto(self, request):
+        """Cuánto se gastó HOY, en efectivo, comprando cada tipo de café
+        (Café Seco, Café Mojado, Cacao, Pasilla), para esta caja
+        específica -- pensado como paso/resumen justo antes del botón de
+        cerrar caja.
+
+        Se calcula desde DetalleCompra (no desde MovimientoCaja) porque
+        ahí sí existe la relación con tipo_cafe -- MovimientoCaja no
+        tiene FK a Compra ni a tipo de café, solo una descripción de
+        texto libre.
+
+        'Hoy' se toma de Compra.creado_en (el momento real en que se
+        registró en el sistema), no de Compra.fecha (que el usuario
+        puede editar a mano y quedar con una fecha distinta a la real
+        de hoy) -- mismo criterio de 'hoy real' que ya usan resumen_dia
+        y exportar_dia arriba con MovimientoCaja.fecha.
+
+        Solo cuenta lo pagado en efectivo: si la compra se convirtió en
+        un vale (CuentaPorPagar) hoy mismo, ese valor no se pagó en
+        efectivo -- se resta, prorrateado por línea según su peso en el
+        total de la compra (un vale puede cubrir solo una parte de la
+        compra, no siempre el 100%, así que no se puede simplemente
+        excluir la compra completa).
+
+        Simplificación consciente: si el vale se abona luego EN EFECTIVO
+        (AbonoCuentaPorPagar), ese abono no se atribuye de vuelta a un
+        tipo de café aquí -- normalmente ocurre días después, fuera del
+        alcance de \"hoy\", y no hay forma de reconstruir a qué línea de
+        qué compra corresponde un abono parcial. Vale la pena que Keynner
+        lo confirme con Jimmi si en la práctica los abonos en efectivo el
+        mismo día del vale son frecuentes.
+        """
+        from django.utils import timezone
+        from django.db.models import Sum
+        from decimal import Decimal
+        from compras.models import DetalleCompra
+
+        usuario = request.user
+        caja_id = request.query_params.get('caja')
+        if not caja_id:
+            raise ValidationError('Debes especificar la caja.')
+
+        try:
+            caja = Caja.objects.select_related('bodega').get(pk=caja_id)
+        except Caja.DoesNotExist:
+            raise ValidationError('Caja no encontrada.')
+
+        if usuario.rol == 'administrador' and caja.bodega != usuario.bodega:
+            raise PermissionDenied('No tienes acceso a esta caja.')
+
+        hoy = timezone.localdate()
+        detalles = DetalleCompra.objects.filter(
+            bodega=caja.bodega,
+            es_deposito=False,
+            compra__estado='activa',
+            compra__creado_en__date=hoy,
+        ).select_related('tipo_cafe', 'compra').prefetch_related(
+            'compra__detalles', 'compra__cuentas_por_pagar'
+        )
+
+        totales = {}
+        info_por_compra = {}
+
+        for d in detalles:
+            compra = d.compra
+            if compra.id not in info_por_compra:
+                total_compra = sum(
+                    (dd.kilos * (dd.precio_kilo or Decimal('0'))
+                     for dd in compra.detalles.all() if not dd.es_deposito),
+                    Decimal('0')
+                )
+                valor_vale_hoy = compra.cuentas_por_pagar.filter(
+                    creado_en__date=hoy
+                ).aggregate(total=Sum('valor_total'))['total'] or Decimal('0')
+                info_por_compra[compra.id] = {'total': total_compra, 'vale': valor_vale_hoy}
+
+            info = info_por_compra[compra.id]
+            subtotal_detalle = d.kilos * (d.precio_kilo or Decimal('0'))
+            proporcion = (subtotal_detalle / info['total']) if info['total'] > 0 else Decimal('0')
+            gasto_efectivo = max(subtotal_detalle - (info['vale'] * proporcion), Decimal('0'))
+
+            clave = d.tipo_cafe_id
+            if clave not in totales:
+                totales[clave] = {
+                    'tipo_cafe_id': clave,
+                    'tipo_cafe_nombre': d.tipo_cafe.nombre,
+                    'total': Decimal('0'),
+                }
+            totales[clave]['total'] += gasto_efectivo
+
+        filas = sorted(
+            (
+                {
+                    'tipo_cafe_id': v['tipo_cafe_id'],
+                    'tipo_cafe_nombre': v['tipo_cafe_nombre'],
+                    'total': float(v['total']),
+                }
+                for v in totales.values()
+            ),
+            key=lambda f: f['tipo_cafe_nombre']
+        )
+
+        return Response({
+            'fecha': hoy.isoformat(),
+            'filas': filas,
+            'total_general': sum(f['total'] for f in filas),
+        })
+
 
 class CierreCajaViewSet(viewsets.ReadOnlyModelViewSet):
     """Historial de aperturas/cierres de caja.
