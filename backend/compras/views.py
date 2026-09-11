@@ -1,95 +1,141 @@
 from rest_framework import viewsets, permissions, filters as drf_filters
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Sum, F, Case, When, DecimalField, Value, OuterRef, Subquery
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Compra, DetalleCompra, LiquidacionDeposito
-from .serializers import CompraSerializer, LiquidacionDepositoSerializer
+from .models import Compra, DetalleCompra, LiquidacionDeposito, SolicitudEliminacionCompra
+from .serializers import (
+    CompraSerializer, LiquidacionDepositoSerializer,
+    SolicitudEliminacionCompraSerializer,  # ← NUEVO (ítem 24)
+)
 from .filters import CompraFilter  # ← NUEVO (ítem 17)
 from inventario.models import MovimientoInventario
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 
+# ── ÍTEM 24 ──
+# Anula una compra de forma segura: revierte inventario, caja y WAC.
+# Reemplaza al borrado físico que había antes (Compra.delete()) --
+# ese borrado tenía un bug preexistente y no relacionado con este
+# ítem: MovimientoInventario.objects.filter(...).delete() es un
+# .delete() masivo sobre queryset, que Django NO dispara como señal
+# post_delete, así que el WAC en CostoInventario nunca se enteraba de
+# que esos movimientos habían sido borrados y se quedaba con kilos y
+# valor que ya no existían. Esta función corrige eso de una vez,
+# usando la señal post_save de un movimiento 'salida' (que sí está
+# conectada) para revertir el WAC correctamente.
+#
+# LIMITACIÓN CONOCIDA Y ACEPTADA: la reversa de WAC resta al costo
+# promedio ACTUAL (costo.costo_promedio en el momento de anular), no
+# al precio exacto que tenía esa compra en su momento. Si hubo compras
+# o ventas de por medio que movieron el promedio, la reversa es una
+# aproximación, no un deshacer perfecto -- es una limitación inherente
+# a cualquier sistema de costo promedio ponderado (WAC), no algo que
+# se pueda evitar sin rehacer el histórico completo de movimientos.
+def _anular_compra(compra):
+    from inventario.models import CostoInventario
+    from caja.models import MovimientoCaja
+
+    if compra.estado == 'anulada':
+        raise ValidationError('Esta compra ya está anulada.')
+
+    # ── Bloqueo 1: depósitos ya liquidados ──
+    # Si algún detalle de esta compra ya tiene liquidaciones registradas,
+    # anular dejaría esas liquidaciones (y el dinero/kilos que ya
+    # movieron) sin una compra válida detrás. No se resuelve
+    # automáticamente -- Jimmi debe resolverlo manualmente si esto pasa.
+    tiene_liquidaciones = LiquidacionDeposito.objects.filter(
+        detalle_compra__compra=compra
+    ).exists()
+    if tiene_liquidaciones:
+        raise ValidationError(
+            'No se puede anular: esta compra tiene depósitos que ya fueron '
+            'liquidados. Anularla dejaría esas liquidaciones sin respaldo.'
+        )
+
+    # ── Bloqueo 2: abonos a letra registrados desde esta compra ──
+    if compra.abonos_letra.exists():
+        raise ValidationError(
+            'No se puede anular: desde esta compra se registró un abono a '
+            'una letra de cambio. Anularla dejaría ese abono sin respaldo.'
+        )
+
+    # ── Bloqueo 3: que no quede stock negativo ──
+    # Si ya se vendió o trasladó parte del café que esta compra aportó,
+    # anularla dejaría el stock de ese tipo de café/bodega en negativo.
+    for detalle in compra.detalles.all():
+        costo, _ = CostoInventario.objects.get_or_create(
+            bodega=detalle.bodega, tipo_cafe=detalle.tipo_cafe
+        )
+        if costo.kilos_actuales < detalle.kilos:
+            raise ValidationError(
+                f'No se puede anular: ya se movió parte del stock de '
+                f'{detalle.tipo_cafe} en {detalle.bodega} (quedan '
+                f'{costo.kilos_actuales}kg en stock, esta compra aportó '
+                f'{detalle.kilos}kg). Anularla dejaría el stock en negativo.'
+            )
+
+    # ── Reversa de inventario ──
+    # Un movimiento 'salida' por cada detalle, con los mismos kilos que
+    # entraron. Dispara la señal post_save de MovimientoInventario, que
+    # sí actualiza CostoInventario correctamente (a diferencia del
+    # .delete() masivo que tenía el código anterior).
+    for detalle in compra.detalles.all():
+        MovimientoInventario.objects.create(
+            tipo='salida',
+            tipo_cafe=detalle.tipo_cafe,
+            bodega=detalle.bodega,
+            kilos=detalle.kilos,
+            referencia=f'anulacion-compra-{compra.id}',
+            nota=f'Reverso por anulación de compra #{compra.id}',
+        )
+
+    # ── Reversa de caja ──
+    # Un ingreso compensatorio por cada egreso que generó esta compra.
+    # Se busca por descripción porque MovimientoCaja no tiene FK directa
+    # a Compra (limitación existente del modelo, no introducida aquí).
+    egresos = MovimientoCaja.objects.filter(
+        descripcion__startswith=f'Compra #{compra.id} —'
+    )
+    for egreso in egresos:
+        MovimientoCaja.objects.create(
+            caja=egreso.caja,
+            tipo='ingreso',
+            valor=egreso.valor,
+            descripcion=f'Reverso por anulación de compra #{compra.id}',
+            creado_por=compra.creado_por,
+        )
+
+    compra.estado = 'anulada'
+    compra.save()
+
+
 class CompraViewSet(viewsets.ModelViewSet):
     serializer_class = CompraSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    # ── NUEVO (ítem 17): filtros combinables (caficultor, búsqueda por
-    # nombre, rango de fechas, bodega, tipo de café) + ordenamiento.
-    # La paginación se aplica sola porque DEFAULT_PAGINATION_CLASS ya
-    # quedó configurada globalmente en settings.py. ──
-    #
-    # FIX: DjangoFilterBackend debe ser la CLASE importada, no un string.
-    # DRF instancia cada elemento de filter_backends llamándolo como
-    # backend() -- un string no es invocable, eso causaba el 500
-    # ('str' object is not callable) en cualquier petición a este
-    # endpoint, con o sin ordering/filtros en la URL.
     filterset_class = CompraFilter
     filter_backends = [
         DjangoFilterBackend,
         drf_filters.OrderingFilter,
     ]
-    # Campos permitidos para ?ordering=campo o ?ordering=-campo.
-    # 'total_anotado' en vez de 'total' porque Compra.total es una
-    # @property de Python -- SQL no puede ordenar por eso directamente.
-    # Ver anotación en get_queryset() más abajo.
     ordering_fields = ['id', 'fecha', 'caficultor__nombre', 'total_anotado']
-    ordering = ['-fecha']  # orden por defecto, igual al que ya tenía la tabla
+    ordering = ['-fecha']
 
-    # ── NUEVO (ítem 18): tope de compras devueltas cuando la consulta
-    # viene filtrada por caficultor (ej. CuentaPagarModal.jsx al
-    # seleccionar un caficultor para vincular una compra). Antes no
-    # tenía límite propio: dependía del PAGE_SIZE global, que puede ser
-    # mayor a 10 y devolver el historial completo del caficultor solo
-    # para mostrar un selector rápido. ──
     LIMITE_POR_CAFICULTOR = 10
 
     def get_queryset(self):
         usuario = self.request.user
         qs = Compra.objects.prefetch_related('cuentas_por_pagar', 'detalles').all()
 
-        # Administrador solo ve compras que involucran su bodega
-        # (filtro de SEGURIDAD, se mantiene tal cual estaba — no se toca
-        # ni se reemplaza por el filtro de "bodega" combinable de arriba,
-        # que es el que el USUARIO elige libremente en la tabla. Ambos
-        # se aplican: este restringe lo que puede VER el administrador,
-        # el de CompraFilter es el que el usuario elige para acotar
-        # SU PROPIA vista dentro de lo que ya tiene permitido).
         if usuario.rol == 'administrador':
             qs = qs.filter(detalles__bodega=usuario.bodega).distinct()
 
-        # ── NUEVO (ítem 17): anotación para poder ordenar por "total"
-        # desde el backend.
-        #
-        # ADVERTENCIA TÉCNICA QUE QUEDA REGISTRADA A PROPÓSITO:
-        # Anotar con .annotate(Sum(...)) directamente sobre 'detalles'
-        # mientras el queryset YA tiene un .filter(detalles__bodega=...)
-        # + .distinct() (caso administrador) es un patrón de Django/SQL
-        # con riesgo conocido de inflar o alterar la suma, porque el
-        # JOIN de 'detalles__bodega' y el JOIN de la agregación pueden
-        # no generar el GROUP BY que uno espera.
-        #
-        # Por eso aquí se usa una SUBQUERY independiente (Subquery +
-        # OuterRef) en vez de un annotate+join directo: la subconsulta
-        # calcula el total de cada compra de forma aislada, sin verse
-        # afectada por los joins/filtros que ya tiene el queryset
-        # principal. Esto es el patrón que recomienda la documentación
-        # de Django para "agregación + filtro sobre relación inversa"
-        # cuando coexisten en el mismo queryset.
-        #
-        # ADVERTENCIA ADICIONAL (pendiente de revisar con calma):
-        # esta subquery solo suma detalles con es_deposito=False. La
-        # property Compra.total (en models.py) además suma los
-        # depósitos ya liquidados vía sus LiquidacionDeposito. Es decir,
-        # 'total_anotado' y 'total' pueden NO coincidir para compras que
-        # incluyan depósitos liquidados -- el ordenamiento por
-        # total_anotado sería aproximado en esos casos, no exacto.
-        # Queda pendiente decidir si vale la pena ampliar la subquery
-        # para incluir liquidaciones, o si se documenta como limitación
-        # conocida del ordenamiento. ──
         subtotal_normal = DetalleCompra.objects.filter(
             compra_id=OuterRef('pk'),
             es_deposito=False,
@@ -107,25 +153,12 @@ class CompraViewSet(viewsets.ModelViewSet):
         return qs
 
     def filter_queryset(self, queryset):
-        # ── NUEVO (ítem 18) ──
-        # Se aplica DESPUÉS de que DjangoFilterBackend y OrderingFilter
-        # ya corrieron (filter_queryset() de DRF los encadena en orden,
-        # uno por backend, antes de llegar aquí) -- en este punto el
-        # queryset ya tiene su .distinct() resuelto si correspondía
-        # (filtro de bodega/tipo_cafe o el de administrador), así que
-        # cortar con slicing aquí es seguro: no interfiere con el JOIN
-        # de relación uno-a-muchos que pudiera duplicar filas.
-        #
-        # Solo se limita cuando la consulta llega filtrada por un
-        # caficultor específico -- las tablas normales de Compras (sin
-        # ese filtro) siguen usando la paginación global sin cambios.
         queryset = super().filter_queryset(queryset)
         if self.request.query_params.get('caficultor'):
             queryset = queryset[:self.LIMITE_POR_CAFICULTOR]
         return queryset
 
     def get_serializer_context(self):
-        # Necesario para que CompraSerializer.validate() sepa el rol del usuario
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
@@ -134,15 +167,105 @@ class CompraViewSet(viewsets.ModelViewSet):
         user = self.request.user if self.request.user.is_authenticated else None
         serializer.save(creado_por=user)
 
-    @transaction.atomic
-    def destroy(self, request, *args, **kwargs):
-        # get_object() ya usa get_queryset() filtrado por bodega
+    # ── ÍTEM 24 ──
+    # DELETE /compras/{id}/ ya NO borra físicamente -- anula de forma
+    # segura con _anular_compra(). Solo el jefe puede llegar aquí; un
+    # administrador recibe 403 y debe usar solicitar_eliminacion()
+    # en su lugar. perform_destroy() es el hook que DRF llama desde su
+    # destroy() genérico -- no hace falta sobreescribir destroy() entero.
+    def perform_destroy(self, instance):
+        if self.request.user.rol != 'jefe':
+            raise PermissionDenied(
+                'Solo el jefe puede eliminar compras directamente. '
+                'Usa "Solicitar eliminación" para pedir su aprobación.'
+            )
+        _anular_compra(instance)
+
+    # ── ÍTEM 24: el administrador solicita, no elimina ──
+    @action(detail=True, methods=['post'], url_path='solicitar-eliminacion')
+    def solicitar_eliminacion(self, request, pk=None):
         compra = self.get_object()
-        MovimientoInventario.objects.filter(
-            referencia=f'compra-{compra.id}'
-        ).delete()
-        compra.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+
+        if compra.estado == 'anulada':
+            return Response({'detail': 'Esta compra ya está anulada.'}, status=400)
+
+        if compra.solicitudes_eliminacion.filter(estado='pendiente').exists():
+            return Response(
+                {'detail': 'Ya existe una solicitud de eliminación pendiente para esta compra.'},
+                status=400,
+            )
+
+        motivo = (request.data.get('motivo') or '').strip()
+        if not motivo:
+            return Response({'motivo': 'El motivo es obligatorio.'}, status=400)
+
+        solicitud = SolicitudEliminacionCompra.objects.create(
+            compra=compra,
+            solicitado_por=request.user,
+            motivo=motivo,
+        )
+        return Response(
+            SolicitudEliminacionCompraSerializer(solicitud).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+# ── ÍTEM 24: solicitudes de eliminación -- ver, aprobar, rechazar ──
+class SolicitudEliminacionCompraViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Solo lectura + dos acciones (aprobar/rechazar). No se expone create
+    aquí a propósito -- se crea únicamente vía
+    CompraViewSet.solicitar_eliminacion(), que ya valida que no exista
+    otra pendiente para la misma compra.
+    """
+    serializer_class = SolicitudEliminacionCompraSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.rol != 'jefe':
+            raise PermissionDenied('Solo el jefe puede ver las solicitudes de eliminación.')
+
+        qs = SolicitudEliminacionCompra.objects.select_related(
+            'compra', 'compra__caficultor', 'solicitado_por', 'respondido_por'
+        ).order_by('-fecha_solicitud')
+
+        estado = self.request.query_params.get('estado')
+        if estado:
+            qs = qs.filter(estado=estado)
+        return qs
+
+    @action(detail=True, methods=['post'])
+    def aprobar(self, request, pk=None):
+        solicitud = self.get_object()
+        if solicitud.estado != 'pendiente':
+            return Response({'detail': 'Esta solicitud ya fue resuelta.'}, status=400)
+
+        try:
+            _anular_compra(solicitud.compra)
+        except ValidationError as e:
+            # El mensaje de _anular_compra ya explica exactamente por
+            # qué no se puede anular (liquidaciones, abonos, o stock) --
+            # se devuelve tal cual para que el frontend lo muestre.
+            return Response({'detail': str(e.detail[0]) if hasattr(e, 'detail') else str(e)}, status=400)
+
+        solicitud.estado = 'aprobada'
+        solicitud.respondido_por = request.user
+        solicitud.fecha_respuesta = timezone.now()
+        solicitud.save()
+        return Response(SolicitudEliminacionCompraSerializer(solicitud).data)
+
+    @action(detail=True, methods=['post'])
+    def rechazar(self, request, pk=None):
+        solicitud = self.get_object()
+        if solicitud.estado != 'pendiente':
+            return Response({'detail': 'Esta solicitud ya fue resuelta.'}, status=400)
+
+        solicitud.estado = 'rechazada'
+        solicitud.motivo_rechazo = (request.data.get('motivo_rechazo') or '').strip()
+        solicitud.respondido_por = request.user
+        solicitud.fecha_respuesta = timezone.now()
+        solicitud.save()
+        return Response(SolicitudEliminacionCompraSerializer(solicitud).data)
 
 
 class LiquidacionDepositoViewSet(viewsets.ModelViewSet):

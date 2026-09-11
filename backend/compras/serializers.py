@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from django.db import transaction
-from .models import Compra, DetalleCompra, LiquidacionDeposito
+from .models import Compra, DetalleCompra, LiquidacionDeposito, SolicitudEliminacionCompra
 from inventario.models import MovimientoInventario
 
 
@@ -85,13 +85,18 @@ class CompraSerializer(serializers.ModelSerializer):
     # el modal y volver a abrir la compra desde la tabla. ──
     abonos_letra = serializers.SerializerMethodField()
 
+    # ── ÍTEM 24: si hay una solicitud de eliminación pendiente para esta
+    # compra, ComprasPage.jsx la usa para mostrar "Solicitud pendiente"
+    # en vez del botón de eliminar/solicitar de nuevo. ──
+    solicitud_eliminacion_pendiente = serializers.SerializerMethodField()
+
     # opcional, solo se usa en el create(), nunca se devuelve en la respuesta
     abono_letra = serializers.DictField(write_only=True, required=False)
 
     class Meta:
         model = Compra
         fields = '__all__'
-        read_only_fields = ['creado_por', 'creado_en']
+        read_only_fields = ['creado_por', 'creado_en', 'estado']
 
     def get_total(self, obj):
         try:
@@ -160,6 +165,17 @@ class CompraSerializer(serializers.ModelSerializer):
                 'saldo_letra_restante': float(abono.letra.saldo),
             })
         return resultado
+
+    # ── ÍTEM 24 ──
+    def get_solicitud_eliminacion_pendiente(self, obj):
+        solicitud = obj.solicitudes_eliminacion.filter(estado='pendiente').first()
+        if not solicitud:
+            return None
+        return {
+            'id': solicitud.id,
+            'motivo': solicitud.motivo,
+            'fecha_solicitud': solicitud.fecha_solicitud.isoformat(),
+        }
 
     def validate(self, data):
         request = self.context.get('request')
@@ -233,3 +249,30 @@ class CompraSerializer(serializers.ModelSerializer):
             )
 
         return compra
+
+
+# ── ÍTEM 24 ──
+class SolicitudEliminacionCompraSerializer(serializers.ModelSerializer):
+    solicitado_por_nombre = serializers.CharField(
+        source='solicitado_por.get_full_name', read_only=True
+    )
+    respondido_por_nombre = serializers.CharField(
+        source='respondido_por.get_full_name', read_only=True, default=None
+    )
+    compra_info = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SolicitudEliminacionCompra
+        fields = '__all__'
+        read_only_fields = [
+            'solicitado_por', 'estado', 'fecha_solicitud',
+            'respondido_por', 'fecha_respuesta',
+        ]
+
+    def get_compra_info(self, obj):
+        return {
+            'id': obj.compra.id,
+            'fecha': str(obj.compra.fecha),
+            'caficultor': obj.compra.caficultor.nombre,
+            'total': float(obj.compra.total),
+        }

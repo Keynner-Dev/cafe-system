@@ -6,6 +6,18 @@ from inventario.models import TipoCafe, Bodega
 
 
 class Compra(models.Model):
+    # ── ÍTEM 24: estado de la compra. 'anulada' reemplaza al borrado
+    # físico -- conserva el registro completo para auditoría y deja de
+    # contar para inventario/caja/WAC hacia adelante (ver
+    # _anular_compra() en views.py). No se agrega ningún filtro
+    # automático por estado en el manager: las vistas que listan
+    # compras deben decidir explícitamente si excluyen las anuladas. ──
+    ESTADO_CHOICES = [
+        ('activa', 'Activa'),
+        ('anulada', 'Anulada'),
+    ]
+    estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default='activa')
+
     # Renombramos proveedor → caficultor para mayor claridad
     caficultor = models.ForeignKey(
         Tercero,
@@ -121,3 +133,47 @@ class LiquidacionDeposito(models.Model):
         verbose_name = 'Liquidación de Depósito'
         verbose_name_plural = 'Liquidaciones de Depósito'
         ordering = ['-fecha']
+
+
+# ── ÍTEM 24: aprobación de eliminación de compras ──
+class SolicitudEliminacionCompra(models.Model):
+    """
+    Un administrador de bodega no puede eliminar una compra directamente
+    -- solo puede solicitarlo, con un motivo obligatorio. Solo el jefe
+    puede aprobar (anula la compra, ver _anular_compra() en views.py) o
+    rechazar la solicitud.
+
+    Es un ForeignKey a Compra (no OneToOne) a propósito: si Jimmi rechaza
+    una solicitud, el administrador puede volver a solicitarla después
+    con otro motivo, y queda el historial completo de ambos intentos.
+    """
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('aprobada', 'Aprobada'),
+        ('rechazada', 'Rechazada'),
+    ]
+
+    compra = models.ForeignKey(
+        Compra, on_delete=models.CASCADE, related_name='solicitudes_eliminacion'
+    )
+    solicitado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='+'
+    )
+    motivo = models.TextField()
+    estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default='pendiente')
+    fecha_solicitud = models.DateTimeField(auto_now_add=True)
+
+    respondido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='+'
+    )
+    fecha_respuesta = models.DateTimeField(null=True, blank=True)
+    motivo_rechazo = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Solicitud #{self.id} — Compra #{self.compra_id} ({self.estado})"
+
+    class Meta:
+        verbose_name = 'Solicitud de Eliminación de Compra'
+        verbose_name_plural = 'Solicitudes de Eliminación de Compra'
+        ordering = ['-fecha_solicitud']
