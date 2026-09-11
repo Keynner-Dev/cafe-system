@@ -253,12 +253,8 @@ class CompraSerializer(serializers.ModelSerializer):
 
 # ── ÍTEM 24 ──
 class SolicitudEliminacionCompraSerializer(serializers.ModelSerializer):
-    solicitado_por_nombre = serializers.CharField(
-        source='solicitado_por.get_full_name', read_only=True
-    )
-    respondido_por_nombre = serializers.CharField(
-        source='respondido_por.get_full_name', read_only=True, default=None
-    )
+    solicitado_por_nombre = serializers.SerializerMethodField()
+    respondido_por_nombre = serializers.SerializerMethodField()
     compra_info = serializers.SerializerMethodField()
 
     class Meta:
@@ -268,7 +264,14 @@ class SolicitudEliminacionCompraSerializer(serializers.ModelSerializer):
             'solicitado_por', 'estado', 'fecha_solicitud',
             'respondido_por', 'fecha_respuesta',
         ]
+    def get_solicitado_por_nombre(self, obj):
+        u = obj.solicitado_por
+        return (u.get_full_name() or u.username) if u else None
 
+    def get_respondido_por_nombre(self, obj):
+        u = obj.respondido_por
+        return (u.get_full_name() or u.username) if u else None
+    
     def get_compra_info(self, obj):
         return {
             'id': obj.compra.id,
