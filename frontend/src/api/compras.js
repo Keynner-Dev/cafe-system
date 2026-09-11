@@ -16,3 +16,15 @@ export const getComprasPorCaficultor = (caficultorId) =>
 
 export const getLiquidaciones  = ()     => api.get('/compras/liquidaciones/').then(res => ({ ...res, data: desenvolver(res) }))
 export const createLiquidacion = (data) => api.post('/compras/liquidaciones/', data)
+export const solicitarEliminacionCompra = (id, motivo) =>
+  api.post(`/compras/compras/${id}/solicitar-eliminacion/`, { motivo })
+ 
+export const getSolicitudesEliminacion = (params = {}) =>
+  api.get('/compras/solicitudes-eliminacion/', { params })
+ 
+export const aprobarSolicitudEliminacion = (id) =>
+  api.post(`/compras/solicitudes-eliminacion/${id}/aprobar/`)
+ 
+export const rechazarSolicitudEliminacion = (id, motivo_rechazo) =>
+  api.post(`/compras/solicitudes-eliminacion/${id}/rechazar/`, { motivo_rechazo })
+ 

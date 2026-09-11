@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getCompras, deleteCompra } from '../../api/compras'
+import { getCompras, deleteCompra, solicitarEliminacionCompra, getSolicitudesEliminacion } from '../../api/compras' // ← ÍTEM 24
 import { getBodegas, getTiposCafe } from '../../api/inventario'
 import { useAuth } from '../../context/AuthContext'
 import CompraModal from '../../components/compras/CompraModal'
@@ -7,6 +7,8 @@ import LiquidacionModal from '../../components/compras/LiquidacionModal'
 import CompraDetalle from '../../components/compras/CompraDetalle'
 import AbonoModal from '../../components/cuentasPagar/AbonoModal'
 import EstadoError from '../../components/common/EstadoError' // NUEVO
+import SolicitarEliminacionModal from '../../components/compras/SolicitarEliminacionModal' // ← ÍTEM 24
+import SolicitudesEliminacionModal from '../../components/compras/SolicitudesEliminacionModal' // ← ÍTEM 24
 
 // ─── Iconos SVG inline ────────────────────────────────────────────────────────
 const IconPlus = () => (
@@ -66,6 +68,20 @@ const IconChevronRight = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="9 18 15 12 9 6"/>
+  </svg>
+)
+// ← ÍTEM 24
+const IconClock = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+  </svg>
+)
+const IconAlertCircle = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
   </svg>
 )
 
@@ -148,6 +164,13 @@ export default function ComprasPage() {
   const [abonoOpen, setAbonoOpen]                     = useState(false)
   const [cuentaSeleccionada, setCuentaSeleccionada]   = useState(null)
 
+  // ── ÍTEM 24: solicitar eliminación (administrador) y ver/resolver
+  // solicitudes pendientes (jefe) ──
+  const [solicitarOpen, setSolicitarOpen]             = useState(false)
+  const [compraParaSolicitar, setCompraParaSolicitar] = useState(null)
+  const [solicitudesOpen, setSolicitudesOpen]         = useState(false)
+  const [cantidadPendientes, setCantidadPendientes]   = useState(0)
+
   // ── Búsqueda y ordenamiento ──
   const [busqueda, setBusqueda]               = useState('')
   const [busquedaDebounced, setBusquedaDebounced] = useState('')  // ← NUEVO
@@ -173,6 +196,20 @@ export default function ComprasPage() {
     if (esJefe) getBodegas().then(res => setBodegas(res.data.results ?? res.data))
     getTiposCafe().then(res => setTiposCafe(res.data.results ?? res.data))
   }, [])
+
+  // ── ÍTEM 24: solo el jefe consulta cuántas solicitudes pendientes
+  // hay, para el badge del botón del encabezado ──
+  const cargarCantidadPendientes = () => {
+    if (!esJefe) return
+    getSolicitudesEliminacion({ estado: 'pendiente' }).then(res => {
+      const lista = res.data.results ?? res.data
+      setCantidadPendientes(lista.length)
+    })
+  }
+
+  useEffect(() => {
+    cargarCantidadPendientes()
+  }, [esJefe])
 
   // ── ÍTEM 17: paginación ──
   const [pagina, setPagina]   = useState(1)
@@ -235,21 +272,33 @@ export default function ComprasPage() {
     setLiquidacionOpen(true)
   }
 
+  // ── ÍTEM 24: solo el jefe llega aquí -- para el administrador el
+  // botón de la tabla ahora abre handleAbrirSolicitar() en su lugar.
+  // El texto del confirm ya no dice "se eliminarán sus movimientos de
+  // inventario" -- ahora es una anulación reversible con validaciones
+  // (ver _anular_compra() en el backend), no un borrado físico. ──
   const handleEliminar = async (id) => {
-    if (!confirm('¿Eliminar esta compra? También se eliminarán sus movimientos de inventario.')) return
+    if (!confirm('¿Anular esta compra? Se revertirán sus movimientos de inventario y caja. Esta acción no se puede deshacer desde la interfaz.')) return
     try {
       await deleteCompra(id)
-      // ── Si eliminamos el último registro de la página actual y no
-      // somos la página 1, retrocedemos una página para no quedar
-      // viendo una página vacía ──
       if (compras.length === 1 && pagina > 1) {
         setPagina(p => p - 1)
       } else {
         cargarCompras()
       }
-    } catch {
-      alert('No se pudo eliminar.')
+    } catch (err) {
+      // El backend devuelve un mensaje claro cuando la anulación no es
+      // segura (liquidaciones ya hechas, abonos a letra, o stock
+      // insuficiente) -- se muestra tal cual en vez de un genérico.
+      const detalle = err.response?.data?.detail
+      alert(detalle || 'No se pudo anular la compra.')
     }
+  }
+
+  // ── ÍTEM 24: administrador -- abre el modal de solicitud con motivo ──
+  const handleAbrirSolicitar = (compra) => {
+    setCompraParaSolicitar(compra)
+    setSolicitarOpen(true)
   }
 
   const handleVerDeuda = (cuenta) => {
@@ -275,20 +324,50 @@ export default function ComprasPage() {
             Registro de compras de café y gestión de depósitos
           </p>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            background: '#16a34a', color: 'white',
-            border: 'none', borderRadius: '6px',
-            padding: '8px 14px', fontSize: '13px', fontWeight: 500,
-            cursor: 'pointer',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = '#15803d'}
-          onMouseLeave={e => e.currentTarget.style.background = '#16a34a'}
-        >
-          <IconPlus /> Nueva compra
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          {/* ── ÍTEM 24: solo el jefe ve este botón, con badge de
+               cuántas solicitudes están pendientes ── */}
+          {esJefe && (
+            <button
+              onClick={() => setSolicitudesOpen(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                background: cantidadPendientes > 0 ? '#fffbeb' : 'white',
+                color: cantidadPendientes > 0 ? '#92400e' : '#475569',
+                border: `1px solid ${cantidadPendientes > 0 ? '#fde68a' : '#e2e8f0'}`,
+                borderRadius: '6px',
+                padding: '8px 14px', fontSize: '13px', fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              <IconClock /> Solicitudes de eliminación
+              {cantidadPendientes > 0 && (
+                <span style={{
+                  background: '#ca8a04', color: 'white',
+                  fontSize: '11px', fontWeight: 700,
+                  padding: '1px 7px', borderRadius: '99px',
+                  marginLeft: '2px',
+                }}>
+                  {cantidadPendientes}
+                </span>
+              )}
+            </button>
+          )}
+          <button
+            onClick={() => setModalOpen(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              background: '#16a34a', color: 'white',
+              border: 'none', borderRadius: '6px',
+              padding: '8px 14px', fontSize: '13px', fontWeight: 500,
+              cursor: 'pointer',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#15803d'}
+            onMouseLeave={e => e.currentTarget.style.background = '#16a34a'}
+          >
+            <IconPlus /> Nueva compra
+          </button>
+        </div>
       </div>
 
       {/* ── Búsqueda y ordenamiento ── */}
@@ -491,12 +570,29 @@ export default function ComprasPage() {
                 compras.map(c => (
                   <tr
                     key={c.id}
-                    style={{ borderTop: '1px solid #f1f5f9', transition: 'background 0.1s' }}
+                    style={{
+                      borderTop: '1px solid #f1f5f9', transition: 'background 0.1s',
+                      // ── ÍTEM 24: una compra anulada se ve atenuada,
+                      // sigue en el listado (no se esconde) para no
+                      // perder el rastro visual ──
+                      opacity: c.estado === 'anulada' ? 0.55 : 1,
+                    }}
                     onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
                     onMouseLeave={e => e.currentTarget.style.background = 'white'}
                   >
                     <td style={{ padding: '11px 16px', color: '#94a3b8' }}>{c.id}</td>
-                    <td style={{ padding: '11px 16px', fontWeight: 500, color: '#0f172a' }}>{c.fecha}</td>
+                    <td style={{ padding: '11px 16px', fontWeight: 500, color: '#0f172a' }}>
+                      {c.fecha}
+                      {c.estado === 'anulada' && (
+                        <span style={{
+                          marginLeft: '8px', fontSize: '10px', fontWeight: 700,
+                          textDecoration: 'line-through', color: '#94a3b8',
+                          textTransform: 'uppercase',
+                        }}>
+                          Anulada
+                        </span>
+                      )}
+                    </td>
                     <td style={{ padding: '11px 16px', color: '#475569' }}>{c.caficultor_nombre}</td>
                     <td style={{ padding: '11px 16px', fontWeight: 600, color: '#0f172a' }}>
                       {formatCOP(c.total)}
@@ -555,19 +651,48 @@ export default function ComprasPage() {
                           </button>
                         )}
 
-                        <button
-                          onClick={() => handleEliminar(c.id)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: '4px',
-                            padding: '5px 10px', borderRadius: '5px', border: 'none',
-                            background: '#fef2f2', color: '#dc2626',
-                            fontSize: '12px', fontWeight: 500, cursor: 'pointer',
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
-                          onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}
-                        >
-                          <IconTrash /> Eliminar
-                        </button>
+                        {/* ── ÍTEM 24: no se muestra nada de eliminar/
+                             solicitar sobre una compra ya anulada ── */}
+                        {c.estado !== 'anulada' && (
+                          esJefe ? (
+                            <button
+                              onClick={() => handleEliminar(c.id)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '4px',
+                                padding: '5px 10px', borderRadius: '5px', border: 'none',
+                                background: '#fef2f2', color: '#dc2626',
+                                fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                              onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}
+                            >
+                              <IconTrash /> Eliminar
+                            </button>
+                          ) : c.solicitud_eliminacion_pendiente ? (
+                            <span style={{
+                              display: 'flex', alignItems: 'center', gap: '4px',
+                              padding: '5px 10px', borderRadius: '5px',
+                              background: '#fffbeb', color: '#92400e',
+                              fontSize: '12px', fontWeight: 500,
+                            }}>
+                              <IconClock /> Solicitud pendiente
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleAbrirSolicitar(c)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '4px',
+                                padding: '5px 10px', borderRadius: '5px', border: 'none',
+                                background: '#fef2f2', color: '#dc2626',
+                                fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                              onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}
+                            >
+                              <IconAlertCircle /> Solicitar eliminación
+                            </button>
+                          )
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -658,6 +783,27 @@ export default function ComprasPage() {
             setCuentaSeleccionada(null)
           }}
           onSaved={cargarCompras}
+        />
+      )}
+
+      {/* ── ÍTEM 24 ── */}
+      {solicitarOpen && compraParaSolicitar && (
+        <SolicitarEliminacionModal
+          compra={compraParaSolicitar}
+          onClose={() => {
+            setSolicitarOpen(false)
+            setCompraParaSolicitar(null)
+          }}
+          onSaved={cargarCompras}
+        />
+      )}
+      {solicitudesOpen && (
+        <SolicitudesEliminacionModal
+          onClose={() => setSolicitudesOpen(false)}
+          onResuelto={() => {
+            cargarCompras()
+            cargarCantidadPendientes()
+          }}
         />
       )}
     </div>
