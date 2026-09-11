@@ -34,3 +34,8 @@ export const getMovimientos  = ()          => api.get('/inventario/movimientos/'
 export const createMovimiento = (data)     => api.post('/inventario/movimientos/', data)
 
 export const trasladar        = (data)     => api.post('/inventario/trasladar/', data)
+
+// Ajuste manual de stock (ítem 26 — solo Jimmi)
+export const getAjustesStock    = (params = {}) =>
+  api.get('/inventario/ajustes-stock/', { params }).then(res => ({ ...res, data: desenvolver(res) }))
+export const createAjusteStock  = (data) => api.post('/inventario/ajustes-stock/', data)

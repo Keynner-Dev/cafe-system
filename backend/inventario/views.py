@@ -5,9 +5,13 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Sum
 from django.db import transaction
-from decimal import Decimal
-from .models import TipoCafe, Bodega, MovimientoInventario
-from .serializers import TipoCafeSerializer, BodegaSerializer, MovimientoInventarioSerializer
+from django.shortcuts import get_object_or_404
+from decimal import Decimal, InvalidOperation
+from .models import TipoCafe, Bodega, MovimientoInventario, CostoInventario, AjusteStock
+from .serializers import (
+    TipoCafeSerializer, BodegaSerializer, MovimientoInventarioSerializer,
+    AjusteStockSerializer,
+)
 
 
 def get_stock(tipo_cafe_id, bodega_id):
@@ -194,6 +198,109 @@ class MovimientoInventarioViewSet(viewsets.ModelViewSet):
                 'stock_actual': float(total_entradas - total_salidas),
             }
         })
+
+
+# ── ÍTEM 26: ajuste manual de stock (solo Jimmi) ──
+class SoloJefe(permissions.BasePermission):
+    """A diferencia de SoloJefeEscritura, aquí ni siquiera la lectura
+    queda abierta al administrador -- el ajuste de stock es una
+    herramienta exclusiva de Jimmi, no algo que el administrador deba
+    ver u operar (a diferencia de las solicitudes de eliminación del
+    ítem 24, que sí tienen un lado para el administrador)."""
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.rol == 'jefe')
+
+
+class AjusteStockViewSet(viewsets.ModelViewSet):
+    queryset = AjusteStock.objects.select_related('bodega', 'tipo_cafe', 'realizado_por').all()
+    serializer_class = AjusteStockSerializer
+    permission_classes = [SoloJefe]
+    http_method_names = ['get', 'post', 'head', 'options']  # es un historial -- no se edita ni se borra
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        bodega_id = self.request.query_params.get('bodega')
+        tipo_cafe_id = self.request.query_params.get('tipo_cafe')
+        if bodega_id:
+            qs = qs.filter(bodega_id=bodega_id)
+        if tipo_cafe_id:
+            qs = qs.filter(tipo_cafe_id=tipo_cafe_id)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        bodega_id = request.data.get('bodega')
+        tipo_cafe_id = request.data.get('tipo_cafe')
+        modo = request.data.get('modo')  # 'exacto' | 'delta'
+        valor = request.data.get('valor')
+        motivo = (request.data.get('motivo') or '').strip()
+
+        if not motivo:
+            return Response({'detail': 'El motivo del ajuste es obligatorio.'}, status=status.HTTP_400_BAD_REQUEST)
+        if modo not in ('exacto', 'delta'):
+            return Response({'detail': 'Modo de ajuste inválido.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not bodega_id or not tipo_cafe_id or valor is None or valor == '':
+            return Response({'detail': 'Faltan datos del ajuste.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            valor = Decimal(str(valor))
+        except (InvalidOperation, ValueError):
+            return Response({'detail': 'El valor ingresado no es un número válido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        bodega = get_object_or_404(Bodega, id=bodega_id)
+        tipo_cafe = get_object_or_404(TipoCafe, id=tipo_cafe_id)
+
+        with transaction.atomic():
+            costo, _ = CostoInventario.objects.get_or_create(bodega=bodega, tipo_cafe=tipo_cafe)
+            kilos_antes = costo.kilos_actuales
+
+            if modo == 'exacto':
+                if valor < 0:
+                    return Response({'detail': 'La cantidad no puede ser negativa.'}, status=status.HTTP_400_BAD_REQUEST)
+                kilos_despues = valor
+            else:
+                kilos_despues = kilos_antes + valor
+
+            if kilos_despues < 0:
+                return Response({
+                    'detail': f'Ese ajuste dejaría el stock en negativo (quedaría en {kilos_despues} kg). '
+                              f'Disponible actualmente: {kilos_antes} kg.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            diferencia = kilos_despues - kilos_antes
+            if diferencia == 0:
+                return Response({
+                    'detail': 'No hay ningún cambio que aplicar -- la cantidad ingresada es igual al stock actual.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # No se crean tipos nuevos de MovimientoInventario a propósito
+            # (ver docstring de AjusteStock): un incremento pasa el
+            # costo_promedio actual como precio_kilo para que el WAC no se
+            # mueva, y un decremento no necesita precio_kilo porque la
+            # señal de 'salida' siempre usa el promedio vigente.
+            if diferencia > 0:
+                movimiento = MovimientoInventario.objects.create(
+                    tipo='entrada', tipo_cafe=tipo_cafe, bodega=bodega,
+                    kilos=diferencia, precio_kilo=costo.costo_promedio,
+                    referencia='ajuste-stock',
+                    nota=f'Ajuste manual de stock — {motivo}',
+                )
+            else:
+                movimiento = MovimientoInventario.objects.create(
+                    tipo='salida', tipo_cafe=tipo_cafe, bodega=bodega,
+                    kilos=abs(diferencia),
+                    referencia='ajuste-stock',
+                    nota=f'Ajuste manual de stock — {motivo}',
+                )
+
+            ajuste = AjusteStock.objects.create(
+                bodega=bodega, tipo_cafe=tipo_cafe,
+                kilos_antes=kilos_antes, kilos_despues=kilos_despues,
+                kilos_ajuste=diferencia, motivo=motivo,
+                realizado_por=request.user, movimiento=movimiento,
+            )
+
+        serializer = self.get_serializer(ajuste)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 @api_view(['POST'])

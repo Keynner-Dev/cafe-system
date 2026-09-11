@@ -5,6 +5,7 @@ import {
   getStockDetallado
 } from '../../api/inventario'
 import ItemModal from '../../components/inventario/ItemModal'
+import AjusteStockModal from '../../components/inventario/AjusteStockModal' // ← ÍTEM 26
 import { useAuth } from '../../context/AuthContext'
 
 // ─── Iconos SVG inline ────────────────────────────────────────────────────────
@@ -108,6 +109,10 @@ export default function InventarioPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [itemEditando, setItemEditando] = useState(null)
 
+  // ── ÍTEM 26: ajuste manual de stock ──
+  const [ajusteOpen, setAjusteOpen] = useState(false)
+  const [filaParaAjustar, setFilaParaAjustar] = useState(null)
+
   // ── Cargas ──
   const cargarTipos = () => {
     setLoadingTipos(true)
@@ -200,6 +205,9 @@ export default function InventarioPage() {
 
   const handleEditar = (item) => { setItemEditando(item); setModalOpen(true) }
   const handleNuevo  = ()     => { setItemEditando(null);  setModalOpen(true) }
+
+  // ── ÍTEM 26: solo Jimmi ve el botón que abre este modal ──
+  const handleAjustar = (fila) => { setFilaParaAjustar(fila); setAjusteOpen(true) }
 
   const mostrarColumnaBodega = esJefe && !filtroBodega
 
@@ -603,9 +611,12 @@ export default function InventarioPage() {
                     {[
                       ...(mostrarColumnaBodega ? ['Bodega'] : []),
                       'Tipo de Café', 'Entradas (kg)', 'Salidas (kg)', 'Stock actual (kg)',
+                      ...(esJefe ? ['Acciones'] : []),
                     ].map(col => (
                       <th key={col} style={{
-                        padding: '11px 16px', textAlign: col === 'Tipo de Café' || col === 'Bodega' ? 'left' : 'right',
+                        padding: '11px 16px',
+                        textAlign: col === 'Tipo de Café' || col === 'Bodega' ? 'left'
+                          : col === 'Acciones' ? 'center' : 'right',
                         color: '#e2e8f0', fontWeight: 500, fontSize: '12px',
                         whiteSpace: 'nowrap',
                       }}>
@@ -670,6 +681,24 @@ export default function InventarioPage() {
                       }}>
                         {formatKg(fila.stock_actual)}
                       </td>
+                      {esJefe && (
+                        <td style={{ padding: '11px 16px', textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleAjustar(fila)}
+                            title="Ajustar stock"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '4px',
+                              padding: '5px 10px', borderRadius: '5px', border: 'none',
+                              background: '#f8fafc', color: '#475569',
+                              fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                            onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
+                          >
+                            <IconEdit /> Ajustar
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -687,6 +716,15 @@ export default function InventarioPage() {
           campos={tabActiva === 'Tipos de Café' ? camposTipoCafe : camposBodega}
           onClose={() => setModalOpen(false)}
           onSubmit={tabActiva === 'Tipos de Café' ? handleSubmitTipo : handleSubmitBodega}
+        />
+      )}
+
+      {/* ── ÍTEM 26: ajuste manual de stock, solo jefe ── */}
+      {ajusteOpen && filaParaAjustar && (
+        <AjusteStockModal
+          fila={filaParaAjustar}
+          onClose={() => { setAjusteOpen(false); setFilaParaAjustar(null) }}
+          onSaved={consultarStock}
         />
       )}
     </div>
