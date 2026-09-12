@@ -267,17 +267,17 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
 
         /* ── Ítem 23: encabezado con logo + Cafe San + Jimmi Martinez + NIT ── */
         .header { text-align: center; margin-bottom: 7px; }
-        .header .logo { width: 62px; height: auto; display: block; margin: 0 auto 4px; }
+        .header .logo { width: 90px; height: auto; display: block; margin: 0 auto 4px; }
         .header h1 { font-size: 16px; font-weight: 700; color: #000; letter-spacing: 0.5px; }
         .header .propietario { font-size: 11px; font-weight: 700; color: #000; margin-top: 2px; }
-        .header .nit { font-size: 10px; color: #000; margin-top: 2px; }
+        .header .nit { font-size: 11px; font-weight: 600; color: #000; margin-top: 2px; }
 
         .sep { border: none; border-top: 1px dashed #000; margin: 6px 0; }
         .sep-double { border: none; border-top: 2px solid #000; margin: 6px 0; }
 
         .compra-info { text-align: center; margin-bottom: 5px; }
         .compra-info .num { font-size: 14px; font-weight: 700; color: #000; }
-        .compra-info .fecha { font-size: 10px; color: #000; margin-top: 1px; }
+        .compra-info .fecha { font-size: 11px; font-weight: 600; color: #000; margin-top: 1px; }
 
         .caficultor { margin-bottom: 5px; }
         .caficultor label {
@@ -294,10 +294,10 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
 
         .linea { margin-bottom: 7px; }
         .linea-tipo { font-size: 12px; font-weight: 700; color: #000; }
-        .linea-sub { font-size: 10.5px; color: #000; }
+        .linea-sub { font-size: 11.5px; font-weight: 600; color: #000; }
         .linea-precio {
           display: flex; justify-content: space-between;
-          font-size: 11px; margin-top: 1px; color: #000;
+          font-size: 11.5px; font-weight: 600; margin-top: 1px; color: #000;
         }
         .linea-subtotal { font-weight: 700; }
         .linea-deposito { font-size: 10px; font-weight: 700; color: #000; margin-top: 1px; }
@@ -308,7 +308,7 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
           font-size: 11px; margin-bottom: 2px; color: #000;
         }
         .fila-abono { font-weight: 600; }
-        .letra-detalle { font-size: 9.5px; color: #000; margin-bottom: 3px; line-height: 1.4; }
+        .letra-detalle { font-size: 10.5px; font-weight: 600; color: #000; margin-bottom: 3px; line-height: 1.4; }
 
         .total-box { text-align: center; margin: 6px 0 4px; }
         .total-box span {
@@ -320,9 +320,9 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
           display: block; margin-top: 2px;
         }
 
-        .nota { font-size: 10px; color: #000; margin-bottom: 5px; word-wrap: break-word; }
+        .nota { font-size: 11px; font-weight: 600; color: #000; margin-bottom: 5px; word-wrap: break-word; }
 
-        .footer { text-align: center; font-size: 9.5px; color: #000; margin-top: 8px; line-height: 1.5; }
+        .footer { text-align: center; font-size: 10.5px; font-weight: 600; color: #000; margin-top: 8px; line-height: 1.5; }
         .footer .telefono { font-weight: 700; }
 
         @media print {
@@ -585,20 +585,33 @@ export default function CompraModal({ onClose, onSaved }) {
   // sin tocar), se preselecciona "Café Seco" -- igual que si el usuario lo
   // hubiera elegido a mano, incluyendo el precio del día si ya está
   // disponible. Si el usuario ya eligió algo mientras tanto, no se pisa.
+  //
+  // ── FIX (ítem 30): getTiposCafe() y getPreciosHoy() son dos llamadas
+  // independientes que pueden resolver en cualquier orden. Antes, este
+  // efecto solo comprobaba `!tipo_cafe` para decidir si podía tocar la
+  // línea -- si el usuario ya había escrito un precio_kilo a mano (ej.
+  // 18800) ANTES de que /precios-hoy/ terminara de responder, y
+  // `tipo_cafe` seguía vacío en ese momento (porque el usuario no había
+  // tocado ese dropdown todavía), este efecto llegaba después y le
+  // PISABA el precio recién escrito con el de /precios-hoy/ -- el total
+  // mostrado (Subtotal café / Total a pagar) se recalculaba con ese
+  // precio nuevo, sin que el campo visible cambiara de inmediato para
+  // avisarle al usuario. Ahora también exige que precio_kilo siga vacío
+  // para tocarlo -- si el usuario ya escribió algo ahí, se respeta. ──
   useEffect(() => {
     if (tiposCafe.length === 0) return
     const idCafeSeco = buscarIdCafeSeco(tiposCafe)
     if (!idCafeSeco) return
     const precioHoy = preciosHoy.find(p => String(p.tipo_cafe) === idCafeSeco)
-    setDetalles(prev =>
-      prev.length === 1 && !prev[0].tipo_cafe
-        ? [{
-            ...prev[0],
-            tipo_cafe: idCafeSeco,
-            precio_kilo: precioHoy ? precioHoy.precio : prev[0].precio_kilo,
-          }]
-        : prev
-    )
+    setDetalles(prev => {
+      if (prev.length !== 1 || prev[0].tipo_cafe) return prev
+      const linea = prev[0]
+      return [{
+        ...linea,
+        tipo_cafe: idCafeSeco,
+        precio_kilo: (!linea.precio_kilo && precioHoy) ? precioHoy.precio : linea.precio_kilo,
+      }]
+    })
   }, [tiposCafe, preciosHoy])
 
   useEffect(() => {

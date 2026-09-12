@@ -186,17 +186,17 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
 
           /* ── Ítem 23: encabezado con logo + Cafe San + Jimmi Martinez + NIT ── */
           .header { text-align: center; margin-bottom: 7px; }
-          .header .logo { width: 62px; height: auto; display: block; margin: 0 auto 4px; }
+          .header .logo { width: 90px; height: auto; display: block; margin: 0 auto 4px; }
           .header h1 { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
           .header .propietario { font-size: 11px; font-weight: 700; margin-top: 2px; }
-          .header .nit { font-size: 10px; margin-top: 2px; }
+          .header .nit { font-size: 11px; font-weight: 600; margin-top: 2px; }
 
           .sep { border: none; border-top: 1px dashed #000; margin: 6px 0; }
           .sep-double { border: none; border-top: 2px solid #000; margin: 6px 0; }
 
           .compra-info { text-align: center; margin-bottom: 5px; }
           .compra-info .num { font-size: 14px; font-weight: 700; }
-          .compra-info .fecha { font-size: 10px; margin-top: 1px; }
+          .compra-info .fecha { font-size: 11px; font-weight: 600; margin-top: 1px; }
 
           .caficultor { margin-bottom: 5px; }
           .caficultor label { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
@@ -206,22 +206,22 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
 
           .linea { margin-bottom: 7px; }
           .linea-tipo { font-size: 12px; font-weight: 700; }
-          .linea-sub { font-size: 10.5px; }
-          .linea-precio { display: flex; justify-content: space-between; font-size: 11px; margin-top: 1px; }
+          .linea-sub { font-size: 11.5px; font-weight: 600; }
+          .linea-precio { display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 600; margin-top: 1px; }
           .linea-subtotal { font-weight: 700; }
           .linea-deposito { font-size: 10px; font-weight: 700; margin-top: 1px; }
 
           .totales-desglose { margin: 5px 0 2px; }
           .fila-total { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 2px; }
           .fila-abono { font-weight: 600; }
-          .letra-detalle { font-size: 9.5px; margin-bottom: 3px; line-height: 1.4; }
+          .letra-detalle { font-size: 10.5px; font-weight: 600; margin-bottom: 3px; line-height: 1.4; }
 
           .total-box { text-align: center; margin: 6px 0 4px; }
           .total-box span { font-size: 10px; display: block; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
           .total-box strong { font-size: 20px; font-weight: 700; display: block; margin-top: 2px; }
 
-          .nota { font-size: 10px; margin-bottom: 5px; word-wrap: break-word; }
-          .footer { text-align: center; font-size: 9.5px; margin-top: 8px; line-height: 1.5; }
+          .nota { font-size: 11px; font-weight: 600; margin-bottom: 5px; word-wrap: break-word; }
+          .footer { text-align: center; font-size: 10.5px; font-weight: 600; margin-top: 8px; line-height: 1.5; }
           .footer .telefono { font-weight: 700; }
 
           @media print { html, body { width: 80mm; } }
