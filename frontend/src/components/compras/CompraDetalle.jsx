@@ -233,7 +233,7 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
             <img class="logo" src="${LOGO_TICKET_BASE64}" alt="Cafe San" />
             <h1>Cafe San</h1>
             <p class="propietario">Jimmi Martinez</p>
-            <p class="nit">NIT. 901659573-8</p>
+            <p class="nit">NIT. 901659573-6</p>
           </div>
           <div class="sep"></div>
           <div class="compra-info">
@@ -254,7 +254,7 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
           <div class="sep"></div>
           <div class="footer">
             Cafe San Joaquin SAS<br>
-            Tel: <span class="telefono">3126164059</span><br>
+            Tel: <span class="telefono">3114343274</span><br>
             Reimpreso el ${new Date().toLocaleDateString('es-CO')}
           </div>
         </div>
