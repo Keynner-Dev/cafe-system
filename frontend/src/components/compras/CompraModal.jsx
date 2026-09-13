@@ -118,7 +118,18 @@ function limpiarNumeroWhatsApp(numero) {
 function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, letraInfo, onClose, onNuevaCompra }) {
 
   const hayAbono = Number(valorAbono) > 0
-  const totalFinal = hayAbono ? Math.max(subtotalCafe - Number(valorAbono), 0) : subtotalCafe
+
+  // ── NUEVO: parte de esta compra que quedó como vale (no se pagó en
+  // efectivo). En este momento (recién creada) solo puede venir de
+  // detalles normales marcados es_vale -- todavía no puede haber
+  // liquidaciones de depósito, porque esas se registran después. ──
+  const subtotalVale = compra.detalles.reduce((acc, d) => {
+    if (d.es_vale) return acc + Number(d.kilos) * Number(d.precio_kilo)
+    return acc
+  }, 0)
+  const hayVale = subtotalVale > 0
+
+  const totalFinal = Math.max(subtotalCafe - subtotalVale - (hayAbono ? Number(valorAbono) : 0), 0)
 
   // ── NUEVO: contexto de la letra abonada — saldo restante después
   // de este abono, y su fecha/id para que quede claro a qué deuda
@@ -138,10 +149,11 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
         return `• ${d.tipo_cafe_nombre}\n  ${d.kilos} kg — _Depósito (liquidar después)_`
         }
         const subtotal = Number(d.kilos) * Number(d.precio_kilo)
+        const notaVale = d.es_vale ? '\n  _Vale — queda a deber_' : ''
         return (
         `• ${d.tipo_cafe_nombre}\n` +
         `  ${Number(d.kilos).toLocaleString('es-CO')} kg × ${formatCOP(d.precio_kilo)}/kg\n` +
-        `  Subtotal: *${formatCOP(subtotal)}*`
+        `  Subtotal: *${formatCOP(subtotal)}*${notaVale}`
         )
     }).join('\n\n')
 
@@ -160,12 +172,17 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
     msg += `${lineasDetalle}\n\n`
     msg += `${marco}\n`
 
-    // ── Desglose si hubo abono a letra ──
-    if (hayAbono) {
+    // ── Desglose si hubo abono a letra y/o vale ──
+    if (hayAbono || hayVale) {
       msg += `Subtotal café: *${formatCOP(subtotalCafe)}*\n`
-      msg += `Abono a letra${letraInfo ? ` #${letraInfo.id}` : ''}${fechaLetraFmt ? ` (creada ${fechaLetraFmt})` : ''}: *-${formatCOP(valorAbono)}*\n`
-      if (letraInfo) {
-        msg += `_Saldo restante de la letra: ${formatCOP(saldoRestanteLetra)}_\n`
+      if (hayVale) {
+        msg += `Vale (queda a deber): *-${formatCOP(subtotalVale)}*\n`
+      }
+      if (hayAbono) {
+        msg += `Abono a letra${letraInfo ? ` #${letraInfo.id}` : ''}${fechaLetraFmt ? ` (creada ${fechaLetraFmt})` : ''}: *-${formatCOP(valorAbono)}*\n`
+        if (letraInfo) {
+          msg += `_Saldo restante de la letra: ${formatCOP(saldoRestanteLetra)}_\n`
+        }
       }
       msg += `*TOTAL PAGADO: ${formatCOP(totalFinal)}*\n`
     } else {
@@ -216,14 +233,18 @@ function PantallaExito({ compra, telefonoWhatsapp, subtotalCafe, valorAbono, let
           <span>${formatCOP(d.precio_kilo)}/kg</span>
           <span class="linea-subtotal">${formatCOP(subtotal)}</span>
         </div>
+        ${d.es_vale ? '<div class="linea-deposito">VALE — queda a deber</div>' : ''}
       </div>`
   }).join('')
 
-  const totalesHTML = hayAbono ? `
+  const totalesHTML = (hayAbono || hayVale) ? `
     <div class="totales-desglose">
       <div class="fila-total"><span>Subtotal cafe</span><span>${formatCOP(subtotalCafe)}</span></div>
-      <div class="fila-total fila-abono"><span>Abono a letra${letraInfo ? ` #${letraInfo.id}` : ''}</span><span>-${formatCOP(valorAbono)}</span></div>
-      ${letraInfo ? `<div class="letra-detalle">Letra creada: ${fechaLetraFmt} | Saldo restante: ${formatCOP(saldoRestanteLetra)}</div>` : ''}
+      ${hayVale ? `<div class="fila-total fila-abono"><span>Vale (queda a deber)</span><span>-${formatCOP(subtotalVale)}</span></div>` : ''}
+      ${hayAbono ? `
+        <div class="fila-total fila-abono"><span>Abono a letra${letraInfo ? ` #${letraInfo.id}` : ''}</span><span>-${formatCOP(valorAbono)}</span></div>
+        ${letraInfo ? `<div class="letra-detalle">Letra creada: ${fechaLetraFmt} | Saldo restante: ${formatCOP(saldoRestanteLetra)}</div>` : ''}
+      ` : ''}
     </div>
     <div class="total-box">
       <span>TOTAL A PAGAR</span>

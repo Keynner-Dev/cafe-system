@@ -43,7 +43,26 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
   const abonosLetra = compra.abonos_letra || []
   const totalAbonos = abonosLetra.reduce((acc, a) => acc + Number(a.valor || 0), 0)
   const hayAbonos = totalAbonos > 0
-  const totalRealPagado = Math.max(Number(compra.total || 0) - totalAbonos, 0)
+
+  // ── NUEVO: parte de esta compra que quedó (o quedó después de
+  // liquidar un depósito) como vale -- no se pagó en efectivo. Cubre
+  // dos casos: un detalle normal marcado es_vale desde el inicio, y
+  // un detalle de depósito cuya liquidación posterior se marcó es_vale. ──
+  const subtotalVale = compra.detalles.reduce((acc, d) => {
+    if (d.es_vale) {
+      return acc + Number(d.kilos) * Number(d.precio_kilo)
+    }
+    if (d.es_deposito && d.liquidaciones) {
+      const valeDeLiquidaciones = d.liquidaciones.reduce((a2, l) => {
+        return l.es_vale ? a2 + Number(l.kilos) * Number(l.precio_kilo) : a2
+      }, 0)
+      return acc + valeDeLiquidaciones
+    }
+    return acc
+  }, 0)
+  const hayVale = subtotalVale > 0
+
+  const totalRealPagado = Math.max(Number(compra.total || 0) - totalAbonos - subtotalVale, 0)
 
   // ── Mensaje de WhatsApp (mismo formato que en CompraModal.jsx,
   // duplicado a propósito para no tocar ese archivo — ver nota en el
@@ -58,10 +77,11 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
         return `• ${d.tipo_cafe_nombre}\n  ${d.kilos} kg — _Depósito (liquidar después)_`
       }
       const subtotal = Number(d.kilos) * Number(d.precio_kilo)
+      const notaVale = d.es_vale ? '\n  _Vale — queda a deber_' : ''
       return (
         `• ${d.tipo_cafe_nombre}\n` +
         `  ${Number(d.kilos).toLocaleString('es-CO')} kg × ${formatCOP(d.precio_kilo)}/kg\n` +
-        `  Subtotal: *${formatCOP(subtotal)}*`
+        `  Subtotal: *${formatCOP(subtotal)}*${notaVale}`
       )
     }).join('\n\n')
 
@@ -80,8 +100,11 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
     msg += `${lineasDetalle}\n\n`
     msg += `${marco}\n`
 
-    if (hayAbonos) {
+    if (hayAbonos || hayVale) {
       msg += `Subtotal café: *${formatCOP(compra.total)}*\n`
+      if (hayVale) {
+        msg += `Vale (queda a deber): *-${formatCOP(subtotalVale)}*\n`
+      }
       abonosLetra.forEach(a => {
         msg += `Abono a letra #${a.letra_id}: *-${formatCOP(a.valor)}*\n`
         msg += `_Saldo restante de la letra: ${formatCOP(a.saldo_letra_restante)}_\n`
@@ -140,12 +163,14 @@ export default function CompraDetalle({ compra, onClose, onLiquidar }) {
             <span>${formatCOP(d.precio_kilo)}/kg</span>
             <span class="linea-subtotal">${formatCOP(subtotal)}</span>
           </div>
+          ${d.es_vale ? '<div class="linea-deposito">VALE — queda a deber</div>' : ''}
         </div>`
     }).join('')
 
-    const totalesHTML = hayAbonos ? `
+    const totalesHTML = (hayAbonos || hayVale) ? `
       <div class="totales-desglose">
         <div class="fila-total"><span>Subtotal cafe</span><span>${formatCOP(compra.total)}</span></div>
+        ${hayVale ? `<div class="fila-total fila-abono"><span>Vale (queda a deber)</span><span>-${formatCOP(subtotalVale)}</span></div>` : ''}
         ${abonosLetra.map(a => `
           <div class="fila-total fila-abono"><span>Abono a letra #${a.letra_id}</span><span>-${formatCOP(a.valor)}</span></div>
           <div class="letra-detalle">Saldo restante: ${formatCOP(a.saldo_letra_restante)}</div>
