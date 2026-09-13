@@ -141,19 +141,11 @@ export default function CuentasPagarPage() {
             Deudas pendientes con caficultores
           </p>
         </div>
-        <button
-          onClick={() => { setCuentaEditando(null); setModalCuenta(true); }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: '#16a34a', color: 'white', border: 'none',
-            borderRadius: 6, padding: '9px 18px', fontSize: 14,
-            fontWeight: 600, cursor: 'pointer'
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = '#15803d'}
-          onMouseLeave={e => e.currentTarget.style.background = '#16a34a'}
-        >
-          <IconPlus /> Nueva cuenta
-        </button>
+        {/* NUEVO: se quitó el botón "Nueva cuenta" -- las cuentas por
+            pagar ahora solo se crean automáticamente desde el modal de
+            compra (marcando "Es vale") o al liquidar un depósito. Se
+            conserva la edición (botón de editar más abajo, que sigue
+            usando este mismo modal vía setModalCuenta/setCuentaEditando). */}
       </div>
 
       {/* Tarjeta resumen */}

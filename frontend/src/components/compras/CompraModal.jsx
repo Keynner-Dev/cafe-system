@@ -88,7 +88,8 @@ const labelStyle = {
 const hoy = new Date().toISOString().split('T')[0]
 
 const crearDetalleVacio = (bodegaDefault = '', tipoCafeDefault = '') => ({
-  tipo_cafe: tipoCafeDefault, bodega: bodegaDefault, kilos: '', precio_kilo: '', es_deposito: false
+  tipo_cafe: tipoCafeDefault, bodega: bodegaDefault, kilos: '', precio_kilo: '',
+  es_deposito: false, es_vale: false
 })
 
 // NUEVO [Sprint 6, ítem 40]: "Café Seco" por defecto en cada línea nueva de
@@ -683,7 +684,11 @@ export default function CompraModal({ onClose, onSaved }) {
       const precioHoy = preciosHoy.find(p => String(p.tipo_cafe) === String(value))
       if (precioHoy) nuevos[index].precio_kilo = precioHoy.precio
     }
-    if (name === 'es_deposito' && checked) nuevos[index].precio_kilo = ''
+    if (name === 'es_deposito' && checked) {
+      nuevos[index].precio_kilo = ''
+      nuevos[index].es_vale = false
+    }
+    if (name === 'es_vale' && checked) nuevos[index].es_deposito = false
     setDetalles(nuevos)
   }
 
@@ -702,8 +707,15 @@ export default function CompraModal({ onClose, onSaved }) {
     return acc + (Number(d.kilos) * Number(d.precio_kilo) || 0)
   }, 0)
 
+  // NUEVO: parte del subtotal que queda como vale (no se paga hoy en
+  // efectivo, queda como cuenta por pagar).
+  const subtotalVale = detalles.reduce((acc, d) => {
+    if (d.es_deposito || !d.es_vale) return acc
+    return acc + (Number(d.kilos) * Number(d.precio_kilo) || 0)
+  }, 0)
+
   const valorAbonoNum = letraElegida ? (Number(valorAbono) || 0) : 0
-  const totalAPagar = Math.max(subtotalCafe - valorAbonoNum, 0)
+  const totalAPagar = Math.max(subtotalCafe - subtotalVale - valorAbonoNum, 0)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -731,8 +743,8 @@ export default function CompraModal({ onClose, onSaved }) {
         return
       }
   
-      if (Number(valorAbono) > subtotalCafe) {
-        setError(`El abono no puede superar el valor de la compra (${formatCOP(subtotalCafe)}).`)
+      if (Number(valorAbono) > subtotalCafe - subtotalVale) {
+        setError(`El abono no puede superar el valor que se paga en efectivo (${formatCOP(subtotalCafe - subtotalVale)}).`)
         return
       }
     }
@@ -1078,10 +1090,46 @@ export default function CompraModal({ onClose, onSaved }) {
                             </span>
                           </label>
 
+                          {/* NUEVO: toggle "Es vale" -- solo aplica cuando el
+                              precio ya está definido (no es depósito). Marca
+                              este detalle para que quede como cuenta por pagar
+                              en vez de descontarse de caja. */}
+                          {!detalle.es_deposito && (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                              <div style={{ position: 'relative', width: '36px', height: '20px' }}>
+                                <input type="checkbox" name="es_vale" checked={detalle.es_vale}
+                                  onChange={e => handleDetalleChange(index, e)}
+                                  style={{ opacity: 0, width: 0, height: 0 }}
+                                />
+                                <span style={{
+                                  position: 'absolute', inset: 0, borderRadius: '99px',
+                                  background: detalle.es_vale ? '#dc2626' : '#e2e8f0',
+                                  transition: 'background 0.2s', cursor: 'pointer',
+                                }}>
+                                  <span style={{
+                                    position: 'absolute', width: '14px', height: '14px',
+                                    borderRadius: '50%', background: 'white', top: '3px',
+                                    left: detalle.es_vale ? '19px' : '3px',
+                                    transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                                  }} />
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '12px', color: '#475569' }}>
+                                Es vale
+                                <span style={{ color: '#94a3b8', marginLeft: '4px' }}>(no se lleva el dinero)</span>
+                              </span>
+                            </label>
+                          )}
+
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            {!detalle.es_deposito && detalle.kilos && detalle.precio_kilo && (
+                            {!detalle.es_deposito && !detalle.es_vale && detalle.kilos && detalle.precio_kilo && (
                               <span style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a' }}>
                                 ${(Number(detalle.kilos) * Number(detalle.precio_kilo)).toLocaleString('es-CO')}
+                              </span>
+                            )}
+                            {!detalle.es_deposito && detalle.es_vale && detalle.kilos && detalle.precio_kilo && (
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#dc2626' }}>
+                                ${(Number(detalle.kilos) * Number(detalle.precio_kilo)).toLocaleString('es-CO')} — queda como vale
                               </span>
                             )}
                             {detalle.es_deposito && detalle.kilos && (
@@ -1124,6 +1172,17 @@ export default function CompraModal({ onClose, onSaved }) {
                       {formatCOP(subtotalCafe)}
                     </span>
                   </div>
+
+                  {subtotalVale > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '12px', color: '#dc2626' }}>
+                        − Vale (queda a deber):
+                      </span>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#dc2626' }}>
+                        {formatCOP(subtotalVale)}
+                      </span>
+                    </div>
+                  )}
 
                   {letraElegida && valorAbonoNum > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

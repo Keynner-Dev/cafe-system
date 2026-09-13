@@ -30,12 +30,14 @@ export default function LiquidacionModal({ detalle, onClose, onSaved }) {
     precio_kilo: '',
     fecha: hoy,
     nota: '',
+    es_vale: false,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState(null)
 
   const handleChange = (e) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+    const { name, value, type, checked } = e.target
+    setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
   }
 
   const handleSubmit = async (e) => {
@@ -208,17 +210,46 @@ export default function LiquidacionModal({ detalle, onClose, onSaved }) {
               />
             </div>
 
+            {/* NUEVO: toggle "Es vale" -- si el caficultor no se lleva el
+                dinero de esta liquidación, queda como cuenta por pagar en
+                vez de descontarse de caja. */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <div style={{ position: 'relative', width: '36px', height: '20px' }}>
+                <input type="checkbox" name="es_vale" checked={form.es_vale}
+                  onChange={handleChange}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span style={{
+                  position: 'absolute', inset: 0, borderRadius: '99px',
+                  background: form.es_vale ? '#dc2626' : '#e2e8f0',
+                  transition: 'background 0.2s', cursor: 'pointer',
+                }}>
+                  <span style={{
+                    position: 'absolute', width: '14px', height: '14px',
+                    borderRadius: '50%', background: 'white', top: '3px',
+                    left: form.es_vale ? '19px' : '3px',
+                    transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  }} />
+                </span>
+              </div>
+              <span style={{ fontSize: '12px', color: '#475569' }}>
+                Es vale
+                <span style={{ color: '#94a3b8', marginLeft: '4px' }}>(no se lleva el dinero)</span>
+              </span>
+            </label>
+
             {/* Total preview */}
             {subtotal > 0 && (
               <div style={{
-                background: '#fffbeb', border: '1px solid #fde68a',
+                background: form.es_vale ? '#fef2f2' : '#fffbeb',
+                border: form.es_vale ? '1px solid #fecaca' : '1px solid #fde68a',
                 borderRadius: '8px', padding: '12px 14px',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
                 <span style={{ fontSize: '13px', fontWeight: 500, color: '#475569' }}>
-                  Total a pagar:
+                  {form.es_vale ? 'Queda como vale:' : 'Total a pagar:'}
                 </span>
-                <span style={{ fontSize: '18px', fontWeight: 700, color: '#ca8a04' }}>
+                <span style={{ fontSize: '18px', fontWeight: 700, color: form.es_vale ? '#dc2626' : '#ca8a04' }}>
                   ${subtotal.toLocaleString('es-CO')}
                 </span>
               </div>

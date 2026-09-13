@@ -77,6 +77,13 @@ class DetalleCompra(models.Model):
     es_deposito = models.BooleanField(default=False)
     liquidado = models.BooleanField(default=False)
 
+    # ── NUEVO (vale/CxP desde la compra): si es True, el caficultor no
+    # se lleva el dinero en el momento -- queda como cuenta por pagar
+    # en vez de descontarse de caja. Solo aplica cuando es_deposito es
+    # False (el precio ya tiene que estar definido para poder ser vale;
+    # un depósito todavía no tiene precio). ──
+    es_vale = models.BooleanField(default=False)
+
     @property
     def kilos_liquidados(self):
         return sum(
@@ -111,6 +118,11 @@ class LiquidacionDeposito(models.Model):
     precio_kilo = models.DecimalField(max_digits=10, decimal_places=2)
     fecha = models.DateField()
     nota = models.TextField(blank=True, null=True)
+
+    # ── NUEVO (vale/CxP desde la liquidación): igual que en
+    # DetalleCompra.es_vale, pero para cuando el depósito se liquida
+    # más adelante y el caficultor tampoco se lleva el dinero ahí. ──
+    es_vale = models.BooleanField(default=False)
 
     # Usuario que registró la liquidación
     creado_por = models.ForeignKey(

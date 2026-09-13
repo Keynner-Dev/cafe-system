@@ -100,27 +100,6 @@ class AbonoCuentaPorPagar(models.Model):
         verbose_name_plural = 'Abonos'
         ordering = ['-fecha', '-creado_en']
         
-@receiver(post_save, sender=CuentaPorPagar)
-def ingreso_caja_vale_creado(sender, instance, created, **kwargs):
-    """Al crear un vale, devuelve el dinero a la caja (la compra ya lo descontó)."""
-    if not created:
-        return
-
-    from caja.models import Caja, MovimientoCaja
-
-    try:
-        caja = Caja.objects.get(bodega=instance.bodega)
-    except Caja.DoesNotExist:
-        return
-
-    MovimientoCaja.objects.create(
-        caja=caja,
-        tipo='ingreso',
-        valor=instance.valor_total,
-        descripcion=f'Vale — {instance.caficultor.nombre}: {instance.descripcion}',
-        creado_por=instance.creado_por,
-    )
-
 
 @receiver(post_save, sender=AbonoCuentaPorPagar)
 def egreso_caja_abono_vale(sender, instance, created, **kwargs):

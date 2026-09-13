@@ -65,6 +65,17 @@ def _anular_compra(compra):
             'una letra de cambio. Anularla dejaría ese abono sin respaldo.'
         )
 
+    # ── Bloqueo 2b (NUEVO): vale/CxP generado desde esta compra ──
+    # Si algún detalle (o liquidación) de esta compra se marcó como
+    # vale, ya existe una CuentaPorPagar real con ese dinero pendiente.
+    # Anular la compra dejaría esa deuda sin respaldo. Jimmi debe
+    # resolverlo manualmente (igual que con letras y liquidaciones).
+    if compra.cuentas_por_pagar.exists():
+        raise ValidationError(
+            'No se puede anular: esta compra tiene una cuenta por pagar '
+            '(vale) asociada. Resuélvela manualmente antes de anular.'
+        )
+
     # ── Bloqueo 3: que no quede stock negativo ──
     # Si ya se vendió o trasladó parte del café que esta compra aportó,
     # anularla dejaría el stock de ese tipo de café/bodega en negativo.
@@ -298,6 +309,10 @@ def egreso_caja_compra_normal(sender, instance, created, **kwargs):
         return
     if instance.es_deposito:
         return
+    if instance.es_vale:
+        # No sale dinero de caja: queda como cuenta por pagar
+        # (ver crear_o_actualizar_cxp_detalle_vale más abajo).
+        return
     if not instance.precio_kilo:
         return
 
@@ -320,10 +335,51 @@ def egreso_caja_compra_normal(sender, instance, created, **kwargs):
     )
 
 
+# ── NUEVO: vale/CxP elegido desde el modal de compra ──
+# Reemplaza al flujo anterior de crear la cuenta por pagar a mano desde
+# el módulo de CxP. Si dos detalles de la MISMA compra se marcan como
+# vale (ej. dos tipos de café distintos), se consolidan en una sola
+# CuentaPorPagar por compra -- no se crea una por cada detalle.
+#
+# IMPORTANTE: a diferencia del flujo viejo, aquí nunca se generó un
+# egreso de caja para este detalle (ver receptor de arriba), así que
+# esta cuenta por pagar NO debe disparar ningún ingreso compensatorio
+# a caja. Por eso se quitó la señal post_save que existía en
+# cuentas_pagar/models.py -- ya no aplica con este flujo.
+@receiver(post_save, sender=DetalleCompra)
+def crear_o_actualizar_cxp_detalle_vale(sender, instance, created, **kwargs):
+    if not created or not instance.es_vale:
+        return
+
+    from cuentas_pagar.models import CuentaPorPagar
+
+    compra = instance.compra
+    subtotal = instance.kilos * (instance.precio_kilo or 0)
+
+    cuenta, creada = CuentaPorPagar.objects.get_or_create(
+        compra=compra,
+        defaults={
+            'caficultor': compra.caficultor,
+            'bodega': instance.bodega,
+            'descripcion': f'Vale — Compra #{compra.id} — {compra.caficultor.nombre}',
+            'valor_total': subtotal,
+            'fecha': compra.fecha,
+            'creado_por': compra.creado_por,
+        },
+    )
+    if not creada:
+        cuenta.valor_total += subtotal
+        cuenta.actualizar_estado()
+
+
 @receiver(post_save, sender=LiquidacionDeposito)
 def egreso_caja_liquidacion_deposito(sender, instance, created, **kwargs):
     """Al liquidar un depósito, descuenta de la caja de esa bodega."""
     if not created:
+        return
+    if instance.es_vale:
+        # No sale dinero de caja: queda como cuenta por pagar
+        # (ver crear_o_actualizar_cxp_liquidacion_vale más abajo).
         return
 
     from caja.models import Caja, MovimientoCaja
@@ -347,3 +403,34 @@ def egreso_caja_liquidacion_deposito(sender, instance, created, **kwargs):
                     f'{detalle.compra.caficultor.nombre}',
         creado_por=instance.creado_por,
     )
+
+
+# ── NUEVO: vale/CxP elegido al liquidar un depósito ──
+# Mismo mecanismo que crear_o_actualizar_cxp_detalle_vale, pero para
+# cuando el vale se decide en el momento de liquidar, no en la compra
+# original. Se sigue consolidando en una sola CuentaPorPagar por compra.
+@receiver(post_save, sender=LiquidacionDeposito)
+def crear_o_actualizar_cxp_liquidacion_vale(sender, instance, created, **kwargs):
+    if not created or not instance.es_vale:
+        return
+
+    from cuentas_pagar.models import CuentaPorPagar
+
+    detalle = instance.detalle_compra
+    compra = detalle.compra
+    subtotal = instance.kilos * instance.precio_kilo
+
+    cuenta, creada = CuentaPorPagar.objects.get_or_create(
+        compra=compra,
+        defaults={
+            'caficultor': compra.caficultor,
+            'bodega': detalle.bodega,
+            'descripcion': f'Vale — Compra #{compra.id} — {compra.caficultor.nombre}',
+            'valor_total': subtotal,
+            'fecha': instance.fecha,
+            'creado_por': instance.creado_por,
+        },
+    )
+    if not creada:
+        cuenta.valor_total += subtotal
+        cuenta.actualizar_estado()
