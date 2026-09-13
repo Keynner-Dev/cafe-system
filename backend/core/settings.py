@@ -1,6 +1,7 @@
 from pathlib import Path
 from dotenv import load_dotenv
 import os
+import dj_database_url  # ← NUEVO: para leer DATABASE_URL como una sola cadena
 
 load_dotenv()
 
@@ -78,18 +79,21 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
+# ─── Base de datos ────────────────────────────────────────────────────────
+# ANTES: 5 variables sueltas (DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT).
+# AHORA: una sola variable DATABASE_URL con la cadena de conexión completa,
+# tal como la entrega Neon. dj_database_url la interpreta automáticamente,
+# incluyendo el ?sslmode=require si viene en la cadena.
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+if not DATABASE_URL:
+    raise Exception(
+        'DATABASE_URL no está configurada. '
+        'Defínela en el .env (local) o en las variables de entorno (Railway).'
+    )
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT', '5432'),
-        'OPTIONS': {
-            'sslmode': 'require',
-        },
-    }
+    'default': dj_database_url.parse(DATABASE_URL)
 }
 
 AUTH_USER_MODEL = 'usuarios.Usuario'
@@ -147,7 +151,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'portal_caficultor': '5/min',
     },
-  
+
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
 
