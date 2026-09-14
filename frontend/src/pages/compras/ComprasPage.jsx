@@ -615,7 +615,7 @@ export default function ComprasPage() {
                     )}
 
                     <td style={{ padding: '11px 16px' }}>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' }}>
                         <button
                           onClick={() => handleVerDetalle(c)}
                           style={{
