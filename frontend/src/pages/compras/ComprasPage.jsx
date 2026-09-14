@@ -778,11 +778,15 @@ export default function ComprasPage() {
       {abonoOpen && cuentaSeleccionada && (
         <AbonoModal
           cuenta={cuentaSeleccionada}
-          onClose={() => {
+          onCerrar={() => {
             setAbonoOpen(false)
             setCuentaSeleccionada(null)
           }}
-          onSaved={cargarCompras}
+          onGuardado={() => {
+            setAbonoOpen(false)
+            setCuentaSeleccionada(null)
+            cargarCompras()
+          }}
         />
       )}
 

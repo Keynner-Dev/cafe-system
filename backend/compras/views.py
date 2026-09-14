@@ -4,10 +4,11 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Sum, F, Case, When, DecimalField, Value, OuterRef, Subquery
+from django.db.models import Sum, F, Case, When, DecimalField, Value, OuterRef, Subquery, Prefetch
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Compra, DetalleCompra, LiquidacionDeposito, SolicitudEliminacionCompra
+from letras_cambio.models import AbonoLetra
 from .serializers import (
     CompraSerializer, LiquidacionDepositoSerializer,
     SolicitudEliminacionCompraSerializer,  # ← NUEVO (ítem 24)
@@ -142,7 +143,23 @@ class CompraViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         usuario = self.request.user
-        qs = Compra.objects.prefetch_related('cuentas_por_pagar', 'detalles').all()
+        qs = Compra.objects.select_related('caficultor', 'creado_por').prefetch_related(
+            'cuentas_por_pagar',
+            Prefetch(
+                'detalles',
+                queryset=DetalleCompra.objects.select_related('tipo_cafe', 'bodega')
+                    .prefetch_related('liquidaciones'),
+            ),
+            Prefetch(
+                'abonos_letra',
+                queryset=AbonoLetra.objects.select_related('letra'),
+            ),
+            Prefetch(
+                'solicitudes_eliminacion',
+                queryset=SolicitudEliminacionCompra.objects.filter(estado='pendiente'),
+                to_attr='solicitudes_eliminacion_pendientes',
+            ),
+        ).all()
 
         if usuario.rol == 'administrador':
             qs = qs.filter(detalles__bodega=usuario.bodega).distinct()

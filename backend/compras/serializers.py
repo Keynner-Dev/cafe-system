@@ -114,14 +114,15 @@ class CompraSerializer(serializers.ModelSerializer):
         try:
             total = sum(
                 d.kilos_pendientes_liquidar
-                for d in obj.detalles.filter(es_deposito=True, liquidado=False)
+                for d in obj.detalles.all()
+                if d.es_deposito and not d.liquidado
             )
             return float(total)
         except Exception:
             return 0.0
 
     def get_tiene_deposito_pendiente(self, obj):
-        return obj.detalles.filter(es_deposito=True, liquidado=False).exists()
+        return any(d.es_deposito and not d.liquidado for d in obj.detalles.all())
 
     def get_cuenta_por_pagar(self, obj):
         cuenta = obj.cuentas_por_pagar.first()
@@ -137,8 +138,8 @@ class CompraSerializer(serializers.ModelSerializer):
 
     # ← NUEVO: nombres únicos de bodega de todos los detalles de la compra
     def get_bodegas(self, obj):
-        nombres = obj.detalles.values_list('bodega__nombre', flat=True).distinct()
-        return list(nombres)
+        nombres = {d.bodega.nombre for d in obj.detalles.all()}
+        return sorted(nombres)
 
     # ── NUEVO (ítem 16) ──
     # Devuelve los abonos a letra registrados DESDE esta compra específica.
@@ -153,7 +154,7 @@ class CompraSerializer(serializers.ModelSerializer):
     # HOY, no el saldo histórico exacto en el momento de este abono --
     # decisión tomada a propósito por simplicidad, confirmada con el cliente.
     def get_abonos_letra(self, obj):
-        abonos = obj.abonos_letra.select_related('letra').all()
+        abonos = obj.abonos_letra.all()
         resultado = []
         for abono in abonos:
             resultado.append({
@@ -168,7 +169,16 @@ class CompraSerializer(serializers.ModelSerializer):
 
     # ── ÍTEM 24 ──
     def get_solicitud_eliminacion_pendiente(self, obj):
-        solicitud = obj.solicitudes_eliminacion.filter(estado='pendiente').first()
+        # Usa la lista ya prefetcheada (ver Prefetch con to_attr en
+        # CompraViewSet.get_queryset) en vez de .filter(), que siempre
+        # golpea la base de datos aunque 'solicitudes_eliminacion' ya
+        # esté prefetcheado -- .filter() nunca usa la caché de prefetch.
+        pendientes = getattr(obj, 'solicitudes_eliminacion_pendientes', None)
+        if pendientes is None:
+            # Fallback por si este serializer se usa fuera de una vista
+            # con el prefetch armado (ej. en tests o en el create()).
+            pendientes = obj.solicitudes_eliminacion.filter(estado='pendiente')
+        solicitud = pendientes[0] if len(pendientes) else None
         if not solicitud:
             return None
         return {
