@@ -43,6 +43,36 @@ class CompraFilter(django_filters.FilterSet):
     bodega = django_filters.NumberFilter(field_name='detalles__bodega_id')
     tipo_cafe = django_filters.NumberFilter(field_name='detalles__tipo_cafe_id')
 
+    # ── NUEVO: filtro por estado de pago de la compra.
+    # 'deposito'   -> tiene al menos un detalle en depósito sin liquidar
+    # 'con_deuda'  -> tiene una cuenta por pagar (vale) con saldo pendiente
+    # 'pagado'     -> no tiene depósito pendiente NI deuda pendiente
+    estado_pago = django_filters.ChoiceFilter(
+        choices=[
+            ('deposito', 'En depósito'),
+            ('con_deuda', 'Con deuda (vale)'),
+            ('pagado', 'Pagado completo'),
+        ],
+        method='filtrar_estado_pago',
+    )
+
+    def filtrar_estado_pago(self, queryset, name, value):
+        if value == 'deposito':
+            return queryset.filter(
+                detalles__es_deposito=True, detalles__liquidado=False
+            ).distinct()
+        if value == 'con_deuda':
+            return queryset.filter(
+                cuentas_por_pagar__estado__in=['pendiente', 'parcial']
+            ).distinct()
+        if value == 'pagado':
+            return queryset.exclude(
+                detalles__es_deposito=True, detalles__liquidado=False
+            ).exclude(
+                cuentas_por_pagar__estado__in=['pendiente', 'parcial']
+            ).distinct()
+        return queryset
+
     class Meta:
         model = Compra
-        fields = ['caficultor', 'buscar', 'fecha_desde', 'fecha_hasta', 'bodega', 'tipo_cafe']
+        fields = ['caficultor', 'buscar', 'fecha_desde', 'fecha_hasta', 'bodega', 'tipo_cafe', 'estado_pago']

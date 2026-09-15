@@ -174,8 +174,10 @@ export default function ComprasPage() {
   // ── Búsqueda y ordenamiento ──
   const [busqueda, setBusqueda]               = useState('')
   const [busquedaDebounced, setBusquedaDebounced] = useState('')  // ← NUEVO
-  const [ordenCampo, setOrdenCampo]           = useState('id')
-  const [ordenDir, setOrdenDir]               = useState('desc')
+  // ── NUEVO: filtro por estado de pago (pagado / depósito / con deuda) --
+  // reemplaza el selector de "Ordenar por", que se quitó a pedido: la
+  // lista siempre va de la compra más reciente a la más antigua.
+  const [filtroEstadoPago, setFiltroEstadoPago] = useState('')
 
   // ── NUEVO (ítem 17): filtros combinables de bodega y tipo de café ──
   const [bodegas, setBodegas]           = useState([])
@@ -232,17 +234,13 @@ export default function ComprasPage() {
   // lista completa, porque ahora el backend solo entrega 10 a la vez ──
   const cargarCompras = () => {
     setLoading(true)
-    const params = {
-      page: pagina,
-      ordering: ordenDir === 'desc'
-        ? `-${CAMPO_ORDEN_BACKEND[ordenCampo]}`
-        : CAMPO_ORDEN_BACKEND[ordenCampo],
-    }
+    const params = { page: pagina }
     if (busquedaDebounced.trim()) params.buscar = busquedaDebounced.trim()
     if (filtroBodega) params.bodega = filtroBodega
     if (filtroTipoCafe) params.tipo_cafe = filtroTipoCafe
     if (filtroFechaDesde) params.fecha_desde = filtroFechaDesde
     if (filtroFechaHasta) params.fecha_hasta = filtroFechaHasta
+    if (filtroEstadoPago) params.estado_pago = filtroEstadoPago
 
     getCompras(params)
       .then(res => {
@@ -260,7 +258,7 @@ export default function ComprasPage() {
 
   useEffect(() => {
     cargarCompras()
-  }, [pagina, busquedaDebounced, ordenCampo, ordenDir, filtroBodega, filtroTipoCafe, filtroFechaDesde, filtroFechaHasta])
+  }, [pagina, busquedaDebounced, filtroBodega, filtroTipoCafe, filtroFechaDesde, filtroFechaHasta, filtroEstadoPago])
 
   const handleVerDetalle = (compra) => {
     setCompraSeleccionada(compra)
@@ -466,44 +464,28 @@ export default function ComprasPage() {
           />
         </div>
 
-        {/* Ordenamiento */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>Ordenar por</span>
-          <select
-            value={ordenCampo}
-            onChange={e => { setOrdenCampo(e.target.value); setPagina(1) }}
-            style={{
-              border: '1px solid #e2e8f0', borderRadius: '6px',
-              padding: '6px 10px', fontSize: '12px', color: '#0f172a',
-              background: 'white', outline: 'none', cursor: 'pointer',
-            }}
-            onFocus={e => e.target.style.borderColor = '#16a34a'}
-            onBlur={e => e.target.style.borderColor = '#e2e8f0'}
-          >
-            <option value="id">ID</option>
-            <option value="fecha">Fecha</option>
-            <option value="caficultor">Caficultor</option>
-            <option value="total">Total</option>
-          </select>
-          <button
-            onClick={() => { setOrdenDir(d => d === 'asc' ? 'desc' : 'asc'); setPagina(1) }}
-            title={ordenDir === 'asc' ? 'Ascendente' : 'Descendente'}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: '32px', height: '32px', borderRadius: '6px',
-              border: '1px solid #e2e8f0', background: 'white',
-              color: '#475569', cursor: 'pointer',
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
-            onMouseLeave={e => e.currentTarget.style.background = 'white'}
-          >
-            {ordenDir === 'asc' ? <IconSortAsc /> : <IconSortDesc />}
-          </button>
-        </div>
+        {/* NUEVO: filtro por estado de pago -- reemplaza el selector de
+            "Ordenar por" que se quitó. */}
+        <select
+          value={filtroEstadoPago}
+          onChange={e => { setFiltroEstadoPago(e.target.value); setPagina(1) }}
+          style={{
+            border: '1px solid #e2e8f0', borderRadius: '6px',
+            padding: '6px 10px', fontSize: '12px', color: '#0f172a',
+            background: 'white', outline: 'none', cursor: 'pointer',
+          }}
+          onFocus={e => e.target.style.borderColor = '#16a34a'}
+          onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+        >
+          <option value="">Todos los estados</option>
+          <option value="deposito">En depósito</option>
+          <option value="con_deuda">Con deuda (vale)</option>
+          <option value="pagado">Pagado completo</option>
+        </select>
 
         {/* ── NUEVO (ítem 17): limpiar filtros, mismo patrón visual que
              ya usa GastosPage.jsx ── */}
-        {(busqueda || filtroBodega || filtroTipoCafe || filtroFechaDesde || filtroFechaHasta) && (
+        {(busqueda || filtroBodega || filtroTipoCafe || filtroFechaDesde || filtroFechaHasta || filtroEstadoPago) && (
           <button
             onClick={() => {
               setBusqueda('')
@@ -511,6 +493,7 @@ export default function ComprasPage() {
               setFiltroTipoCafe('')
               setFiltroFechaDesde('')
               setFiltroFechaHasta('')
+              setFiltroEstadoPago('')
               setPagina(1)
             }}
             style={{
