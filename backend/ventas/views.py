@@ -2,8 +2,9 @@ from rest_framework import viewsets, filters as drf_filters
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
+from django.db.models import Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Venta
+from .models import Venta, DetalleVenta
 from .serializers import VentaSerializer
 from .filters import VentaFilter  # ← NUEVO (ítem 17)
 from inventario.models import MovimientoInventario
@@ -34,7 +35,14 @@ class VentaViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         usuario = self.request.user
-        qs = Venta.objects.all().prefetch_related('detalles')
+        qs = Venta.objects.select_related(
+            'empresa', 'flete_caja__bodega', 'creado_por'
+        ).prefetch_related(
+            Prefetch(
+                'detalles',
+                queryset=DetalleVenta.objects.select_related('tipo_cafe', 'bodega'),
+            )
+        )
 
         # Administrador solo ve remisiones que involucran su bodega
         if usuario.rol == 'administrador':
@@ -57,6 +65,43 @@ class VentaViewSet(viewsets.ModelViewSet):
         # get_object() ya usa get_queryset() filtrado — un admin no puede
         # eliminar remisiones de otra bodega (le devuelve 404, no 403)
         venta = self.get_object()
+
+        # ── FIX: reversa correcta de inventario/WAC y de caja ──
+        # Antes, esto solo hacía MovimientoInventario.filter(...).delete()
+        # + venta.delete(). Como MovimientoInventario no tiene ninguna
+        # señal post_delete, el WAC (CostoInventario) se quedaba con los
+        # kilos y el valor restados PARA SIEMPRE, aunque la venta que los
+        # descontó ya no existiera. Y el egreso de caja por el flete
+        # (creado por señal, sin FK a Venta) tampoco se revertía nunca.
+        # Mismo patrón de bug que ya se corrigió para Compras en la v26
+        # -- aquí se replica la misma solución: movimientos compensatorios
+        # que sí disparan las señales correctas, en vez de borrar/ignorar.
+        from inventario.models import CostoInventario
+        from caja.models import MovimientoCaja
+
+        for detalle in venta.detalles.all():
+            MovimientoInventario.objects.create(
+                tipo='entrada',
+                tipo_cafe=detalle.tipo_cafe,
+                bodega=detalle.bodega,
+                kilos=detalle.kilos,
+                precio_kilo=detalle.costo_promedio,
+                referencia=f'anulacion-venta-{venta.id}',
+                nota=f'Reverso por eliminación de la remisión {venta.numero_remision}',
+            )
+
+        if venta.flete_caja and venta.flete_descontado:
+            egresos_flete = MovimientoCaja.objects.filter(
+                descripcion__startswith=f'Flete remisión {venta.numero_remision} —'
+            )
+            for egreso in egresos_flete:
+                MovimientoCaja.objects.create(
+                    caja=egreso.caja,
+                    tipo='ingreso',
+                    valor=egreso.valor,
+                    descripcion=f'Reverso por eliminación de la remisión {venta.numero_remision}',
+                    creado_por=venta.creado_por,
+                )
 
         MovimientoInventario.objects.filter(
             referencia=f'venta-{venta.id}'
